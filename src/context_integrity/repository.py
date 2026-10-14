@@ -113,20 +113,50 @@ def parse_status(data: bytes) -> dict[str, GitFileStatus]:
 
 def discover_repository(path: Path | str) -> RepositoryContext:
     try:
-        root = Path(path).expanduser().resolve(strict=True)
-        if not root.is_dir():
+        requested_root = Path(path).expanduser().resolve(strict=True)
+        if not requested_root.is_dir():
             raise RepositoryError("Scan path must be an existing directory.")
     except (OSError, RuntimeError) as exc:
         raise RepositoryError("Scan path cannot be opened.") from exc
+    root = requested_root
     warnings: list[ScanWarning] = []
     is_git = False
     if shutil.which("git"):
         try:
-            result = git_command(root, "rev-parse", "--show-toplevel")
-            if result.returncode == 0:
-                root = Path(os.fsdecode(result.stdout.removesuffix(b"\n"))).resolve()
+            top_result = git_command(requested_root, "rev-parse", "--show-toplevel")
+            if top_result.returncode == 0:
+                try:
+                    git_dir_result = git_command(requested_root, "rev-parse", "--absolute-git-dir")
+                    if git_dir_result.returncode != 0:
+                        raise RepositoryError("Git repository identity could not be verified.")
+                    if not top_result.stdout.strip() or not git_dir_result.stdout.strip():
+                        raise RepositoryError("Git repository identity could not be verified.")
+                    discovered_root = Path(
+                        os.fsdecode(top_result.stdout.removesuffix(b"\n"))
+                    ).resolve(strict=True)
+                    requested_git_dir = Path(
+                        os.fsdecode(git_dir_result.stdout.removesuffix(b"\n"))
+                    ).resolve(strict=True)
+                    normalized_git_dir_result = git_command(
+                        discovered_root, "rev-parse", "--absolute-git-dir"
+                    )
+                    normalized_git_dir = (
+                        Path(
+                            os.fsdecode(normalized_git_dir_result.stdout.removesuffix(b"\n"))
+                        ).resolve(strict=True)
+                        if normalized_git_dir_result.returncode == 0
+                        else None
+                    )
+                except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
+                    raise RepositoryError("Git repository identity could not be verified.") from exc
+                if (
+                    discovered_root != requested_root
+                    and discovered_root not in requested_root.parents
+                ) or normalized_git_dir != requested_git_dir:
+                    raise RepositoryError("Git repository identity could not be verified.")
+                root = discovered_root
                 is_git = True
-            elif b"not a git repository" not in result.stderr:
+            elif b"not a git repository" not in top_result.stderr:
                 warnings.append(
                     ScanWarning(
                         "git_command_failed",

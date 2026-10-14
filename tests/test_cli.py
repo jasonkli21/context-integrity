@@ -101,6 +101,22 @@ def test_scan_dot_git(git_repo, monkeypatch):
     assert "Sources: 2" in result.stdout
 
 
+def test_scan_rejects_git_worktree_redirect(git_repo, tmp_path, git):
+    redirected = tmp_path / "redirected"
+    redirected.mkdir()
+    git(redirected, "init", "--initial-branch=main", "--object-format=sha1")
+    (redirected / "docs").mkdir()
+    (redirected / "docs/architecture.md").write_text("redirected secret content")
+    git(git_repo, "config", "core.worktree", str(redirected))
+
+    result = runner.invoke(app, ["scan", str(git_repo), "--format", "json"])
+
+    assert result.exit_code == 3
+    assert "identity could not be verified" in result.stderr
+    assert str(redirected) not in result.stdout + result.stderr
+    assert "redirected secret content" not in result.stdout + result.stderr
+
+
 @pytest.mark.parametrize(
     "path,kind,authority,rule",
     [

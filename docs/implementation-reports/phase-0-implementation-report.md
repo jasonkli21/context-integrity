@@ -1,8 +1,10 @@
 # Phase 0 implementation report
 
 **Implementation date:** 2026-10-14  
-**Status:** Implemented and verified; ready for separate independent review.  
-**Branch/commits:** None: this supplied checkout has no `.git` directory. No commits created.  
+**Status:** Implemented and verified; independent review fixes applied and verified.
+**Initial implementation checkout:** The original implementation report was prepared from a
+source copy without `.git` metadata. The subsequent review-fix pass is recorded in one commit
+on the repository branch.
 **Normative scope:** `docs/plans/phase-0-implementation-plan.md`; architecture unchanged.
 
 ## Implemented
@@ -141,14 +143,15 @@ uv run context-integrity explain docs/architecture.md
 uv run context-integrity explain docs/plans/phase-0-implementation-plan.md
 ```
 
-All succeeded. After documentation updates, the checkout has 18 context sources, no warnings,
+All succeeded. After documentation updates, the original source copy had 18 context sources, no warnings,
 no ordinary code sources, and unknown lifecycle for all sources. Instructions, architecture,
 and active plan receive operating-instruction, architecture/product, and plan authority roles.
 Each readable candidate has a SHA-256. Two stable real JSON scans were byte-identical, source
 paths were relative, and no resolved root, timestamp, or source body appeared in stable output.
-This copy has no Git metadata: real scans correctly show unavailable HEAD/dirty status.
-Synthetic Git fixtures verify clean, dirty, ignored, untracked, staged rename, nested root,
-unborn branch, and linked-worktree behavior. Real-checkout Git smoke verification is unavailable.
+At initial implementation handoff, that source copy had no Git metadata, so Git metadata was
+unavailable there. Synthetic Git fixtures verify clean, dirty, ignored, untracked, staged
+rename, nested root, unborn branch, and linked-worktree behavior. Real-checkout Git smoke
+verification was unavailable during that initial handoff.
 
 ## Deviations, limitations, and classification ambiguities
 
@@ -179,7 +182,35 @@ No authority ranking/resolution, active/superseded inference, claims, persistenc
 semantic checks, servers, or companion-engine integration were added. `unknown` remains valid.
 Plans do not prove delivery; Phase 0 classifications do not resolve authority conflicts.
 
-Independent review should compare implementation, tests, active plan, architecture, and actual
-state. After review fixes and closure, Phase 1 planning can consider explicit repository/source
-metadata for ADR templates, curated reports, and filename/directory collisions; question-specific
-authority policy must stay separate from discovery and provisional kind classification.
+The initial implementation handoff requested independent review against implementation, tests,
+the active plan, architecture, and actual state. After Phase 0 closure, Phase 1 planning can
+consider explicit repository/source metadata for ADR templates, curated reports, and
+filename/directory collisions; question-specific authority policy must stay separate from
+discovery and provisional kind classification.
+
+## Independent review fix pass (2026-10-14)
+
+The independent post-implementation review identified F-001, F-002, and F-003. All three
+findings were addressed without changing the Phase 0 architecture or adding future-phase
+behavior:
+
+| Finding | Resolution | Verification |
+| --- | --- | --- |
+| F-001 — Git root can redirect to another repository | Discovery now records the Git directory from the requested path, checks that the reported top level encloses the request, and verifies the Git directory again from the normalized root. A mismatch or unverifiable identity raises `RepositoryError` with a path-free message and maps to CLI exit 3. | `test_discovery_rejects_git_worktree_redirect`; `test_discovery_fails_closed_when_git_identity_cannot_be_read`; `test_scan_rejects_git_worktree_redirect`; existing nested-root and linked-worktree tests. |
+| F-002 — Deleted tracked files appear as sources | Candidates marked deleted by the bulk status map are omitted before reads. If a candidate or ancestor disappears after enumeration, it is omitted with `candidate_metadata_failed`; unreadable and oversized existing files retain their prior behavior. | `test_deleted_tracked_source_is_not_in_inventory`; `test_candidate_disappearing_after_enumeration_is_warned_and_omitted`; unreadable/oversized regression tests. |
+| F-003 — JSON v1 follows dataclass layout | `rendering.py` now uses explicit v1 projections for each public object and rejects unsupported manifest schema versions. | `test_schema_v1_uses_explicit_key_sets`; all three existing JSON golden tests remain byte-identical. |
+
+The review also identified that the plan's note that deleted files are “normally not discovered”
+was technically incomplete. The completed Phase 0 plan remains unchanged as historical planning
+evidence; the implementation and this report record the corrected behavior.
+
+Final verification on the review-fix state:
+
+```bash
+UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check
+```
+
+Ruff lint and format passed; **129 tests passed** on Python 3.12.13/macOS. A focused run of
+`tests/test_repository.py`, `tests/test_acquisition.py`, `tests/test_rendering.py`, and
+`tests/test_cli.py` also passed (71 tests). No public JSON bytes or architecture schema changed;
+the README now documents deleted-source behavior.

@@ -253,6 +253,15 @@ def read_source(context: RepositoryContext, path: str) -> tuple[int | None, str 
             return opened.st_size, None, False
         return count, digest.hexdigest(), False
     except OSError as exc:
+        if exc.errno in {errno.ENOENT, errno.ENOTDIR}:
+            context.warnings.append(
+                ScanWarning(
+                    "candidate_metadata_failed",
+                    path,
+                    "Candidate disappeared before it could be opened.",
+                )
+            )
+            return None, None, True
         code = (
             "symlink_skipped"
             if exc.errno == errno.ELOOP

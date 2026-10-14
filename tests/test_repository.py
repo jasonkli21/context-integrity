@@ -1,6 +1,15 @@
+import subprocess
+
+import pytest
+
 from context_integrity import repository
 from context_integrity.models import GitFileStatus
-from context_integrity.repository import discover_repository, normalize_remote, parse_status
+from context_integrity.repository import (
+    RepositoryError,
+    discover_repository,
+    normalize_remote,
+    parse_status,
+)
 
 
 def test_discovery_root_nested_and_identity(git_repo, git):
@@ -107,3 +116,29 @@ def test_git_context_environment_is_not_used(git_repo, monkeypatch, tmp_path):
     monkeypatch.setenv("GIT_DIR", str(tmp_path / "unrelated"))
     monkeypatch.setenv("GIT_WORK_TREE", str(tmp_path))
     assert discover_repository(git_repo).root == git_repo
+
+
+def test_discovery_rejects_git_worktree_redirect(git_repo, tmp_path, git):
+    redirected = tmp_path / "redirected"
+    redirected.mkdir()
+    git(redirected, "init", "--initial-branch=main", "--object-format=sha1")
+    (redirected / "docs").mkdir()
+    (redirected / "docs/architecture.md").write_text("must not be inventoried")
+    git(git_repo, "config", "core.worktree", str(redirected))
+
+    with pytest.raises(RepositoryError, match="identity could not be verified"):
+        discover_repository(git_repo)
+
+
+def test_discovery_fails_closed_when_git_identity_cannot_be_read(git_repo, monkeypatch):
+    original = repository.git_command
+
+    def timeout_on_identity(root, *args):
+        if args == ("rev-parse", "--absolute-git-dir"):
+            raise subprocess.TimeoutExpired("git", timeout=30)
+        return original(root, *args)
+
+    monkeypatch.setattr(repository, "git_command", timeout_on_identity)
+
+    with pytest.raises(RepositoryError, match="identity could not be verified"):
+        discover_repository(git_repo)

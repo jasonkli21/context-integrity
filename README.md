@@ -150,9 +150,12 @@ precede directory rules, so `docs/adr/README.md` remains a README.
 
 Git mode includes tracked and untracked nonignored context files. Non-Git mode skips
 common vendor/build directories and does not interpret `.gitignore`. Ordinary code files
-are excluded. Symlinks are skipped with warnings; files exceeding 5 MiB retain records
-with null hashes and warnings. Every readable source within the limit has a raw-byte hash,
-which identifies observed working-tree bytes independently of HEAD.
+are excluded. Tracked files deleted from the working tree remain part of the repository's
+dirty status but are omitted from the current source inventory. A candidate that disappears
+during a scan is omitted with a structured warning. Symlinks are skipped with warnings;
+files exceeding 5 MiB retain records with null hashes and warnings. Every readable source
+within the limit has a raw-byte hash, which identifies observed working-tree bytes
+independently of HEAD.
 
 Stable JSON uses schema version 1, sorted repository-relative paths, and no source bodies,
 absolute root, or timestamp. `--include-runtime-meta` adds the resolved root, UTC observation

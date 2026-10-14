@@ -1,28 +1,100 @@
 """Pure human and stable JSON renderers."""
 
 import json
-from dataclasses import asdict
 
-from context_integrity.models import InventoryManifest, SourceRecord
+from context_integrity.models import (
+    ClassificationResult,
+    InventoryManifest,
+    InventorySummary,
+    RepositoryRef,
+    RuleMatch,
+    ScanWarning,
+    SourceRecord,
+    SourceRevision,
+)
+
+
+def _repository_v1(repository: RepositoryRef) -> dict:
+    return {
+        "id": repository.id,
+        "name": repository.name,
+        "identity_basis": repository.identity_basis,
+        "git": {
+            "available": repository.git_available,
+            "head": repository.git_head,
+            "dirty": repository.git_dirty,
+        },
+    }
+
+
+def _revision_v1(revision: SourceRevision) -> dict:
+    return {
+        "content_sha256": revision.content_sha256,
+        "git_head": revision.git_head,
+        "git_status": revision.git_status.value,
+        "observed_revision_basis": revision.observed_revision_basis,
+    }
+
+
+def _rule_match_v1(match: RuleMatch) -> dict:
+    return {
+        "rule_id": match.rule_id,
+        "dimension": match.dimension,
+        "result": match.result,
+        "confidence": match.confidence.value,
+        "basis": match.basis,
+    }
+
+
+def _classification_v1(classification: ClassificationResult) -> dict:
+    return {
+        "kind": classification.kind.value,
+        "authority_class": classification.authority_class.value,
+        "lifecycle": classification.lifecycle.value,
+        "confidence": classification.confidence.value,
+        "matched_rules": list(classification.matched_rules),
+        "basis": [_rule_match_v1(match) for match in classification.basis],
+    }
+
+
+def _source_v1(source: SourceRecord) -> dict:
+    return {
+        "id": source.id,
+        "path": source.path,
+        "kind": source.kind.value,
+        "authority_class": source.authority_class.value,
+        "lifecycle": source.lifecycle.value,
+        "revision": _revision_v1(source.revision),
+        "classification": _classification_v1(source.classification),
+        "size_bytes": source.size_bytes,
+    }
+
+
+def _summary_v1(summary: InventorySummary) -> dict:
+    return {
+        "source_count": summary.source_count,
+        "by_kind": summary.by_kind,
+        "by_authority_class": summary.by_authority_class,
+        "by_lifecycle": summary.by_lifecycle,
+        "warning_count": summary.warning_count,
+        "unclassified_kind_count": summary.unclassified_kind_count,
+        "unclassified_authority_count": summary.unclassified_authority_count,
+    }
+
+
+def _warning_v1(warning: ScanWarning) -> dict:
+    return {"code": warning.code, "path": warning.path, "message": warning.message}
 
 
 def manifest_dict(manifest: InventoryManifest) -> dict:
-    repo = manifest.repository
+    if manifest.schema_version != 1:
+        raise ValueError(f"Unsupported inventory schema version: {manifest.schema_version}")
     return {
-        "schema_version": manifest.schema_version,
-        "repository": {
-            "id": repo.id,
-            "name": repo.name,
-            "identity_basis": repo.identity_basis,
-            "git": {
-                "available": repo.git_available,
-                "head": repo.git_head,
-                "dirty": repo.git_dirty,
-            },
-        },
-        "sources": [asdict(s) for s in sorted(manifest.sources, key=lambda s: s.path)],
-        "summary": asdict(manifest.summary),
-        "warnings": [asdict(w) for w in manifest.warnings],
+        "schema_version": 1,
+        "repository": _repository_v1(manifest.repository),
+        "sources": [_source_v1(s) for s in sorted(manifest.sources, key=lambda s: s.path)],
+        "summary": _summary_v1(manifest.summary),
+        "warnings": [_warning_v1(w) for w in manifest.warnings],
     }
 
 

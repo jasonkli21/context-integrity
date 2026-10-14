@@ -3,8 +3,8 @@ import os
 
 import pytest
 
-from context_integrity import acquisition
-from context_integrity.acquisition import SKIPPED_DIRECTORIES, normalize_path
+from context_integrity import acquisition, inventory
+from context_integrity.acquisition import SKIPPED_DIRECTORIES, normalize_path, read_source
 from context_integrity.inventory import inventory_repository, scan_repository
 from context_integrity.repository import RepositoryError, discover_repository
 
@@ -32,6 +32,20 @@ def test_git_ignore_dirty_and_raw_bytes(git_repo, git):
         sources["docs/untracked.md"].revision.content_sha256
         == hashlib.sha256(b"\xff\r\n\x00").hexdigest()
     )
+
+
+def test_deleted_tracked_source_is_not_in_inventory(git_repo, git):
+    git(git_repo, "add", ".")
+    git(git_repo, "commit", "-m", "fixture")
+    (git_repo / "docs/architecture.md").unlink()
+
+    result = scan_repository(git_repo)
+
+    assert result.repository.git_dirty is True
+    assert [source.path for source in result.sources] == ["AGENTS.md"]
+    assert result.summary.source_count == 1
+    assert result.summary.by_kind == {"agent_instruction": 1}
+    assert not any(warning.path == "docs/architecture.md" for warning in result.warnings)
 
 
 @pytest.mark.parametrize("directory", sorted(SKIPPED_DIRECTORIES))
@@ -102,9 +116,12 @@ def test_git_symlink_ancestor(git_repo, git):
     (git_repo / "docs/architecture.md").unlink()
     (git_repo / "docs").rmdir()
     (git_repo / "docs").symlink_to(git_repo.parent, target_is_directory=True)
-    result = scan_repository(git_repo)
-    assert [s.path for s in result.sources] == ["AGENTS.md"]
-    assert any(w.code == "symlink_skipped" for w in result.warnings)
+    context = discover_repository(git_repo)
+
+    _, _, skipped = read_source(context, "docs/architecture.md")
+
+    assert skipped
+    assert any(w.code == "symlink_skipped" for w in context.warnings)
 
 
 def test_unreadable_hash_and_metadata_failures(tmp_path, monkeypatch):
@@ -130,6 +147,24 @@ def test_unreadable_hash_and_metadata_failures(tmp_path, monkeypatch):
     path.unlink()
     os.mkfifo(path)
     assert scan_repository(tmp_path).warnings[0].code == "candidate_metadata_failed"
+
+
+def test_candidate_disappearing_after_enumeration_is_warned_and_omitted(tmp_path, monkeypatch):
+    path = tmp_path / "docs/architecture.md"
+    path.parent.mkdir()
+    path.write_text("architecture")
+    context = discover_repository(tmp_path)
+    candidates = acquisition.enumerate_candidates(context)
+    assert candidates == ["docs/architecture.md"]
+    path.unlink()
+    monkeypatch.setattr(inventory, "enumerate_candidates", lambda _: candidates)
+
+    result = inventory.inventory_repository(context)
+
+    assert result.sources == ()
+    assert len(result.warnings) == 1
+    assert result.warnings[0].code == "candidate_metadata_failed"
+    assert result.warnings[0].path == "docs/architecture.md"
 
 
 def test_failed_git_listing_is_fatal(git_repo, monkeypatch):

@@ -21,15 +21,17 @@ from context_integrity.repository import RepositoryContext, discover_repository
 def inventory_repository(context: RepositoryContext) -> InventoryManifest:
     sources = []
     for path in enumerate_candidates(context):
-        size, digest, skipped = read_source(context, path)
-        if skipped:
-            continue
-        classification = classify_source(path)
         status = (
             context.statuses.get(path, GitFileStatus.TRACKED_CLEAN)
             if context.status_known
             else GitFileStatus.UNKNOWN
         )
+        if status == GitFileStatus.DELETED:
+            continue
+        size, digest, skipped = read_source(context, path)
+        if skipped:
+            continue
+        classification = classify_source(path)
         revision = SourceRevision(
             digest,
             context.repository.git_head,

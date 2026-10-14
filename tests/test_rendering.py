@@ -1,8 +1,12 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from context_integrity.inventory import scan_repository
-from context_integrity.rendering import render_json, render_text
+from context_integrity.models import ScanWarning
+from context_integrity.rendering import manifest_dict, render_json, render_text
 
 GOLDEN = Path(__file__).parent / "fixtures/inventory-v1.json"
 
@@ -25,6 +29,65 @@ def test_golden_json(git_repo):
     assert "Instructions" not in rendered
     assert rendered.endswith("\n")
     assert render_json(scan_repository(git_repo)) == rendered
+
+
+def test_schema_v1_uses_explicit_key_sets(git_repo):
+    manifest = scan_repository(git_repo)
+    manifest = replace(
+        manifest,
+        warnings=(ScanWarning("test_warning", "AGENTS.md", "Fixture warning."),),
+    )
+
+    data = manifest_dict(manifest)
+    source = data["sources"][0]
+    classification = source["classification"]
+
+    assert set(data) == {"schema_version", "repository", "sources", "summary", "warnings"}
+    assert set(data["repository"]) == {"id", "name", "identity_basis", "git"}
+    assert set(data["repository"]["git"]) == {"available", "head", "dirty"}
+    assert set(source) == {
+        "id",
+        "path",
+        "kind",
+        "authority_class",
+        "lifecycle",
+        "revision",
+        "classification",
+        "size_bytes",
+    }
+    assert set(source["revision"]) == {
+        "content_sha256",
+        "git_head",
+        "git_status",
+        "observed_revision_basis",
+    }
+    assert set(classification) == {
+        "kind",
+        "authority_class",
+        "lifecycle",
+        "confidence",
+        "matched_rules",
+        "basis",
+    }
+    assert set(classification["basis"][0]) == {
+        "rule_id",
+        "dimension",
+        "result",
+        "confidence",
+        "basis",
+    }
+    assert set(data["summary"]) == {
+        "source_count",
+        "by_kind",
+        "by_authority_class",
+        "by_lifecycle",
+        "warning_count",
+        "unclassified_kind_count",
+        "unclassified_authority_count",
+    }
+    assert set(data["warnings"][0]) == {"code", "path", "message"}
+    with pytest.raises(ValueError, match="Unsupported inventory schema version: 2"):
+        manifest_dict(replace(manifest, schema_version=2))
 
 
 def test_runtime_and_text(git_repo):
