@@ -3,6 +3,9 @@
 import json
 
 from context_integrity.models import (
+    AuthorityPolicy,
+    AuthorityResolution,
+    AuthorityTier,
     ClassificationResult,
     InventoryManifest,
     InventorySummary,
@@ -163,9 +166,25 @@ def render_explanation(source: SourceRecord) -> str:
         "Matched rules:",
     ]
     lines.extend(
-        f"- {m.rule_id}: {m.dimension} -> {m.result} ({m.confidence}; {m.basis})"
+        f"- {m.rule_id}: {m.dimension} -> {m.result} ({m.confidence}; {display(m.basis)})"
         for m in source.classification.basis
     )
+    if source.authority_metadata is not None:
+        metadata = source.authority_metadata
+        eligible = (
+            str(metadata.authority_eligible).lower()
+            if metadata.authority_eligible is not None
+            else "true (default)"
+        )
+        lines.extend(
+            [
+                "",
+                "Explicit authority metadata:",
+                f"- authority_class: {metadata.authority_class_override or 'unchanged'}",
+                f"- authority_eligible: {eligible}",
+                f"- reason: {display(metadata.reason)}",
+            ]
+        )
     rev = source.revision
     lines.extend(
         [
@@ -181,4 +200,141 @@ def render_explanation(source: SourceRecord) -> str:
             "- authority precedence, claim correctness, implementation delivery, or drift",
         ]
     )
+    return "\n".join(lines) + "\n"
+
+
+AUTHORITY_DISCLAIMER = (
+    "This resolves observed source-role precedence only. "
+    "It does not establish claim correctness or agreement."
+)
+
+
+def policy_dict(policy: AuthorityPolicy) -> dict:
+    return {
+        "id": policy.id,
+        "description": policy.description,
+        "origin": policy.origin,
+        "policy_version": policy.policy_version,
+        "config_sha256": policy.config_revision,
+        "tiers": [_tier_dict(i, tier) for i, tier in enumerate(policy.tiers)],
+    }
+
+
+def _tier_dict(index: int, tier: AuthorityTier) -> dict:
+    return {"index": index, "classes": [c.value for c in tier.classes]}
+
+
+def _authority_source(source: SourceRecord) -> dict:
+    return {
+        "source_id": source.id,
+        "path": source.path,
+        "kind": source.kind.value,
+        "authority_class": source.authority_class.value,
+        "lifecycle": source.lifecycle.value,
+        "revision": _revision_v1(source.revision),
+    }
+
+
+def authority_dict(resolution: AuthorityResolution) -> dict:
+    return {
+        "schema_version": 1,
+        "repository": _repository_v1(resolution.repository),
+        "policy": policy_dict(resolution.policy),
+        "config_sha256": resolution.config_sha256,
+        "status": resolution.status.value,
+        "highest_observed_tier": resolution.highest_observed_tier,
+        "missing_stronger_tiers": [
+            _tier_dict(i, resolution.policy.tiers[i]) for i in resolution.missing_stronger_tiers
+        ],
+        "highest_candidates": [
+            {**_authority_source(c.source), "tier_index": c.tier_index}
+            for c in resolution.highest_candidates
+        ],
+        "lower_candidates": [
+            {**_authority_source(c.source), "tier_index": c.tier_index}
+            for c in resolution.lower_candidates
+        ],
+        # Every inventoried source is accounted for, including not_in_policy.
+        "excluded": [
+            {
+                **_authority_source(e.source),
+                "reason": e.reason,
+                "metadata_reason": e.metadata_reason,
+            }
+            for e in resolution.excluded
+        ],
+        "warnings": [_warning_v1(w) for w in resolution.warnings],
+    }
+
+
+def render_authority_json(resolution: AuthorityResolution) -> str:
+    return (
+        json.dumps(authority_dict(resolution), indent=2, sort_keys=True, ensure_ascii=True) + "\n"
+    )
+
+
+def render_policy_list(policies: tuple[AuthorityPolicy, ...], as_json: bool = False) -> str:
+    if as_json:
+        return json.dumps([policy_dict(p) for p in policies], indent=2, sort_keys=True) + "\n"
+    return "POLICY | ORIGIN | DESCRIPTION\n" + "".join(
+        f"{display(p.id)} | {display(p.origin)} | {display(p.description)}\n" for p in policies
+    )
+
+
+def render_policy(policy: AuthorityPolicy, as_json: bool = False) -> str:
+    if as_json:
+        return json.dumps(policy_dict(policy), indent=2, sort_keys=True) + "\n"
+    lines = [
+        f"Policy: {display(policy.id)}",
+        f"Origin: {display(policy.origin)}",
+        f"Policy version: {display(policy.policy_version)}",
+        f"Config sha256: {policy.config_revision or 'absent'}",
+        display(policy.description),
+        "",
+    ]
+    lines.extend(f"Tier {i}: {', '.join(t.classes)}" for i, t in enumerate(policy.tiers))
+    return "\n".join(lines) + "\n"
+
+
+def render_authority_text(resolution: AuthorityResolution) -> str:
+    tier = resolution.highest_observed_tier
+    lines = [
+        f"Authority — {display(resolution.policy.id)}",
+        "",
+        f"Origin: {display(resolution.policy.origin)}",
+        f"Policy version: {display(resolution.policy.policy_version)}",
+        f"Config sha256: {resolution.config_sha256 or 'absent'}",
+        f"Status: {resolution.status.value}",
+        f"Highest observed tier: {tier if tier is not None else 'none'}",
+        "Missing stronger tiers:",
+    ]
+    lines.extend(
+        f"  {i}: {', '.join(resolution.policy.tiers[i].classes)}"
+        for i in resolution.missing_stronger_tiers
+    )
+    if not resolution.missing_stronger_tiers:
+        lines.append("  none")
+    lines.extend(["", "Highest-precedence observed candidates:"])
+    lines.extend(f"  {display(c.source.path)}" for c in resolution.highest_candidates)
+    if not resolution.highest_candidates:
+        lines.append("  none")
+    lines.extend(["", "Lower-precedence candidates:"])
+    lines.extend(
+        f"  {display(c.source.path)} (tier {c.tier_index})" for c in resolution.lower_candidates
+    )
+    lines.extend(["", "Exclusions:"])
+    lines.extend(
+        f"  {display(e.source.path)}: {e.reason}"
+        + (f" ({display(e.metadata_reason)})" if e.metadata_reason else "")
+        for e in resolution.excluded
+        if e.reason != "not_in_policy"
+    )
+    lines.append(
+        f"  not_in_policy: {sum(e.reason == 'not_in_policy' for e in resolution.excluded)}"
+    )
+    lines.extend(
+        f"Warning: {w.code} [{display(w.path) if w.path else 'repository'}]: {display(w.message)}"
+        for w in resolution.warnings
+    )
+    lines.extend(["", "Important:", AUTHORITY_DISCLAIMER])
     return "\n".join(lines) + "\n"

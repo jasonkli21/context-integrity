@@ -4,12 +4,14 @@ from collections import Counter
 from pathlib import Path
 
 from context_integrity.acquisition import enumerate_candidates, read_source
-from context_integrity.classification import classify_source
+from context_integrity.classification import apply_authority_metadata, classify_source
+from context_integrity.configuration import CONFIG_PATH, load_config, verify_config_revision
 from context_integrity.models import (
     AuthorityClass,
     GitFileStatus,
     InventoryManifest,
     InventorySummary,
+    ScanWarning,
     SourceKind,
     SourceRecord,
     SourceRevision,
@@ -19,19 +21,29 @@ from context_integrity.repository import RepositoryContext, discover_repository
 
 
 def inventory_repository(context: RepositoryContext) -> InventoryManifest:
+    config = load_config(context)
+    metadata = {m.path: m for m in config.source_metadata}
     sources = []
-    for path in enumerate_candidates(context):
+    paths = set(enumerate_candidates(context))
+    # Policy config is observed even if Git ignores it: it still controls interpretation.
+    forced_config = config.content_sha256 is not None and CONFIG_PATH not in paths
+    if config.content_sha256 is not None:
+        paths.add(CONFIG_PATH)
+    for path in sorted(paths):
         status = (
             context.statuses.get(path, GitFileStatus.TRACKED_CLEAN)
             if context.status_known
             else GitFileStatus.UNKNOWN
         )
+        if path == CONFIG_PATH and forced_config:
+            status = GitFileStatus.UNKNOWN
         if status == GitFileStatus.DELETED:
             continue
         size, digest, skipped = read_source(context, path)
         if skipped:
             continue
-        classification = classify_source(path)
+        entry = metadata.get(path)
+        classification = apply_authority_metadata(classify_source(path), entry)
         revision = SourceRevision(
             digest,
             context.repository.git_head,
@@ -48,6 +60,20 @@ def inventory_repository(context: RepositoryContext) -> InventoryManifest:
                 revision,
                 classification,
                 size,
+                entry,
+            )
+        )
+    observed_config = next((s for s in sources if s.path == CONFIG_PATH), None)
+    verify_config_revision(
+        context, config, observed_config.revision.content_sha256 if observed_config else None
+    )
+    observed_paths = {s.path for s in sources}
+    for path in sorted(metadata.keys() - observed_paths):
+        context.warnings.append(
+            ScanWarning(
+                "authority_metadata_source_missing",
+                path,
+                "Authority metadata references a source absent from inventory.",
             )
         )
     warnings = tuple(sorted(context.warnings, key=lambda w: (w.path or "", w.code, w.message)))
@@ -60,7 +86,9 @@ def inventory_repository(context: RepositoryContext) -> InventoryManifest:
         sum(s.kind in {SourceKind.UNKNOWN, SourceKind.OTHER_DOCUMENT} for s in sources),
         sum(s.authority_class == AuthorityClass.UNKNOWN for s in sources),
     )
-    return InventoryManifest(context.repository, tuple(sources), summary, warnings)
+    return InventoryManifest(
+        context.repository, tuple(sources), summary, warnings, authority_config=config
+    )
 
 
 def scan_repository(path: Path | str) -> InventoryManifest:

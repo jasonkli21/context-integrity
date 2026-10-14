@@ -1,39 +1,45 @@
 # Current State
 
-**Last updated:** 2026-10-14  
-**Current phase:** Phase 0 — Context Inventory and Source Classification  
-**Active plan:** `docs/plans/phase-0-implementation-plan.md`  
-**Status:** Independent review fixes implemented and verified; ready for Phase 0 closure.
+**Last updated:** 2026-10-14
+**Current phase:** Phase 1 — Authority and Source-of-Truth Model
+**Active plan:** `docs/plans/phase-1-implementation-plan.md`
+**Status:** Implemented and verified; independent review pending.
 
 ## Delivered
 
-- Local read-only context inventory with Git-aware/non-Git discovery.
-- Provisional, explainable kind/authority/lifecycle classification with historical overlay.
-- Deterministic source IDs, raw-byte hashes, independent Git HEAD/working-tree status.
-- Text and schema-version-1 JSON output, runtime metadata opt-in, structured warnings.
-- Git root normalization is bound to the initially discovered repository; redirects fail safely.
-- Deleted tracked paths and candidates that disappear during a scan are omitted from inventory.
-- Schema-version-1 JSON uses explicit projections independent of internal dataclass fields.
-- Working `scan`, `explain`, and `version` CLI; documented options and exit codes.
-- Synthetic repository tests, basic/dirty/historical golden manifests, locked dependencies.
+- Phase 0 inventory, safe POSIX reads, stable IDs/raw-byte revisions, Git protections,
+  provisional classification, text/JSON v1, scan/explain/version remain intact.
+- Five versioned, question-specific authority policies with ordered equal-precedence tiers.
+- Pure authority resolution returns all highest observed candidates, lower candidates,
+  missing stronger tiers, and exclusions. Historical and explicitly ineligible sources
+  are excluded; no recency, correctness, agreement, or supersession inference.
+- Optional strict `.context-integrity.toml`: whole-policy replacement/addition, explicit
+  source authority-class/eligibility metadata with reasons, stale metadata warnings.
+- Configuration reuses safe bounded reads; unsafe/invalid/inconsistent config fails closed.
+- `authority list/show/resolve` with text/JSON; resolve supports output files. Separate
+  explicit authority JSON v1; inventory JSON v1 has no new keys.
+- Explain exposes metadata without changing source kind/lifecycle/kind confidence.
 
 ## Verification
 
 `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed:
-Ruff lint/format and 129 tests. Independent review regressions cover repository redirects,
-deleted/disappearing sources, CLI exit behavior, and the explicit JSON v1 shape. Golden JSON
-remains byte-identical.
+Ruff lint/format and **221 tests**. Original Phase 0 JSON goldens remain byte-identical.
+New tests cover policies, metadata, three authority goldens, CLI exits, safe config reads,
+and config revision races. Real-checkout authority list/show/resolve smoke checks passed.
 
-Evidence and every acceptance-criterion mapping:
-`docs/implementation-reports/phase-0-implementation-report.md`.
+Acceptance evidence: `docs/implementation-reports/phase-1-implementation-report.md`.
+Phase 0 reviewed baseline: `docs/implementation-reports/phase-0-implementation-report.md`.
 
 ## Known limitations
 
-No implementation blockers remain from the independent review. Safe file reads currently
-target POSIX; scans are sequential, not atomic snapshots. Classifications remain provisional;
-no active/superseded status or question-specific authority is inferred.
+No known implementation blocker remains; independent review is pending. Scans are sequential,
+not atomic snapshots. Safe reads target POSIX. Ordinary code is not inventoried; executable
+truth may be an unobserved stronger tier. ADR acceptance and report contents are not parsed;
+explicit metadata can exclude templates or classify curated evidence. Authority resolves
+source-role precedence only, never claim correctness or agreement.
 
 ## Next expected step
 
-Record Phase 0 closure, then activate Phase 1 planning. The companion Codebase Intelligence
-Engine remains unintegrated and is not required for this phase.
+Independently review Phase 1 against the plan, architecture, actual code/tests, and report;
+address findings separately before phase closure. Phase 2 lifecycle/supersession remains
+unimplemented. Codebase Intelligence remains intentionally unintegrated.

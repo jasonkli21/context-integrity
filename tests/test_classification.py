@@ -11,6 +11,7 @@ from context_integrity.models import AuthorityClass, LifecycleState, SourceKind
 
 # One independent example for every kind rule, in declared precedence order.
 RULE_CASES = [
+    (".context-integrity.toml", "configuration"),
     ("AGENTS.md", "agent_instruction"),
     (".github/copilot-instructions.md", "agent_instruction"),
     ("current-state.md", "current_state"),
@@ -105,6 +106,7 @@ def test_precedence_and_conservative_fallback():
 
 def test_builtin_rule_ids_are_stable():
     assert [r.id for r in KIND_RULES] == [
+        "kind.configuration.exact_context_integrity",
         "kind.agent_instruction.filename",
         "kind.agent_instruction.copilot",
         "kind.current_state.filename",

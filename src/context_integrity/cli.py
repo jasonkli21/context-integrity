@@ -9,9 +9,19 @@ import typer
 
 from context_integrity import __version__
 from context_integrity.acquisition import normalize_path
+from context_integrity.authority import effective_policies, resolve_authority
+from context_integrity.configuration import ConfigurationError
 from context_integrity.inventory import inventory_repository
-from context_integrity.models import InventoryManifest
-from context_integrity.rendering import render_explanation, render_json, render_text
+from context_integrity.models import AuthorityPolicy, InventoryManifest
+from context_integrity.rendering import (
+    render_authority_json,
+    render_authority_text,
+    render_explanation,
+    render_json,
+    render_policy,
+    render_policy_list,
+    render_text,
+)
 from context_integrity.repository import RepositoryContext, RepositoryError, discover_repository
 
 app = typer.Typer(
@@ -30,6 +40,9 @@ def load_inventory(path: Path) -> tuple[RepositoryContext, InventoryManifest]:
     try:
         context = discover_repository(path)
         return context, inventory_repository(context)
+    except ConfigurationError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(6) from exc
     except RepositoryError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(3) from exc
@@ -97,6 +110,74 @@ def explain(
     for warning in manifest.warnings:
         if warning.path in {None, path}:
             typer.echo(f"Warning: {warning.code}: {warning.message}")
+
+
+authority_app = typer.Typer(
+    help="Inspect question-specific source-role authority.", no_args_is_help=True
+)
+app.add_typer(authority_app, name="authority")
+
+
+def requested_policy(manifest: InventoryManifest, policy_id: str) -> AuthorityPolicy:
+    policy = next(
+        (p for p in effective_policies(manifest.authority_config) if p.id == policy_id), None
+    )
+    if policy is None:
+        raise typer.BadParameter("Unknown authority policy ID.")
+    return policy
+
+
+@authority_app.command("list")
+def authority_list(
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+) -> None:
+    """List built-in and repository-defined policies."""
+    _, manifest = load_inventory(path)
+    typer.echo(
+        render_policy_list(
+            effective_policies(manifest.authority_config), format == OutputFormat.JSON
+        ),
+        nl=False,
+    )
+
+
+@authority_app.command("show")
+def authority_show(
+    policy_id: Annotated[str, typer.Argument()],
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+) -> None:
+    """Show ordered policy tiers and provenance."""
+    _, manifest = load_inventory(path)
+    typer.echo(
+        render_policy(requested_policy(manifest, policy_id), format == OutputFormat.JSON), nl=False
+    )
+
+
+@authority_app.command("resolve")
+def authority_resolve(
+    policy_id: Annotated[str, typer.Argument()],
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Resolve observed source-role precedence; never claim correctness or agreement."""
+    _, manifest = load_inventory(path)
+    resolution = resolve_authority(manifest, requested_policy(manifest, policy_id))
+    rendered = (
+        render_authority_json(resolution)
+        if format == OutputFormat.JSON
+        else render_authority_text(resolution)
+    )
+    if output:
+        try:
+            output.write_text(rendered, encoding="utf-8")
+        except (OSError, ValueError) as exc:
+            typer.echo("Output file could not be written.", err=True)
+            raise typer.Exit(4) from exc
+    else:
+        typer.echo(rendered, nl=False)
 
 
 if __name__ == "__main__":

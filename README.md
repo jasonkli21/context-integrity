@@ -10,11 +10,11 @@ Context Integrity is being built around the idea that:
 
 ## Status
 
-**Phase 0 implemented; ready for independent review.**
+**Phase 1 implemented and verified; independent review pending.**
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
 
-The first milestone is intentionally small: inventory repository context sources, classify them conservatively, record exact observed revisions, and explain each classification. Authority resolution, claims, contradiction detection, architectural drift, context compilation, and LLM-assisted analysis come later.
+Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Claims, supersession, contradiction detection, architectural drift, context compilation, and LLM-assisted analysis remain deferred.
 
 See [`docs/current-state.md`](docs/current-state.md) for the exact current state.
 
@@ -82,7 +82,7 @@ The projects intentionally do **not** share a database or implementation lifecyc
 │   ├── architecture.md               # system boundaries and architecture invariants
 │   ├── current-state.md              # concise status snapshot
 │   ├── plans/
-│   │   └── phase-0-implementation-plan.md
+│   │   └── phase-1-implementation-plan.md
 │   ├── adr/                          # durable architectural decisions
 │   ├── implementation-reports/       # evidence of what an implementation session changed
 │   ├── reviews/                      # independent review findings
@@ -143,12 +143,14 @@ It also lists the stable matched rule IDs, per-dimension confidence and basis, r
 SHA-256, Git HEAD/status, and the semantics intentionally left uninferred.
 
 Classifications are **provisional path/name conventions**, not a judgment that a document's
-claims are true. Authority precedence is resolved in a later phase and depends on the
-question. Lifecycle is `historical` only for explicit historical directory conventions;
+claims are true. Authority precedence depends on the question and can be inspected with
+`authority resolve`. Lifecycle is `historical` only for explicit historical directory conventions;
 otherwise it is `unknown`. Recency never implies supersession. Exact known filenames
 precede directory rules, so `docs/adr/README.md` remains a README.
 
-Git mode includes tracked and untracked nonignored context files. Non-Git mode skips
+Git mode includes tracked and untracked nonignored context files. The root authority config
+is always observed if present, including when ignored by Git (its Git file status is then
+`unknown`). Non-Git mode skips
 common vendor/build directories and does not interpret `.gitignore`. Ordinary code files
 are excluded. Tracked files deleted from the working tree remain part of the repository's
 dirty status but are omitted from the current source inventory. A candidate that disappears
@@ -161,8 +163,9 @@ Stable JSON uses schema version 1, sorted repository-relative paths, and no sour
 absolute root, or timestamp. `--include-runtime-meta` adds the resolved root, UTC observation
 time, and application version. `--summary-only` omits only the human source table.
 Warnings appear in both output formats. `--fail-on-warning` returns 5 after rendering.
-Other exits are 0 for success, 2 for usage/invalid source, 3 for a failed scan, and 4 for an
-output write failure.
+Other exits are 0 for success (including no authority candidates), 2 for usage/invalid
+source/unknown policy, 3 for a failed scan, 4 for an output write failure, and 6 for invalid,
+unsafe, or inconsistent authority configuration.
 
 Repository identity prefers a normalized `origin` network remote (credentials are removed).
 The local fallback hashes the repository name plus resolved location; moving a local-only
@@ -172,6 +175,88 @@ The current safe file-opening implementation targets POSIX platforms (macOS/Linu
 
 See the [implementation report](docs/implementation-reports/phase-0-implementation-report.md)
 for the acceptance audit and verification evidence.
+
+## Using authority policies
+
+```bash
+uv run context-integrity authority list .
+uv run context-integrity authority show architectural_intent .
+uv run context-integrity authority resolve architectural_intent .
+uv run context-integrity authority resolve delivered_behavior . --format json --output /tmp/authority.json
+```
+
+`list` and `show` also support `--format text|json`. All commands use the same validated
+repository config and inventory. Built-in policies have the stable version `builtin-v1`:
+
+| Policy | Tier 0 | Tier 1 | Tier 2 |
+| --- | --- | --- | --- |
+| `delivered_behavior` | executable_truth | verification_evidence | generated_derivative |
+| `architectural_intent` | decision | architecture_product | plan |
+| `operating_instructions` | operating_instruction | architecture_product | plan |
+| `implementation_status` | verification_evidence | generated_derivative | plan |
+| `future_work` | plan | architecture_product | generated_derivative |
+
+A tier can contain multiple equally preferred authority classes. Every eligible source in
+the highest observed tier is returned, with lower-tier sources retained separately. No
+mtime, Git time, filename number, or same-tier tie breaker determines authority. Historical
+sources are excluded before explicit eligibility is checked. Unknown or unrelated authority
+classes are excluded as `not_in_policy`; they remain valid inventory sources.
+
+**This resolves observed source-role precedence only. It does not establish claim correctness
+or agreement.** Multiple top candidates do not imply a contradiction. The scanner does not
+index ordinary code, so `delivered_behavior` normally reports `executable_truth` among the
+missing stronger tiers. No candidates is a successful result with all policy tiers missing.
+
+Optionally add `.context-integrity.toml` at the repository root:
+
+```toml
+schema_version = 1
+
+[[authority.policies]]
+id = "security_posture"
+description = "Repository security guidance"
+tiers = [["operating_instruction", "decision"], ["architecture_product"]]
+
+[[source_metadata]]
+path = "docs/adr/0000-template.md"
+authority_eligible = false
+reason = "Template, not an accepted decision"
+
+[[source_metadata]]
+path = "docs/custom-verification.md"
+authority_class = "verification_evidence"
+reason = "Curated verification evidence"
+```
+
+A policy with an existing ID replaces the whole built-in definition; a new ID adds a
+policy. IDs use lowercase ASCII letters, digits, underscores, or hyphens and start with a
+letter. Tiers must be nonempty, with no repeated class anywhere in a policy; `unknown` and
+`historical` cannot be active tiers. Unknown config keys fail validation. There are no
+includes, imports, inheritance, commands, or remote policy fetches.
+
+Metadata requires a repository-relative POSIX path, at least one of `authority_class` or
+boolean `authority_eligible`, and a nonblank `reason`. Overrides preserve kind, lifecycle,
+and kind confidence, recording explicit authority evidence. Eligibility defaults to true;
+false preserves the source in inventory but excludes it from authority resolution.
+`explain` shows both overrides and reasons. Missing metadata paths produce the structured
+warning `authority_metadata_source_missing`. Metadata cannot override kind or lifecycle;
+ADR acceptance is not inferred from document bodies.
+
+Config defaults to `configuration / unknown / unknown`, with a normal source ID/hash. An
+absent config preserves the Phase 0 inventory contract. A present malformed, symlinked,
+unreadable, oversized, or inconsistent config fails closed with exit 6. Reads use the same
+bounded POSIX descriptor boundary as source acquisition; the parsed hash must match the
+inventory observation and a final config read. This detects inconsistent observations but
+does not make the entire scan an atomic snapshot.
+
+Authority JSON has a **separate schema version 1** with explicit projections: repository
+identity/Git metadata, policy origin/version/tiers/config hash, status, highest observed tier,
+missing stronger tiers, highest/lower candidates with source revisions, every exclusion
+(including `not_in_policy`), and warnings. Stable JSON omits absolute roots, timestamps, and
+source bodies and ends with a newline. Inventory schema v1 gains no new keys.
+
+Implementation evidence and the acceptance mapping are in the
+[Phase 1 report](docs/implementation-reports/phase-1-implementation-report.md).
 
 ## Development workflow
 

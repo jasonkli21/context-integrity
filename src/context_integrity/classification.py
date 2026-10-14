@@ -1,6 +1,6 @@
 """Ordered, deterministic kind rules and independent lifecycle overlay."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from fnmatch import fnmatchcase
 from pathlib import PurePosixPath
 
@@ -13,6 +13,7 @@ from context_integrity.models import (
 from context_integrity.models import (
     ClassificationResult,
     RuleMatch,
+    SourceAuthorityMetadata,
 )
 from context_integrity.models import (
     LifecycleState as L,
@@ -42,6 +43,12 @@ class KindRule:
 
 # First matching kind rule wins. This is kind disambiguation, never authority ranking.
 KIND_RULES = (
+    KindRule(
+        "kind.configuration.exact_context_integrity",
+        K.CONFIGURATION,
+        "exact_path",
+        paths=(".context-integrity.toml",),
+    ),
     KindRule(
         "kind.agent_instruction.filename",
         K.AGENT_INSTRUCTION,
@@ -190,6 +197,7 @@ KIND_RULES = (
 )
 HISTORICAL_DIRECTORIES = ("history", "historical", "archive", "archived", "deprecated")
 AUTHORITY_BY_KIND = {
+    K.CONFIGURATION: A.UNKNOWN,
     K.AGENT_INSTRUCTION: A.OPERATING_INSTRUCTION,
     K.DECISION_RECORD: A.DECISION,
     K.IMPLEMENTATION_PLAN: A.PLAN,
@@ -258,4 +266,24 @@ def classify_source(path: str) -> ClassificationResult:
         )
     return ClassificationResult(
         kind, authority, lifecycle, confidence, tuple(m.rule_id for m in matches), tuple(matches)
+    )
+
+
+def apply_authority_metadata(
+    classification: ClassificationResult, metadata: SourceAuthorityMetadata | None
+) -> ClassificationResult:
+    if metadata is None or metadata.authority_class_override is None:
+        return classification
+    match = RuleMatch(
+        "authority.metadata.repository_override",
+        "authority_class",
+        metadata.authority_class_override.value,
+        C.EXPLICIT,
+        metadata.reason,
+    )
+    return replace(
+        classification,
+        authority_class=metadata.authority_class_override,
+        matched_rules=(*classification.matched_rules, match.rule_id),
+        basis=(*classification.basis, match),
     )

@@ -100,6 +100,8 @@ def normalize_path(path: str) -> str:
 
 
 def is_context_candidate(path: str) -> bool:
+    if path == ".context-integrity.toml":
+        return True
     pure = PurePosixPath(normalize_path(path))
     if any(p.lower() in SKIPPED_DIRECTORIES for p in pure.parts[:-1]):
         return False
@@ -184,10 +186,24 @@ def enumerate_candidates(context: RepositoryContext) -> list[str]:
 
 
 def read_source(context: RepositoryContext, path: str) -> tuple[int | None, str | None, bool]:
+    return _read_source(context, path)
+
+
+def read_source_bytes(context: RepositoryContext, path: str) -> bytes | None:
+    """Capture bounded bytes through the same descriptor-safe boundary as inventory reads."""
+    chunks: list[bytes] = []
+    _, digest, skipped = _read_source(context, path, chunks)
+    return b"".join(chunks) if digest is not None and not skipped else None
+
+
+def _read_source(
+    context: RepositoryContext, path: str, chunks: list[bytes] | None = None
+) -> tuple[int | None, str | None, bool]:
     """Open each component relative to a directory FD, rejecting symlinks even during races.
 
     Returns size, digest, skipped. Body reads are bounded even if a file grows after stat.
     """
+    path = normalize_path(path)
     descriptors = []
     try:
         parent_fd = os.open(context.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
@@ -248,6 +264,8 @@ def read_source(context: RepositoryContext, path: str) -> tuple[int | None, str 
                     )
                     return count, None, False
                 digest.update(chunk)
+                if chunks is not None:
+                    chunks.append(chunk)
         except OSError:
             context.warnings.append(ScanWarning("hash_failed", path, "Source hashing failed."))
             return opened.st_size, None, False

@@ -1,0 +1,196 @@
+{
+  "config_sha256": null,
+  "excluded": [
+    {
+      "authority_class": "operating_instruction",
+      "kind": "agent_instruction",
+      "lifecycle": "unknown",
+      "metadata_reason": null,
+      "path": "AGENTS.md",
+      "reason": "not_in_policy",
+      "revision": {
+        "content_sha256": "80b3a97e8e77da79b512bbbaa25e04cda887803d6f89cea8cb05a6048f8580ad",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_AGENTS.md"
+    },
+    {
+      "authority_class": "generated_derivative",
+      "kind": "current_state",
+      "lifecycle": "unknown",
+      "metadata_reason": null,
+      "path": "docs/current-state.md",
+      "reason": "not_in_policy",
+      "revision": {
+        "content_sha256": "80b3a97e8e77da79b512bbbaa25e04cda887803d6f89cea8cb05a6048f8580ad",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/current-state.md"
+    },
+    {
+      "authority_class": "historical",
+      "kind": "architecture",
+      "lifecycle": "historical",
+      "metadata_reason": null,
+      "path": "docs/history/old-architecture.md",
+      "reason": "historical_lifecycle",
+      "revision": {
+        "content_sha256": "80b3a97e8e77da79b512bbbaa25e04cda887803d6f89cea8cb05a6048f8580ad",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/history/old-architecture.md"
+    },
+    {
+      "authority_class": "unknown",
+      "kind": "other_document",
+      "lifecycle": "unknown",
+      "metadata_reason": null,
+      "path": "docs/misc.md",
+      "reason": "not_in_policy",
+      "revision": {
+        "content_sha256": "80b3a97e8e77da79b512bbbaa25e04cda887803d6f89cea8cb05a6048f8580ad",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/misc.md"
+    },
+    {
+      "authority_class": "verification_evidence",
+      "kind": "verification_record",
+      "lifecycle": "unknown",
+      "metadata_reason": null,
+      "path": "docs/verification/check.md",
+      "reason": "not_in_policy",
+      "revision": {
+        "content_sha256": "80b3a97e8e77da79b512bbbaa25e04cda887803d6f89cea8cb05a6048f8580ad",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/verification/check.md"
+    }
+  ],
+  "highest_candidates": [
+    {
+      "authority_class": "decision",
+      "kind": "decision_record",
+      "lifecycle": "unknown",
+      "path": "docs/adr/0001.md",
+      "revision": {
+        "content_sha256": "80b3a97e8e77da79b512bbbaa25e04cda887803d6f89cea8cb05a6048f8580ad",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/adr/0001.md",
+      "tier_index": 0
+    },
+    {
+      "authority_class": "decision",
+      "kind": "decision_record",
+      "lifecycle": "unknown",
+      "path": "docs/adr/0002.md",
+      "revision": {
+        "content_sha256": "80b3a97e8e77da79b512bbbaa25e04cda887803d6f89cea8cb05a6048f8580ad",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/adr/0002.md",
+      "tier_index": 0
+    }
+  ],
+  "highest_observed_tier": 0,
+  "lower_candidates": [
+    {
+      "authority_class": "architecture_product",
+      "kind": "architecture",
+      "lifecycle": "unknown",
+      "path": "docs/architecture.md",
+      "revision": {
+        "content_sha256": "80b3a97e8e77da79b512bbbaa25e04cda887803d6f89cea8cb05a6048f8580ad",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/architecture.md",
+      "tier_index": 1
+    },
+    {
+      "authority_class": "plan",
+      "kind": "implementation_plan",
+      "lifecycle": "unknown",
+      "path": "docs/plans/phase-1.md",
+      "revision": {
+        "content_sha256": "80b3a97e8e77da79b512bbbaa25e04cda887803d6f89cea8cb05a6048f8580ad",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/plans/phase-1.md",
+      "tier_index": 2
+    },
+    {
+      "authority_class": "architecture_product",
+      "kind": "product_requirement",
+      "lifecycle": "unknown",
+      "path": "docs/prd.md",
+      "revision": {
+        "content_sha256": "80b3a97e8e77da79b512bbbaa25e04cda887803d6f89cea8cb05a6048f8580ad",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/prd.md",
+      "tier_index": 1
+    }
+  ],
+  "missing_stronger_tiers": [],
+  "policy": {
+    "config_sha256": null,
+    "description": "Preferred sources for intended architecture",
+    "id": "architectural_intent",
+    "origin": "builtin",
+    "policy_version": "builtin-v1",
+    "tiers": [
+      {
+        "classes": [
+          "decision"
+        ],
+        "index": 0
+      },
+      {
+        "classes": [
+          "architecture_product"
+        ],
+        "index": 1
+      },
+      {
+        "classes": [
+          "plan"
+        ],
+        "index": 2
+      }
+    ]
+  },
+  "repository": {
+    "git": {
+      "available": false,
+      "dirty": null,
+      "head": null
+    },
+    "id": "repo_fixture",
+    "identity_basis": "fixture",
+    "name": "authority-fixture"
+  },
+  "schema_version": 1,
+  "status": "candidates_found",
+  "warnings": []
+}
