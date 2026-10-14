@@ -1,0 +1,244 @@
+{
+  "repository": {
+    "git": {
+      "available": true,
+      "dirty": true,
+      "head": null
+    },
+    "id": "repo_117fc5264566c8adf434f3eb7d37b8df",
+    "identity_basis": "git_remote",
+    "name": "basic-context"
+  },
+  "schema_version": 1,
+  "sources": [
+    {
+      "authority_class": "operating_instruction",
+      "classification": {
+        "authority_class": "operating_instruction",
+        "basis": [
+          {
+            "basis": "exact_filename",
+            "confidence": "strong",
+            "dimension": "kind",
+            "result": "agent_instruction",
+            "rule_id": "kind.agent_instruction.filename"
+          },
+          {
+            "basis": "kind_mapping",
+            "confidence": "strong",
+            "dimension": "authority_class",
+            "result": "operating_instruction",
+            "rule_id": "authority.kind.agent_instruction"
+          },
+          {
+            "basis": "no_historical_signal",
+            "confidence": "unknown",
+            "dimension": "lifecycle",
+            "result": "unknown",
+            "rule_id": "lifecycle.unknown.fallback"
+          }
+        ],
+        "confidence": "strong",
+        "kind": "agent_instruction",
+        "lifecycle": "unknown",
+        "matched_rules": [
+          "kind.agent_instruction.filename",
+          "authority.kind.agent_instruction",
+          "lifecycle.unknown.fallback"
+        ]
+      },
+      "id": "src_464090d845755467a0bab470c3eaa170",
+      "kind": "agent_instruction",
+      "lifecycle": "unknown",
+      "path": "AGENTS.md",
+      "revision": {
+        "content_sha256": "3cdce1db3302a4620afaa8b941420de5b5fe53706434b48102c35bce70e76e75",
+        "git_head": null,
+        "git_status": "untracked",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "size_bytes": 13
+    },
+    {
+      "authority_class": "architecture_product",
+      "classification": {
+        "authority_class": "architecture_product",
+        "basis": [
+          {
+            "basis": "exact_filename",
+            "confidence": "strong",
+            "dimension": "kind",
+            "result": "architecture",
+            "rule_id": "kind.architecture.exact_filename"
+          },
+          {
+            "basis": "kind_mapping",
+            "confidence": "strong",
+            "dimension": "authority_class",
+            "result": "architecture_product",
+            "rule_id": "authority.kind.architecture"
+          },
+          {
+            "basis": "no_historical_signal",
+            "confidence": "unknown",
+            "dimension": "lifecycle",
+            "result": "unknown",
+            "rule_id": "lifecycle.unknown.fallback"
+          }
+        ],
+        "confidence": "strong",
+        "kind": "architecture",
+        "lifecycle": "unknown",
+        "matched_rules": [
+          "kind.architecture.exact_filename",
+          "authority.kind.architecture",
+          "lifecycle.unknown.fallback"
+        ]
+      },
+      "id": "src_5a375ea085185caa766da154f8919e42",
+      "kind": "architecture",
+      "lifecycle": "unknown",
+      "path": "docs/architecture.md",
+      "revision": {
+        "content_sha256": "e8c5671c923012d0d6f0070b25cfc11ef29a6fc347f0655666a1b7039be5fe50",
+        "git_head": null,
+        "git_status": "untracked",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "size_bytes": 13
+    },
+    {
+      "authority_class": "historical",
+      "classification": {
+        "authority_class": "historical",
+        "basis": [
+          {
+            "basis": "directory_rule",
+            "confidence": "strong",
+            "dimension": "kind",
+            "result": "decision_record",
+            "rule_id": "kind.decision.directory"
+          },
+          {
+            "basis": "kind_mapping",
+            "confidence": "strong",
+            "dimension": "authority_class",
+            "result": "decision",
+            "rule_id": "authority.kind.decision_record"
+          },
+          {
+            "basis": "directory_rule",
+            "confidence": "strong",
+            "dimension": "lifecycle",
+            "result": "historical",
+            "rule_id": "lifecycle.historical.directory_history"
+          },
+          {
+            "basis": "historical_lifecycle",
+            "confidence": "strong",
+            "dimension": "authority_class",
+            "result": "historical",
+            "rule_id": "authority.historical.overlay"
+          }
+        ],
+        "confidence": "strong",
+        "kind": "decision_record",
+        "lifecycle": "historical",
+        "matched_rules": [
+          "kind.decision.directory",
+          "authority.kind.decision_record",
+          "lifecycle.historical.directory_history",
+          "authority.historical.overlay"
+        ]
+      },
+      "id": "src_4bb85732cb72cc57147db8f43771452e",
+      "kind": "decision_record",
+      "lifecycle": "historical",
+      "path": "docs/history/adr/0001.md",
+      "revision": {
+        "content_sha256": "1836ba9826fdaed7e7aba81f8b3edc73f167c8d7b1f40ce011671d5bc23c0179",
+        "git_head": null,
+        "git_status": "untracked",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "size_bytes": 11
+    },
+    {
+      "authority_class": "historical",
+      "classification": {
+        "authority_class": "historical",
+        "basis": [
+          {
+            "basis": "filename_pattern",
+            "confidence": "heuristic",
+            "dimension": "kind",
+            "result": "architecture",
+            "rule_id": "kind.architecture.filename"
+          },
+          {
+            "basis": "kind_mapping",
+            "confidence": "heuristic",
+            "dimension": "authority_class",
+            "result": "architecture_product",
+            "rule_id": "authority.kind.architecture"
+          },
+          {
+            "basis": "directory_rule",
+            "confidence": "strong",
+            "dimension": "lifecycle",
+            "result": "historical",
+            "rule_id": "lifecycle.historical.directory_history"
+          },
+          {
+            "basis": "historical_lifecycle",
+            "confidence": "strong",
+            "dimension": "authority_class",
+            "result": "historical",
+            "rule_id": "authority.historical.overlay"
+          }
+        ],
+        "confidence": "heuristic",
+        "kind": "architecture",
+        "lifecycle": "historical",
+        "matched_rules": [
+          "kind.architecture.filename",
+          "authority.kind.architecture",
+          "lifecycle.historical.directory_history",
+          "authority.historical.overlay"
+        ]
+      },
+      "id": "src_b43144e9b655428c13b9b2ca8da580f9",
+      "kind": "architecture",
+      "lifecycle": "historical",
+      "path": "docs/history/old-architecture.md",
+      "revision": {
+        "content_sha256": "1836ba9826fdaed7e7aba81f8b3edc73f167c8d7b1f40ce011671d5bc23c0179",
+        "git_head": null,
+        "git_status": "untracked",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "size_bytes": 11
+    }
+  ],
+  "summary": {
+    "by_authority_class": {
+      "architecture_product": 1,
+      "historical": 2,
+      "operating_instruction": 1
+    },
+    "by_kind": {
+      "agent_instruction": 1,
+      "architecture": 2,
+      "decision_record": 1
+    },
+    "by_lifecycle": {
+      "historical": 2,
+      "unknown": 2
+    },
+    "source_count": 4,
+    "unclassified_authority_count": 0,
+    "unclassified_kind_count": 0,
+    "warning_count": 0
+  },
+  "warnings": []
+}

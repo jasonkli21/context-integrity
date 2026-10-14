@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "context-integrity"
+version = "0.0.1"
+description = "Local-first context integrity tooling for software repositories and AI-assisted development."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = []
+dependencies = [
+  "typer>=0.16,<1",
+]
+
+[project.scripts]
+context-integrity = "context_integrity.cli:app"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.4,<10",
+  "pytest-cov>=6,<8",
+  "ruff>=0.13,<1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "UP",
+  "B",
+  "SIM",
+  "RUF",
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.coverage.run]
+branch = true
+source = ["context_integrity"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
