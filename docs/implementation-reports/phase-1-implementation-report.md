@@ -1,10 +1,12 @@
 # Phase 1 implementation report
 
 **Date:** 2026-10-14
-**Status:** Implemented and verified; independent review pending.
+**Status:** Implemented and verified; independent review findings F-001–F-004 addressed.
 **Baseline:** `d5b62ad` (`fix phase 0 independent review findings`), branch `main`.
-**Implementation commits:** None created; changes remain in the working tree. The Phase 1
-plan was already untracked when this session began and was not edited.
+**Phase 1 delivery:** `9efd5fb` (`implement phase 1`). The post-review corrections and this
+updated report are included together in one follow-up commit.
+**Review:** `context-integrity-phase-1-independent-post-implementation-review.md`, findings
+F-001–F-004.
 **Normative scope:** `docs/plans/phase-1-implementation-plan.md` and the supplied Phase 1
 implementation prompt. Phase 0 baseline gate passed all 129 tests before edits.
 
@@ -55,9 +57,23 @@ metadata or affects other policies, even when the selected policy remains built-
 Config schema 1 allows only `schema_version`, `authority.policies`, and `source_metadata`.
 Policies require ID, description, and nonempty tiers; classes cannot repeat within a policy,
 and historical/unknown classes cannot be active tiers. Metadata supports only path, reason,
-authority class, and eligibility; kind/lifecycle overrides fail validation. Class overrides
-may explicitly set unknown/historical but never undo historical lifecycle exclusion.
-Unknown keys fail closed. Reasons are required for all metadata entries.
+authority class, and eligibility; kind/lifecycle overrides fail validation. Phase 1 source
+metadata may explicitly set `unknown` but rejects `executable_truth` and `historical` so a
+document cannot manufacture executable evidence or emulate lifecycle. Use
+`authority_eligible = false` for policy-independent exclusion. Unknown keys fail closed;
+reasons are required for all metadata entries.
+
+## Post-implementation review findings
+
+- **F-001:** Source metadata now rejects `executable_truth` and `historical`; `unknown` and
+  ordinary document-role overrides remain supported. Tests preserve the delivered-behavior
+  tier-0 gap, actual historical exclusion, and CLI exit 6 for reserved values.
+- **F-002:** Contract tests pin the complete nested built-in tier matrix, IDs, versions,
+  deterministic listing, custom addition, and exact whole-policy replacement.
+- **F-003:** This report and `docs/current-state.md` now describe the Phase 1 baseline and final
+  post-review verification accurately.
+- **F-004:** `explain` now says policy resolution is not performed by that explanation and
+  points to `authority resolve`.
 
 Config reads reuse the 5 MiB descriptor-safe source boundary. Present unsafe/unreadable/
 malformed config errors never fall back to built-ins. Parsed bytes, inventoried config hash,
@@ -98,15 +114,17 @@ ends with a newline. Inventory v1 gains no keys.
 
 ## Verification
 
-Exact full gate, before and after implementation:
+Exact full gate, after the post-implementation review corrections:
 
 ```bash
 UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check
 ```
 
-Baseline: Ruff lint/format and **129 tests passed**. Final implementation: Ruff lint/format
-and **221 tests passed**, Python 3.12.13/macOS. Tests require no network, credentials, or
-database. All three original Phase 0 JSON goldens pass byte-for-byte without modifications.
+Baseline before Phase 1: Ruff lint/format and **129 tests passed**. Phase 1 post-review
+working tree: Ruff lint/format and **226 tests passed**, Python 3.12.13/macOS. This gate ran
+on the complete corrected tree immediately before its single follow-up commit, based on
+reviewed delivery `9efd5fb`. Tests require no network, credentials, or database. All three
+original Phase 0 JSON goldens pass byte-for-byte without modifications.
 Intermediate failures were resolved: the existing exhaustive rule table needed the added
 config rule, the three new goldens had to be generated, and a fault-injection test needed to
 patch reads after repository discovery so it did not affect subprocess pipe reads.
@@ -168,11 +186,12 @@ independent architectural review. Paths for test names are `tests/test_authority
 | repository policy can add custom ID. | A: `test_custom_policy_addition`; config custom-policy merge. |
 | invalid/duplicate tiers fail. | C: `test_invalid_config`; A: `test_invalid_tier`, `test_duplicate_class_across_tiers`. |
 | `historical` and `unknown` cannot be active policy tiers. | C: `test_invalid_config`; A: `test_invalid_tier`. |
-| source authority-class override supported. | A: `test_metadata_and_policy_merge`, `test_unknown_override_allowed`. |
+| source authority-class override supported for allowed document roles. | A: `test_metadata_and_policy_merge`, `test_unknown_override_allowed`; C rejects reserved values. |
 | source authority eligibility supported. | A: `test_metadata_and_policy_merge`, `test_eligibility_omission_defaults_true`. |
 | override reason required. | C: `test_invalid_config` missing/blank reasons. |
 | stale metadata path emits structured warning. | A: `test_metadata_and_policy_merge` structured warning. |
-| lifecycle override is not supported. | C: `test_invalid_config` rejects lifecycle/kind keys. |
+| lifecycle override is not supported. | C: `test_invalid_config` rejects lifecycle/kind keys and historical authority metadata. |
+| document metadata cannot synthesize executable truth. | A/C: reserved-class regressions; delivered behavior keeps tier 0 missing absent executable evidence. |
 | config is safely read and hashed. | C: valid hash, symlink/directory/oversize, unreadable, read failure/growth, open race, revision consistency tests. |
 | unsafe/invalid config fails with exit 6. | A: `test_cli_config_error_exit_6`, `test_cli_config_symlink_exit_6`. |
 
@@ -211,14 +230,14 @@ independent architectural review. Paths for test names are `tests/test_authority
 
 | Acceptance criterion | Verification evidence |
 | --- | --- |
-| all built-in policies tested. | A: `test_exact_builtin_set`, `test_resolution_policies`. |
+| built-in policy contract is exact and listing deterministic. | A: `test_exact_builtin_set` pins IDs, every class in every tier, versions, and sorted output. |
 | config validation thoroughly tested. | C: parser matrix, safe-read failures, ignored config, revision race cases. |
 | authority golden JSON tests pass. | A: `test_authority_golden` all three scenarios. |
 | Phase 0 regression suite passes. | All baseline tests retained; additive config case and rule ID in classification tests. |
-| full offline `make check` passes. | Offline make check: lint, format, 221 tests passed. |
+| full offline `make check` passes after review fixes. | Offline make check: lint, format, 226 tests passed on the corrected tree immediately before commit. |
 | README documents Phase 1 behavior and limitations. | README: authority semantics/table/config/commands/limitations/exit codes. |
 | Phase 1 implementation report maps every acceptance criterion. | This table maps all 58 checkboxes in plan §23. |
-| current-state updated only after verification. | Current-state edited after the 221-test gate passed. |
+| current-state updated only after verification. | Current-state edited after the 226-test gate passed. |
 
 
 ## Security acceptance evidence (plan §22)
@@ -237,10 +256,11 @@ independent architectural review. Paths for test names are `tests/test_authority
 
 ## Decisions, deviations, and limitations
 
-No phase scope or built-in ordering deviations were required. Small implementation choices:
+No phase scope or built-in ordering deviations were required. Review correction and small
+implementation choices:
 
-- Unknown config keys are rejected, as recommended. Source class overrides may set unknown
-  or historical; neither is permitted as an active policy tier.
+- Unknown config keys are rejected, as recommended. Source class overrides may set unknown;
+  `executable_truth` and `historical` are reserved from Phase 1 source metadata.
 - Repository config is inventoried even when ignored by Git, because it still controls
   interpretation. Its per-file Git status is unknown in that case, avoiding an unsupported
   assertion that it is tracked-clean. Other ignored-source behavior is unchanged.
@@ -255,8 +275,9 @@ No phase scope or built-in ordering deviations were required. Small implementati
 - Implementation reports still use existing Phase 0 classification rules. Bodies, ADR
   acceptance, semantic agreement, and active/superseded state remain uninterpreted.
 
-No known Phase 1 acceptance criterion remains unresolved in implementation verification.
-Independent review has not been performed in this session and remains the next step.
+The offline quality gate passed after F-001–F-004 were addressed. The Phase 1 plan remains
+unchanged; its source-metadata class list was underspecified, and the reserved-class rule is
+captured here and in regression tests. Phase 2 has not started.
 
 ## Deferred and inputs for Phase 2
 

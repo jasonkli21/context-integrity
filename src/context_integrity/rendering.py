@@ -197,7 +197,8 @@ def render_explanation(source: SourceRecord) -> str:
             "",
             "Not inferred:",
             "- active, superseded, expired, or invalid status; supersession relationships",
-            "- authority precedence, claim correctness, implementation delivery, or drift",
+            "- authority policy resolution in this explanation (see `authority resolve`), "
+            "claim correctness, implementation delivery, or drift",
         ]
     )
     return "\n".join(lines) + "\n"

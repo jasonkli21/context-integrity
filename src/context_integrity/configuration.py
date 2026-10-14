@@ -16,6 +16,20 @@ from context_integrity.repository import RepositoryContext
 
 CONFIG_PATH = ".context-integrity.toml"
 
+# Phase 1 document metadata can correct document roles, but it cannot synthesize
+# executable evidence or emulate the lifecycle model reserved for a later phase.
+SOURCE_METADATA_AUTHORITY_CLASSES = frozenset(
+    {
+        AuthorityClass.VERIFICATION_EVIDENCE,
+        AuthorityClass.DECISION,
+        AuthorityClass.ARCHITECTURE_PRODUCT,
+        AuthorityClass.OPERATING_INSTRUCTION,
+        AuthorityClass.PLAN,
+        AuthorityClass.GENERATED_DERIVATIVE,
+        AuthorityClass.UNKNOWN,
+    }
+)
+
 
 class ConfigurationError(Exception):
     """Authority interpretation cannot proceed safely."""
@@ -84,6 +98,8 @@ def parse_config(data: bytes) -> RepositoryAuthorityConfig:
                 if "authority_class" in entry
                 else None
             )
+            if override is not None and override not in SOURCE_METADATA_AUTHORITY_CLASSES:
+                raise ValueError("Authority class is reserved from Phase 1 source metadata.")
             if override is None and eligible is None:
                 raise ValueError(
                     "Source metadata must specify an authority override or eligibility."

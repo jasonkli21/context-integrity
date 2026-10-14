@@ -10,7 +10,7 @@ Context Integrity is being built around the idea that:
 
 ## Status
 
-**Phase 1 implemented and verified; independent review pending.**
+**Phase 1 implemented and verified; independent review findings F-001–F-004 addressed.**
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
 
@@ -240,7 +240,10 @@ and kind confidence, recording explicit authority evidence. Eligibility defaults
 false preserves the source in inventory but excludes it from authority resolution.
 `explain` shows both overrides and reasons. Missing metadata paths produce the structured
 warning `authority_metadata_source_missing`. Metadata cannot override kind or lifecycle;
-ADR acceptance is not inferred from document bodies.
+source metadata cannot declare `executable_truth` or `historical`. Use `authority_eligible = false`
+for policy-independent exclusion. `executable_truth` remains a valid policy tier for evidence
+provided through a future executable-evidence boundary. ADR acceptance is not inferred from
+document bodies.
 
 Config defaults to `configuration / unknown / unknown`, with a normal source ID/hash. An
 absent config preserves the Phase 0 inventory contract. A present malformed, symlinked,

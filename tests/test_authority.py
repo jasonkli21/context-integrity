@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 
 from context_integrity.authority import BUILTIN_POLICIES, effective_policies, resolve_authority
 from context_integrity.cli import app
-from context_integrity.configuration import CONFIG_PATH, parse_config
+from context_integrity.configuration import CONFIG_PATH, ConfigurationError, parse_config
 from context_integrity.inventory import scan_repository
 from context_integrity.models import AuthorityClass as A
 from context_integrity.models import (
@@ -30,11 +30,15 @@ from context_integrity.rendering import (
 )
 
 EXPECTED = {
-    "delivered_behavior": ["executable_truth", "verification_evidence", "generated_derivative"],
-    "architectural_intent": ["decision", "architecture_product", "plan"],
-    "operating_instructions": ["operating_instruction", "architecture_product", "plan"],
-    "implementation_status": ["verification_evidence", "generated_derivative", "plan"],
-    "future_work": ["plan", "architecture_product", "generated_derivative"],
+    "delivered_behavior": [
+        ["executable_truth"],
+        ["verification_evidence"],
+        ["generated_derivative"],
+    ],
+    "architectural_intent": [["decision"], ["architecture_product"], ["plan"]],
+    "operating_instructions": [["operating_instruction"], ["architecture_product"], ["plan"]],
+    "implementation_status": [["verification_evidence"], ["generated_derivative"], ["plan"]],
+    "future_work": [["plan"], ["architecture_product"], ["generated_derivative"]],
 }
 
 
@@ -67,9 +71,12 @@ def policy(id):
 
 
 def test_exact_builtin_set():
-    assert {p.id: [t.classes[0].value for t in p.tiers] for p in BUILTIN_POLICIES} == EXPECTED
+    actual = {p.id: [[c.value for c in t.classes] for t in p.tiers] for p in BUILTIN_POLICIES}
+    assert actual == EXPECTED
     assert all(p.origin == "builtin" and p.policy_version == "builtin-v1" for p in BUILTIN_POLICIES)
-    assert [p.id for p in effective_policies()] == sorted(EXPECTED)
+    listed = effective_policies()
+    assert [p.id for p in listed] == sorted(EXPECTED)
+    assert render_policy_list(listed) == render_policy_list(effective_policies())
     assert A.EXECUTABLE_TRUTH == "executable_truth"
 
 
@@ -174,7 +181,16 @@ def test_metadata_and_policy_merge(authority_repo):
     assert [p.id for p in policies] == sorted([*EXPECTED, "custom"])
     selected = next(p for p in policies if p.id == "architectural_intent")
     assert selected.origin == "repository_config"
-    assert selected.tiers[0].classes == (A.VERIFICATION_EVIDENCE,)
+    assert selected.tiers == (
+        AuthorityTier((A.VERIFICATION_EVIDENCE,)),
+        AuthorityTier((A.DECISION, A.ARCHITECTURE_PRODUCT)),
+    )
+    assert selected.description == "Prefer curated verification"
+    assert selected.policy_version == "config-v1"
+    assert len(selected.tiers) == 2
+    assert all(
+        p == policy(p.id) for p in policies if p.id not in {"architectural_intent", "custom"}
+    )
     result = resolve_authority(manifest, selected)
     assert [c.source.path for c in result.highest_candidates] == [
         "docs/misc.md",
@@ -389,24 +405,54 @@ def test_custom_policy_addition():
     custom = AuthorityPolicy("custom", "Custom", (AuthorityTier((A.PLAN,)),))
     merged = effective_policies(RepositoryAuthorityConfig(policies=(custom,)))
     assert len(merged) == 6
+    assert next(p for p in merged if p.id == "custom") == custom
     assert next(p for p in merged if p.id == "future_work") == policy("future_work")
 
 
-def test_executable_truth_can_be_observed(authority_repo):
-    write(
-        authority_repo,
-        CONFIG_PATH,
-        b"""schema_version=1
+def test_source_metadata_cannot_synthesize_reserved_authority_classes(authority_repo):
+    delivered = resolve_authority(scan_repository(authority_repo), policy("delivered_behavior"))
+    assert delivered.highest_observed_tier == 1
+    assert delivered.missing_stronger_tiers == (0,)
+    assert delivered.highest_candidates[0].source.authority_class == A.VERIFICATION_EVIDENCE
+
+    for authority_class in ("executable_truth", "historical"):
+        write(
+            authority_repo,
+            CONFIG_PATH,
+            f"""schema_version=1
 [[source_metadata]]
 path="docs/verification/check.md"
-authority_class="executable_truth"
-reason="Explicit repository mapping"
-""",
+authority_class="{authority_class}"
+reason="Must be rejected"
+""".encode(),
+        )
+        with pytest.raises(ConfigurationError, match=r"Invalid \.context-integrity\.toml"):
+            scan_repository(authority_repo)
+
+
+@pytest.mark.parametrize("authority_class", ["executable_truth", "historical"])
+def test_cli_reserved_source_metadata_class_exits_6(tmp_path, authority_class):
+    write(
+        tmp_path,
+        CONFIG_PATH,
+        f"""schema_version=1
+[[source_metadata]]
+path="docs/verification/check.md"
+authority_class="{authority_class}"
+reason="Must be rejected"
+""".encode(),
     )
-    result = resolve_authority(scan_repository(authority_repo), policy("delivered_behavior"))
-    assert result.highest_observed_tier == 0
-    assert result.missing_stronger_tiers == ()
-    assert [c.source.path for c in result.highest_candidates] == ["docs/verification/check.md"]
+    result = runner.invoke(app, ["authority", "resolve", "delivered_behavior", str(tmp_path)])
+    assert result.exit_code == 6
+    assert "configuration" in result.output
+
+
+def test_explain_limits_authority_wording_to_this_command(authority_repo):
+    explanation = render_explanation(scan_repository(authority_repo).sources[0])
+    assert (
+        "authority policy resolution in this explanation (see `authority resolve`)" in explanation
+    )
+    assert "authority precedence" not in explanation
 
 
 def test_cli_config_symlink_exit_6(tmp_path):

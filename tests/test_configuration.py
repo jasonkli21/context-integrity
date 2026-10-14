@@ -71,6 +71,12 @@ def test_config_absent_and_valid(tmp_path):
         VALID.replace(b'path = "docs/custom.md"', b'path = "."'),
         VALID.replace(b'path = "docs/custom.md"', b'path = "docs/"'),
         VALID.replace(b'authority_class = "verification_evidence"', b'authority_class = "bogus"'),
+        VALID.replace(
+            b'authority_class = "verification_evidence"', b'authority_class = "executable_truth"'
+        ),
+        VALID.replace(
+            b'authority_class = "verification_evidence"', b'authority_class = "historical"'
+        ),
         VALID.replace(b'authority_class = "verification_evidence"\n', b""),
         VALID.replace(b'reason = "Curated evidence"', b'reason = " "'),
         VALID.replace(b'reason = "Curated evidence"\n', b""),
