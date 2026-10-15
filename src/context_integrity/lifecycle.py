@@ -25,6 +25,17 @@ def lifecycle_authority_eligible(state: LifecycleState) -> bool:
     return state in {LifecycleState.UNKNOWN, LifecycleState.ACTIVE}
 
 
+def active_authority_exclusion_reason(
+    state: LifecycleState, explicit_authority_eligible: bool | None
+) -> str | None:
+    """Policy-independent gates, with lifecycle exclusion taking precedence."""
+    if not lifecycle_authority_eligible(state):
+        return f"{state.value}_lifecycle"
+    if explicit_authority_eligible is False:
+        return "explicitly_ineligible"
+    return None
+
+
 def validate_supersession(
     specs: tuple[SupersessionSpec, ...], metadata: tuple[SourceMetadata, ...]
 ) -> None:

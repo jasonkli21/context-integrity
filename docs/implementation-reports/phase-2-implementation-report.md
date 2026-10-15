@@ -2,11 +2,13 @@
 
 **Date:** 2026-10-14  
 **Baseline:** `main`, `36d150af6cf67b8bab41c528b4304fa83da51309` (`fix phase 1 review findings`)  
-**Delivery:** Uncommitted working-tree changes on that baseline. No implementation commit created.  
-**Status:** Implemented and verified; independent Phase 2 review pending.
+**Original delivery:** `3ae38a6dc1fec72b24a64e3a0ccd8f6c2f7195d5` (`phase 2 implementation`).
+Changes were developed in a working tree and subsequently committed at that revision.
+**Status:** Implemented; independent review returned five findings, addressed by the
+cumulative review-fix change recorded below.
 
-The pre-existing untracked `docs/plans/phase-2-implementation-plan.md` was the normative
-Phase 2 input and remains unchanged. Completed Phase 0/1 plans and historical reports were
+At implementation-session start, `docs/plans/phase-2-implementation-plan.md` was an untracked
+normative input; the original delivery commit includes it. The completed plan remains unchanged. Completed Phase 0/1 plans and historical reports were
 not rewritten. This report records implementation evidence, not an independent review.
 
 ## Implemented behavior
@@ -62,8 +64,8 @@ uv run context-integrity lifecycle show docs/adr/0008-storage.md . --format json
 ```
 
 List/show support text/JSON/output files. Show returns one source and direct incoming/outgoing
-relations, revision, origin/reason, and lifecycle authority eligibility without invoking an
-authority policy. It retains all scan warnings. Source-not-found exits 2, output failure 4,
+relations, revision, origin/reason, lifecycle-only eligibility, explicit global eligibility,
+and combined active-authority eligibility/exclusion without invoking an authority policy. It retains all scan warnings. Source-not-found exits 2, output failure 4,
 configuration failure 6. Scan renders effective lifecycle/counts through existing fields;
 explain displays built-in lifecycle, explicit metadata, reason, direct successor, effective
 state, and lifecycle eligibility while retaining its policy-resolution limitation.
@@ -219,7 +221,7 @@ of independent architectural approval.
 
 | Criterion | Evidence |
 | --- | --- |
-| authority resolver uses lifecycle eligibility helper. | authority.resolve_authority calls lifecycle_authority_eligible; L: test_authority_lifecycle_matrix. |
+| authority resolver uses lifecycle eligibility helper. | authority.resolve_authority shares active_authority_exclusion_reason with inspection; L: test_authority_lifecycle_matrix. |
 | new state-specific exclusion reasons stable. | L: test_authority_lifecycle_matrix pins every state exclusion. |
 | equal-tier semantics unchanged. | A: test_equal_tier_and_no_recency; original goldens unchanged. |
 | missing-stronger-tier semantics unchanged. | A: test_resolution_policies; test_no_candidates; original goldens unchanged. |
@@ -292,9 +294,9 @@ be safely readable and consistent. Scans remain sequential observations, not ato
 transient changes that leave identical bytes between reads cannot all be detected. POSIX
 safe-open support remains the platform boundary.
 
-Independent Phase 2 review is the next step, including downstream seam assessment. This
-implementation report does not substitute for that review. No review agent was asked to
-grade the implementation during this session.
+The independent Phase 0–2/Phase 2 review is retained under `docs/reviews/`.
+This implementation report records fixes and testing, not independent approval of those fixes.
+Final independent verification of the corrections remains the next review step.
 
 ## Deferred / key Phase 3 inputs
 
@@ -307,3 +309,61 @@ or agreement. Preserve explicit edge provenance; do not infer transitive or rece
 Claim extraction, semantic contradiction/drift, clock-based expiry, mutation/auto-fix,
 persistence, LLMs/embeddings, context contracts/compiler, cross-repository lifecycle,
 Codebase Intelligence integration, and API/MCP/daemon work remain deferred.
+
+
+## Cumulative independent review fixes (2026-10-14)
+
+Review: [Phase 2 independent review and collective Phase 0–2 audit](../reviews/phase-2-independent-review.md),
+reviewed original delivery `3ae38a6dc1fec72b24a64e3a0ccd8f6c2f7195d5`, outcome
+**PASS WITH FINDINGS** (one P1 and four P2). Finding IDs here belong to that review.
+
+- **F-001:** Shared pure `active_authority_exclusion_reason` applies lifecycle first, then
+  explicit global ineligibility. Lifecycle text/JSON exposes the lifecycle gate, nullable
+  explicit eligibility, combined eligibility, and nullable exclusion reason. Policy membership
+  is not consulted. Five CLI scenarios verify JSON/text and agreement with authority resolve.
+  Only the three new lifecycle JSON v1 goldens gain the three eligibility fields; original
+  inventory/authority schema keys and golden files are unchanged.
+- **F-002:** Original delivery provenance now names the committed Phase 2 tree and preserves
+  the original implementation-session chronology.
+- **F-003:** Repository discovery neutralizes inherited ceiling/cross-filesystem controls;
+  remote identity uses repository-local config. Synthetic tests cover external global/system/
+  command origin scopes, same-path source-ID separation, Git ignores, and real local origins.
+- **F-004:** Phase 0/1 reports name the actual delivery and review-fix commits from Git history.
+- **F-005:** Retained the supplied independent review and recovered the original Phase 0/1
+  independent review artifacts from Downloads, verifying their reviewed commits against Git
+  history. All three original review records are preserved; no historical prose was invented.
+
+All five findings have implementation/evidence corrections; final independent verification
+of these corrections remains separate from this implementation session.
+
+**Review-fix commit:** the single commit titled `fix phases 0-2 independent review findings`
+containing this section, based directly on original Phase 2 delivery `3ae38a6d`.
+Resolve its exact SHA with:
+
+```bash
+git log -1 --format=%H --fixed-strings --grep='fix phases 0-2 independent review findings'
+```
+
+The commit is identified by its containing change rather than embedding its own hash
+(which would change that hash). The final delivery message records the created SHA.
+
+
+### Post-fix verification
+
+```bash
+UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check
+```
+
+Passed Ruff lint, Ruff format (50 files), and **353 tests** on Python **3.12.13**,
+pytest **9.1.1**, macOS. The reviewed Phase 2 delivery recorded 343 tests; this correction
+adds ten regression cases. Targeted repository/acquisition tests passed (57), followed by
+lifecycle/authority/configuration tests (218). The full gate includes the strengthened
+local-origin checks under all three external config scopes. The five new CLI scenarios
+exercise text/JSON inspection and authority resolve end to end.
+
+`git diff --check` and the staged equivalent passed. All original Phase 0 inventory and
+Phase 1 authority goldens remain unmodified and pass byte-for-byte. Only lifecycle v1
+source entries gain `explicit_authority_eligible`, `active_authority_eligible`, and
+`active_authority_exclusion_reason`. This satisfies Phase 2 §21.2 and the first two global
+authority gates; discovery/identity regressions restore the Phase 0 identity/ignore contract.
+No dependencies, architecture decisions, completed plans, or Phase 3 scope were changed.

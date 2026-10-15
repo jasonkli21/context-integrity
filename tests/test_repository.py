@@ -142,3 +142,52 @@ def test_discovery_fails_closed_when_git_identity_cannot_be_read(git_repo, monke
 
     with pytest.raises(RepositoryError, match="identity could not be verified"):
         discover_repository(git_repo)
+
+
+@pytest.mark.parametrize("across", ["0", "1"])
+def test_inherited_discovery_controls_preserve_git_inventory(git_repo, monkeypatch, across):
+    from context_integrity.inventory import scan_repository
+
+    nested = git_repo / "docs/nested"
+    nested.mkdir()
+    (git_repo / ".gitignore").write_text("docs/ignored.md\n")
+    (git_repo / "docs/ignored.md").write_text("ignored")
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(git_repo / "docs"))
+    monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", across)
+    context = discover_repository(nested)
+    assert context.root == git_repo
+    assert context.repository.git_available
+    manifest = scan_repository(nested)
+    assert "docs/architecture.md" in {s.path for s in manifest.sources}
+    assert "docs/ignored.md" not in {s.path for s in manifest.sources}
+
+
+@pytest.mark.parametrize("scope", ["global", "system", "command"])
+def test_external_origin_cannot_supply_repository_identity(tmp_path, git, monkeypatch, scope):
+    from context_integrity.inventory import scan_repository
+
+    external = tmp_path / "external.gitconfig"
+    external.write_text('[remote "origin"]\nurl = https://example.invalid/shared.git\n')
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(external) if scope == "global" else "/dev/null")
+    monkeypatch.setenv("GIT_CONFIG_SYSTEM", str(external) if scope == "system" else "/dev/null")
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "0")
+    if scope == "command":
+        monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+        monkeypatch.setenv("GIT_CONFIG_KEY_0", "remote.origin.url")
+        monkeypatch.setenv("GIT_CONFIG_VALUE_0", "https://example.invalid/shared.git")
+    manifests = []
+    for name in ("one", "two"):
+        root = tmp_path / name
+        root.mkdir()
+        git(root, "init", "--initial-branch=main", "--object-format=sha1")
+        (root / "AGENTS.md").write_text("Instructions")
+        manifests.append(scan_repository(root))
+    assert all(m.repository.git_available for m in manifests)
+    assert all(m.repository.identity_basis == "local_fallback" for m in manifests)
+    assert manifests[0].repository.id != manifests[1].repository.id
+    assert manifests[0].sources[0].id != manifests[1].sources[0].id
+    git(tmp_path / "one", "config", "remote.origin.url", "git@example.invalid:team/local.git")
+    git(tmp_path / "two", "config", "remote.origin.url", "https://example.invalid/team/local.git")
+    local = [discover_repository(tmp_path / name).repository for name in ("one", "two")]
+    assert all(r.identity_basis == "git_remote" for r in local)
+    assert local[0].id == local[1].id

@@ -168,7 +168,10 @@ Other exits are 0 for success (including no authority candidates), 2 for usage/i
 source/unknown policy, 3 for a failed scan, 4 for an output write failure, and 6 for invalid,
 unsafe, or inconsistent repository configuration.
 
-Repository identity prefers a normalized `origin` network remote (credentials are removed).
+Repository identity prefers a normalized repository-local `origin` network remote
+(credentials are removed). Global/system/command-scope origin values cannot supply identity.
+Inherited Git ceiling and cross-filesystem discovery controls are ignored; Git security
+configuration remains in effect.
 The local fallback hashes the repository name plus resolved location; moving a local-only
 repository changes its ID. Source IDs hash repository ID plus normalized relative path,
 so renames create new IDs. Scans are sequential observations, not atomic Git snapshots.
@@ -273,8 +276,12 @@ uv run context-integrity lifecycle show docs/adr/0008-storage.md . --format json
 ```
 
 Both commands support `--format text|json` and `--output PATH`. `show` reports identity,
-revision, effective lifecycle, origin/reason, direct successor/predecessors, and lifecycle
-eligibility for active authority. It does not run a question-specific authority policy.
+revision, effective lifecycle, origin/reason, direct successor/predecessors, and combined
+active-authority eligibility. Lifecycle JSON v1 retains `lifecycle_authority_eligible` for
+only the lifecycle gate, and adds `explicit_authority_eligible` (true/false/null),
+`active_authority_eligible`, and `active_authority_exclusion_reason` (string/null).
+The combined result applies lifecycle exclusion before explicit `authority_eligible = false`.
+It does not run a question-specific authority policy or check policy membership.
 Source-not-found exits 2; output failure exits 4; invalid or unsafe config exits 6.
 `explain` shows built-in rules, explicit lifecycle metadata, the resolved replacement,
 effective lifecycle, and lifecycle eligibility. `scan` uses the existing lifecycle field

@@ -2,7 +2,11 @@
 
 import json
 
-from context_integrity.lifecycle import lifecycle_authority_eligible, lifecycle_entry
+from context_integrity.lifecycle import (
+    active_authority_exclusion_reason,
+    lifecycle_authority_eligible,
+    lifecycle_entry,
+)
 from context_integrity.models import (
     AuthorityPolicy,
     AuthorityResolution,
@@ -384,11 +388,16 @@ def _supersession_v1(edge: ResolvedSupersession) -> dict:
 
 def _lifecycle_entry_v1(entry: LifecycleEntry) -> dict:
     source = entry.source
+    explicit = source.source_metadata.authority_eligible if source.source_metadata else None
+    reason = active_authority_exclusion_reason(source.lifecycle, explicit)
     return {
         **_authority_source(source),
         "lifecycle_origin": entry.origin.value,
         "lifecycle_reason": entry.reason,
         "lifecycle_authority_eligible": lifecycle_authority_eligible(source.lifecycle),
+        "explicit_authority_eligible": explicit,
+        "active_authority_eligible": reason is None,
+        "active_authority_exclusion_reason": reason,
         "superseded_by": _supersession_v1(entry.superseded_by) if entry.superseded_by else None,
         "supersedes": [_supersession_v1(e) for e in entry.supersedes],
     }
@@ -443,6 +452,7 @@ def render_lifecycle_text(overview: LifecycleOverview, detail: bool = False) -> 
             lines.append(f"  supersession reason: {display(entry.superseded_by.reason)}")
         if detail:
             rev = source.revision
+            eligibility = _lifecycle_entry_v1(entry)
             lines.extend(
                 [
                     f"  kind: {source.kind}",
@@ -453,6 +463,16 @@ def render_lifecycle_text(overview: LifecycleOverview, detail: bool = False) -> 
                     f"  observed basis: {rev.observed_revision_basis}",
                     "  lifecycle authority eligibility: "
                     + str(lifecycle_authority_eligible(source.lifecycle)).lower(),
+                    "  explicit authority eligibility: "
+                    + (
+                        str(eligibility["explicit_authority_eligible"]).lower()
+                        if eligibility["explicit_authority_eligible"] is not None
+                        else "unspecified"
+                    ),
+                    "  active authority eligible: "
+                    + str(eligibility["active_authority_eligible"]).lower(),
+                    "  active authority exclusion reason: "
+                    + (eligibility["active_authority_exclusion_reason"] or "none"),
                 ]
             )
         lines.append("")

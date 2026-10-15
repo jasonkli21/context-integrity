@@ -1,6 +1,6 @@
 """Question-specific policy definitions and pure observed source-role resolution."""
 
-from context_integrity.lifecycle import lifecycle_authority_eligible
+from context_integrity.lifecycle import active_authority_exclusion_reason
 from context_integrity.models import (
     AuthorityCandidate,
     AuthorityClass,
@@ -88,10 +88,11 @@ def resolve_authority(
     excluded = []
     for source in sorted(manifest.sources, key=lambda s: s.path):
         entry = metadata.get(source.path)
-        if not lifecycle_authority_eligible(source.lifecycle):
-            reason = f"{source.lifecycle.value}_lifecycle"
-        elif entry is not None and entry.authority_eligible is False:
-            reason = "explicitly_ineligible"
+        reason = active_authority_exclusion_reason(
+            source.lifecycle, entry.authority_eligible if entry else None
+        )
+        if reason is not None:
+            pass
         elif source.authority_class not in tiers:
             reason = "not_in_policy"
         else:

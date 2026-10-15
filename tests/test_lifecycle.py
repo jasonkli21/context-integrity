@@ -459,6 +459,9 @@ def test_explicit_projection_and_compatibility(lifecycle_repo):
         "lifecycle_origin",
         "lifecycle_reason",
         "lifecycle_authority_eligible",
+        "explicit_authority_eligible",
+        "active_authority_eligible",
+        "active_authority_exclusion_reason",
         "superseded_by",
         "supersedes",
     }
@@ -607,3 +610,48 @@ def test_unobserved_symlink_endpoint_cannot_deactivate_source(tmp_path):
     assert sources(manifest)["docs/a.md"].lifecycle == "unknown"
     assert manifest.supersession == ()
     assert {w.code for w in manifest.warnings} >= {"supersession_target_missing"}
+
+
+@pytest.mark.parametrize(
+    "state,explicit,expected_reason",
+    [
+        ("active", False, "explicitly_ineligible"),
+        ("unknown", False, "explicitly_ineligible"),
+        ("active", True, None),
+        ("active", None, None),
+        ("draft", False, "draft_lifecycle"),
+    ],
+)
+def test_show_combined_authority_eligibility(tmp_path, state, explicit, expected_reason):
+    path = "docs/adr/a.md"
+    write(tmp_path, path)
+    fields = f'[[source_metadata]]\npath="{path}"\nreason="Eligibility test"\n'
+    if state != "unknown":
+        fields += f'lifecycle="{state}"\n'
+    if explicit is not None:
+        fields += f"authority_eligible={str(explicit).lower()}\n"
+    config(tmp_path, fields)
+    args = ["lifecycle", "show", path, str(tmp_path)]
+    result = runner.invoke(app, [*args, "--format", "json"])
+    assert result.exit_code == 0, result.output
+    source = json.loads(result.stdout)["sources"][0]
+    assert source["lifecycle_authority_eligible"] == (state != "draft")
+    assert source["explicit_authority_eligible"] is explicit
+    assert source["active_authority_eligible"] == (expected_reason is None)
+    assert source["active_authority_exclusion_reason"] == expected_reason
+    text = runner.invoke(app, args)
+    assert text.exit_code == 0, text.output
+    assert f"lifecycle authority eligibility: {str(state != 'draft').lower()}" in text.stdout
+    explicit_text = "unspecified" if explicit is None else str(explicit).lower()
+    assert f"explicit authority eligibility: {explicit_text}" in text.stdout
+    assert f"active authority eligible: {str(expected_reason is None).lower()}" in text.stdout
+    assert f"active authority exclusion reason: {expected_reason or 'none'}" in text.stdout
+    resolved = runner.invoke(
+        app, ["authority", "resolve", "architectural_intent", str(tmp_path), "--format", "json"]
+    )
+    assert resolved.exit_code == 0, resolved.output
+    data = json.loads(resolved.stdout)
+    if expected_reason:
+        assert next(s for s in data["excluded"] if s["path"] == path)["reason"] == expected_reason
+    else:
+        assert path in {s["path"] for s in data["highest_candidates"]}

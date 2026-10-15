@@ -13,7 +13,10 @@
   "schema_version": 1,
   "sources": [
     {
+      "active_authority_eligible": true,
+      "active_authority_exclusion_reason": null,
       "authority_class": "unknown",
+      "explicit_authority_eligible": null,
       "kind": "configuration",
       "lifecycle": "unknown",
       "lifecycle_authority_eligible": true,
@@ -31,7 +34,10 @@
       "supersedes": []
     },
     {
+      "active_authority_eligible": true,
+      "active_authority_exclusion_reason": null,
       "authority_class": "unknown",
+      "explicit_authority_eligible": null,
       "kind": "other_document",
       "lifecycle": "active",
       "lifecycle_authority_eligible": true,
@@ -49,7 +55,10 @@
       "supersedes": []
     },
     {
+      "active_authority_eligible": true,
+      "active_authority_exclusion_reason": null,
       "authority_class": "decision",
+      "explicit_authority_eligible": null,
       "kind": "decision_record",
       "lifecycle": "unknown",
       "lifecycle_authority_eligible": true,
@@ -67,7 +76,10 @@
       "supersedes": []
     },
     {
+      "active_authority_eligible": true,
+      "active_authority_exclusion_reason": null,
       "authority_class": "decision",
+      "explicit_authority_eligible": null,
       "kind": "decision_record",
       "lifecycle": "unknown",
       "lifecycle_authority_eligible": true,
@@ -85,7 +97,10 @@
       "supersedes": []
     },
     {
+      "active_authority_eligible": true,
+      "active_authority_exclusion_reason": null,
       "authority_class": "decision",
+      "explicit_authority_eligible": null,
       "kind": "decision_record",
       "lifecycle": "unknown",
       "lifecycle_authority_eligible": true,
@@ -103,7 +118,10 @@
       "supersedes": []
     },
     {
+      "active_authority_eligible": false,
+      "active_authority_exclusion_reason": "draft_lifecycle",
       "authority_class": "unknown",
+      "explicit_authority_eligible": null,
       "kind": "other_document",
       "lifecycle": "draft",
       "lifecycle_authority_eligible": false,
@@ -121,7 +139,10 @@
       "supersedes": []
     },
     {
+      "active_authority_eligible": false,
+      "active_authority_exclusion_reason": "expired_lifecycle",
       "authority_class": "unknown",
+      "explicit_authority_eligible": null,
       "kind": "other_document",
       "lifecycle": "expired",
       "lifecycle_authority_eligible": false,
@@ -139,7 +160,10 @@
       "supersedes": []
     },
     {
+      "active_authority_eligible": false,
+      "active_authority_exclusion_reason": "historical_lifecycle",
       "authority_class": "unknown",
+      "explicit_authority_eligible": null,
       "kind": "other_document",
       "lifecycle": "historical",
       "lifecycle_authority_eligible": false,
@@ -157,7 +181,10 @@
       "supersedes": []
     },
     {
+      "active_authority_eligible": false,
+      "active_authority_exclusion_reason": "historical_lifecycle",
       "authority_class": "historical",
+      "explicit_authority_eligible": null,
       "kind": "architecture",
       "lifecycle": "historical",
       "lifecycle_authority_eligible": false,
@@ -175,7 +202,10 @@
       "supersedes": []
     },
     {
+      "active_authority_eligible": false,
+      "active_authority_exclusion_reason": "invalid_lifecycle",
       "authority_class": "unknown",
+      "explicit_authority_eligible": null,
       "kind": "other_document",
       "lifecycle": "invalid",
       "lifecycle_authority_eligible": false,
@@ -193,7 +223,10 @@
       "supersedes": []
     },
     {
+      "active_authority_eligible": false,
+      "active_authority_exclusion_reason": "superseded_lifecycle",
       "authority_class": "unknown",
+      "explicit_authority_eligible": null,
       "kind": "other_document",
       "lifecycle": "superseded",
       "lifecycle_authority_eligible": false,

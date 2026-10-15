@@ -3,10 +3,12 @@
 **Date:** 2026-10-14
 **Status:** Implemented and verified; independent review findings F-001–F-004 addressed.
 **Baseline:** `d5b62ad` (`fix phase 0 independent review findings`), branch `main`.
-**Phase 1 delivery:** `9efd5fb` (`implement phase 1`). The post-review corrections and this
-updated report are included together in one follow-up commit.
+**Phase 1 delivery:** `9efd5fbc509adffbc11a1100ac2bb31caf8f1b6e` (`implement phase 1`).
+**Phase 1 review fix:** `36d150af6cf67b8bab41c528b4304fa83da51309`
+(`fix phase 1 review findings`), also the Phase 2 baseline.
 **Review:** `context-integrity-phase-1-independent-post-implementation-review.md`, findings
-F-001–F-004.
+F-001–F-004. The original external artifact was recovered and is retained as the
+[original independent review](../reviews/phase-1-independent-review.md).
 **Normative scope:** `docs/plans/phase-1-implementation-plan.md` and the supplied Phase 1
 implementation prompt. Phase 0 baseline gate passed all 129 tests before edits.
 
@@ -287,3 +289,21 @@ It must not infer supersession from dates. Keep SourceId plus raw-byte revision 
 when adding richer lifecycle decisions. Later evidence integration can populate executable
 truth without changing the delivered_behavior ordering. Claims and agreement remain separate
 from source-role resolution; no Phase 2/3 infrastructure was introduced here.
+
+
+## Cumulative Phase 0–2 review corrections (2026-10-14)
+
+The [retained independent review](../reviews/phase-2-independent-review.md) F-004 is
+addressed by the explicit original-delivery/review-fix chain above. F-005 is addressed by
+the recovered original independent review, preserving historical reviewer prose.
+The policy-independent authority gates now share a pure helper with lifecycle inspection
+(F-001); policies and authority JSON v1 remain unchanged. See the Phase 2 report's cumulative
+verification section for the shared review-fix commit and post-fix gate.
+
+
+Shared cumulative post-fix gate: `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check`
+passed Ruff lint/format and **353 tests**, Python **3.12.13** / pytest **9.1.1** / macOS.
+The single cumulative fix commit is `fix phases 0-2 independent review findings`, based on
+`3ae38a6dc1fec72b24a64e3a0ccd8f6c2f7195d5`; its exact SHA is retrievable using the Git
+command in the Phase 2 report. This cumulative verification supplements the historical
+phase-specific results above.

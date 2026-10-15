@@ -37,6 +37,9 @@ def git_command(root: Path, *args: str) -> subprocess.CompletedProcess[bytes]:
                 for k, v in os.environ.items()
                 if k
                 not in {
+                    # Discovery must depend on the requested path, not caller boundaries.
+                    "GIT_CEILING_DIRECTORIES",
+                    "GIT_DISCOVERY_ACROSS_FILESYSTEM",
                     "GIT_DIR",
                     "GIT_WORK_TREE",
                     "GIT_INDEX_FILE",
@@ -221,9 +224,10 @@ def discover_repository(path: Path | str) -> RepositoryContext:
         if status is not None:
             dirty, status_known = bool(status), True
             statuses = parse_status(status)
+        # Only repository-local origin defines identity; external config cannot supply it.
         # Missing origin is ordinary, so do not warn for this optional lookup.
         try:
-            result = git_command(root, "config", "--get", "remote.origin.url")
+            result = git_command(root, "config", "--local", "--get", "remote.origin.url")
             if result.returncode == 0:
                 remote = normalize_remote(os.fsdecode(result.stdout).strip())
         except (OSError, subprocess.TimeoutExpired):

@@ -3,8 +3,11 @@
 **Implementation date:** 2026-10-14  
 **Status:** Implemented and verified; independent review fixes applied and verified.
 **Initial implementation checkout:** The original implementation report was prepared from a
-source copy without `.git` metadata. The subsequent review-fix pass is recorded in one commit
-on the repository branch.
+source copy without `.git` metadata. Repository history now identifies the original delivery
+as `240dc93458ed11db901ede9cc264eb3e98a09594` (`initial commit`) and the independent-review
+fix as `d5b62adc9de40416fd715983b2ec629378a4b5c0`
+(`fix phase 0 independent review findings`).
+**Review evidence:** [original independent review](../reviews/phase-0-independent-review.md).
 **Normative scope:** `docs/plans/phase-0-implementation-plan.md`; architecture unchanged.
 
 ## Implemented
@@ -36,7 +39,7 @@ Changed components:
   filename patterns, fallback. Historical lifecycle runs independently and overrides only
   authority/lifecycle. Classification confidence at the top level is kind confidence;
   `basis` carries confidence and explanation for each dimension/rule.
-- Repository ID: `repo_` plus the first 32 hex digits of SHA-256. Prefer normalized `origin`
+- Repository ID: `repo_` plus the first 32 hex digits of SHA-256. Prefer normalized repository-local `origin`
   network remote (host/repository path, `.git` stripped, credentials/query/fragment discarded).
   Otherwise hash repository name + NUL + resolved root. Local moves can change IDs; absolute
   roots are never serialized by default. Source ID hashes repository ID + NUL + relative path.
@@ -214,3 +217,27 @@ Ruff lint and format passed; **129 tests passed** on Python 3.12.13/macOS. A foc
 `tests/test_repository.py`, `tests/test_acquisition.py`, `tests/test_rendering.py`, and
 `tests/test_cli.py` also passed (71 tests). No public JSON bytes or architecture schema changed;
 the README now documents deleted-source behavior.
+
+
+## Cumulative Phase 0–2 review corrections (2026-10-14)
+
+The [retained independent review](../reviews/phase-2-independent-review.md) adds F-003:
+Git discovery now discards inherited `GIT_CEILING_DIRECTORIES` and
+`GIT_DISCOVERY_ACROSS_FILESYSTEM`, alongside existing repository-location overrides.
+Origin lookup uses `git config --local --get remote.origin.url`; external configuration
+cannot manufacture canonical identity. Global/system security settings remain enabled.
+Synthetic tests cover Git enumeration/ignore behavior under discovery controls, distinct
+repository/source IDs for unrelated no-origin repositories, external origin scopes, and
+normalization of genuine local origins. Existing worktree/redirect protections remain.
+
+F-004 corrects the committed delivery chain above; F-005 retains the recovered original
+independent review. See the Phase 2 report's cumulative verification section for the shared
+review-fix commit and post-fix gate.
+
+
+Shared cumulative post-fix gate: `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check`
+passed Ruff lint/format and **353 tests**, Python **3.12.13** / pytest **9.1.1** / macOS.
+The single cumulative fix commit is `fix phases 0-2 independent review findings`, based on
+`3ae38a6dc1fec72b24a64e3a0ccd8f6c2f7195d5`; its exact SHA is retrievable using the Git
+command in the Phase 2 report. This cumulative verification supplements the historical
+phase-specific results above.
