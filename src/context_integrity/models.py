@@ -42,8 +42,13 @@ class AuthorityClass(StrEnum):
 
 
 class LifecycleState(StrEnum):
-    HISTORICAL = "historical"
     UNKNOWN = "unknown"
+    DRAFT = "draft"
+    ACTIVE = "active"
+    SUPERSEDED = "superseded"
+    HISTORICAL = "historical"
+    EXPIRED = "expired"
+    INVALID = "invalid"
 
 
 class ClassificationConfidence(StrEnum):
@@ -108,7 +113,7 @@ class SourceRecord:
     revision: SourceRevision
     classification: ClassificationResult
     size_bytes: int | None
-    authority_metadata: SourceAuthorityMetadata | None = None
+    source_metadata: SourceMetadata | None = None
 
 
 @dataclass(frozen=True)
@@ -136,7 +141,8 @@ class InventoryManifest:
     summary: InventorySummary
     warnings: tuple[ScanWarning, ...]
     schema_version: int = 1
-    authority_config: RepositoryAuthorityConfig | None = None
+    repository_config: RepositoryConfig | None = None
+    supersession: tuple[ResolvedSupersession, ...] = ()
 
 
 def make_source_id(repository_id: str, normalized_path: str) -> SourceId:
@@ -176,19 +182,21 @@ class AuthorityPolicy:
 
 
 @dataclass(frozen=True)
-class SourceAuthorityMetadata:
+class SourceMetadata:
     path: str
     reason: str
     authority_class_override: AuthorityClass | None = None
     authority_eligible: bool | None = None
+    lifecycle_override: LifecycleState | None = None
 
 
 @dataclass(frozen=True)
-class RepositoryAuthorityConfig:
+class RepositoryConfig:
     policies: tuple[AuthorityPolicy, ...] = ()
-    source_metadata: tuple[SourceAuthorityMetadata, ...] = ()
+    source_metadata: tuple[SourceMetadata, ...] = ()
     content_sha256: str | None = None
     schema_version: int = 1
+    supersession: tuple[SupersessionSpec, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -220,4 +228,44 @@ class AuthorityResolution:
     lower_candidates: tuple[AuthorityCandidate, ...]
     missing_stronger_tiers: tuple[int, ...]
     excluded: tuple[AuthorityExclusion, ...]
+    warnings: tuple[ScanWarning, ...]
+
+
+@dataclass(frozen=True)
+class SupersessionSpec:
+    source_path: str
+    superseded_by_path: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class ResolvedSupersession:
+    source: SourceRecord
+    superseded_by: SourceRecord
+    reason: str
+    config_sha256: str | None
+
+
+class LifecycleOrigin(StrEnum):
+    FALLBACK_UNKNOWN = "fallback_unknown"
+    PATH_HEURISTIC = "path_heuristic"
+    REPOSITORY_METADATA = "repository_metadata"
+    SUPERSESSION = "supersession"
+
+
+@dataclass(frozen=True)
+class LifecycleEntry:
+    source: SourceRecord
+    origin: LifecycleOrigin
+    reason: str
+    superseded_by: ResolvedSupersession | None = None
+    supersedes: tuple[ResolvedSupersession, ...] = ()
+
+
+@dataclass(frozen=True)
+class LifecycleOverview:
+    repository: RepositoryRef
+    config_sha256: str | None
+    sources: tuple[LifecycleEntry, ...]
+    supersession: tuple[ResolvedSupersession, ...]
     warnings: tuple[ScanWarning, ...]

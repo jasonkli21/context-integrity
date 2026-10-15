@@ -6,6 +6,7 @@ from pathlib import Path
 from context_integrity.acquisition import enumerate_candidates, read_source
 from context_integrity.classification import apply_authority_metadata, classify_source
 from context_integrity.configuration import CONFIG_PATH, load_config, verify_config_revision
+from context_integrity.lifecycle import apply_lifecycle_metadata, resolve_supersession
 from context_integrity.models import (
     AuthorityClass,
     GitFileStatus,
@@ -44,6 +45,7 @@ def inventory_repository(context: RepositoryContext) -> InventoryManifest:
             continue
         entry = metadata.get(path)
         classification = apply_authority_metadata(classify_source(path), entry)
+        classification = apply_lifecycle_metadata(classification, entry)
         revision = SourceRevision(
             digest,
             context.repository.git_head,
@@ -63,19 +65,33 @@ def inventory_repository(context: RepositoryContext) -> InventoryManifest:
                 entry,
             )
         )
+    # Resolve relations only after the complete observed endpoint set is known.
+    final_sources, edges, edge_warnings = resolve_supersession(tuple(sources), config)
+    sources = list(final_sources)
+    context.warnings.extend(edge_warnings)
+    observed_paths = {s.path for s in sources}
+    for path in sorted(metadata.keys() - observed_paths):
+        entry = metadata[path]
+        if entry.authority_class_override is not None or entry.authority_eligible is not None:
+            context.warnings.append(
+                ScanWarning(
+                    "authority_metadata_source_missing",
+                    path,
+                    "Authority metadata references a source absent from inventory.",
+                )
+            )
+        if entry.lifecycle_override is not None:
+            context.warnings.append(
+                ScanWarning(
+                    "lifecycle_metadata_source_missing",
+                    path,
+                    "Lifecycle metadata references a source absent from inventory.",
+                )
+            )
     observed_config = next((s for s in sources if s.path == CONFIG_PATH), None)
     verify_config_revision(
         context, config, observed_config.revision.content_sha256 if observed_config else None
     )
-    observed_paths = {s.path for s in sources}
-    for path in sorted(metadata.keys() - observed_paths):
-        context.warnings.append(
-            ScanWarning(
-                "authority_metadata_source_missing",
-                path,
-                "Authority metadata references a source absent from inventory.",
-            )
-        )
     warnings = tuple(sorted(context.warnings, key=lambda w: (w.path or "", w.code, w.message)))
     summary = InventorySummary(
         len(sources),
@@ -87,7 +103,12 @@ def inventory_repository(context: RepositoryContext) -> InventoryManifest:
         sum(s.authority_class == AuthorityClass.UNKNOWN for s in sources),
     )
     return InventoryManifest(
-        context.repository, tuple(sources), summary, warnings, authority_config=config
+        context.repository,
+        tuple(sources),
+        summary,
+        warnings,
+        repository_config=config,
+        supersession=edges,
     )
 
 

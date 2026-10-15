@@ -13,7 +13,7 @@ from context_integrity.models import (
 from context_integrity.models import (
     ClassificationResult,
     RuleMatch,
-    SourceAuthorityMetadata,
+    SourceMetadata,
 )
 from context_integrity.models import (
     LifecycleState as L,
@@ -270,7 +270,7 @@ def classify_source(path: str) -> ClassificationResult:
 
 
 def apply_authority_metadata(
-    classification: ClassificationResult, metadata: SourceAuthorityMetadata | None
+    classification: ClassificationResult, metadata: SourceMetadata | None
 ) -> ClassificationResult:
     if metadata is None or metadata.authority_class_override is None:
         return classification

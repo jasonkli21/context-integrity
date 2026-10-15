@@ -1,0 +1,216 @@
+{
+  "config_sha256": "9a8d7c3372cbe9ee1187f3f83c767a435321683f31696b7376b85fee1e274d75",
+  "repository": {
+    "git": {
+      "available": false,
+      "dirty": null,
+      "head": null
+    },
+    "id": "repo_fixture",
+    "identity_basis": "fixture",
+    "name": "lifecycle-fixture"
+  },
+  "schema_version": 1,
+  "sources": [
+    {
+      "authority_class": "unknown",
+      "kind": "configuration",
+      "lifecycle": "unknown",
+      "lifecycle_authority_eligible": true,
+      "lifecycle_origin": "fallback_unknown",
+      "lifecycle_reason": "no_historical_signal",
+      "path": ".context-integrity.toml",
+      "revision": {
+        "content_sha256": "9a8d7c3372cbe9ee1187f3f83c767a435321683f31696b7376b85fee1e274d75",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_.context-integrity.toml",
+      "superseded_by": null,
+      "supersedes": []
+    },
+    {
+      "authority_class": "unknown",
+      "kind": "other_document",
+      "lifecycle": "active",
+      "lifecycle_authority_eligible": true,
+      "lifecycle_origin": "repository_metadata",
+      "lifecycle_reason": "Declared state",
+      "path": "docs/active.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/active.md",
+      "superseded_by": null,
+      "supersedes": []
+    },
+    {
+      "authority_class": "decision",
+      "kind": "decision_record",
+      "lifecycle": "unknown",
+      "lifecycle_authority_eligible": true,
+      "lifecycle_origin": "fallback_unknown",
+      "lifecycle_reason": "no_historical_signal",
+      "path": "docs/adr/a.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/adr/a.md",
+      "superseded_by": null,
+      "supersedes": []
+    },
+    {
+      "authority_class": "decision",
+      "kind": "decision_record",
+      "lifecycle": "unknown",
+      "lifecycle_authority_eligible": true,
+      "lifecycle_origin": "fallback_unknown",
+      "lifecycle_reason": "no_historical_signal",
+      "path": "docs/adr/b.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/adr/b.md",
+      "superseded_by": null,
+      "supersedes": []
+    },
+    {
+      "authority_class": "decision",
+      "kind": "decision_record",
+      "lifecycle": "unknown",
+      "lifecycle_authority_eligible": true,
+      "lifecycle_origin": "fallback_unknown",
+      "lifecycle_reason": "no_historical_signal",
+      "path": "docs/adr/c.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/adr/c.md",
+      "superseded_by": null,
+      "supersedes": []
+    },
+    {
+      "authority_class": "unknown",
+      "kind": "other_document",
+      "lifecycle": "draft",
+      "lifecycle_authority_eligible": false,
+      "lifecycle_origin": "repository_metadata",
+      "lifecycle_reason": "Declared state",
+      "path": "docs/draft.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/draft.md",
+      "superseded_by": null,
+      "supersedes": []
+    },
+    {
+      "authority_class": "unknown",
+      "kind": "other_document",
+      "lifecycle": "expired",
+      "lifecycle_authority_eligible": false,
+      "lifecycle_origin": "repository_metadata",
+      "lifecycle_reason": "Declared state",
+      "path": "docs/expired.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/expired.md",
+      "superseded_by": null,
+      "supersedes": []
+    },
+    {
+      "authority_class": "unknown",
+      "kind": "other_document",
+      "lifecycle": "historical",
+      "lifecycle_authority_eligible": false,
+      "lifecycle_origin": "repository_metadata",
+      "lifecycle_reason": "Declared state",
+      "path": "docs/historical.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/historical.md",
+      "superseded_by": null,
+      "supersedes": []
+    },
+    {
+      "authority_class": "historical",
+      "kind": "architecture",
+      "lifecycle": "historical",
+      "lifecycle_authority_eligible": false,
+      "lifecycle_origin": "path_heuristic",
+      "lifecycle_reason": "directory_rule",
+      "path": "docs/history/architecture.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/history/architecture.md",
+      "superseded_by": null,
+      "supersedes": []
+    },
+    {
+      "authority_class": "unknown",
+      "kind": "other_document",
+      "lifecycle": "invalid",
+      "lifecycle_authority_eligible": false,
+      "lifecycle_origin": "repository_metadata",
+      "lifecycle_reason": "Declared state",
+      "path": "docs/invalid.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/invalid.md",
+      "superseded_by": null,
+      "supersedes": []
+    },
+    {
+      "authority_class": "unknown",
+      "kind": "other_document",
+      "lifecycle": "superseded",
+      "lifecycle_authority_eligible": false,
+      "lifecycle_origin": "repository_metadata",
+      "lifecycle_reason": "Declared state",
+      "path": "docs/superseded.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/superseded.md",
+      "superseded_by": null,
+      "supersedes": []
+    }
+  ],
+  "supersession": [],
+  "warnings": []
+}

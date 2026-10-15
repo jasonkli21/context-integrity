@@ -1,5 +1,6 @@
 """Command-line adapter for local context inventories."""
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -12,12 +13,15 @@ from context_integrity.acquisition import normalize_path
 from context_integrity.authority import effective_policies, resolve_authority
 from context_integrity.configuration import ConfigurationError
 from context_integrity.inventory import inventory_repository
+from context_integrity.lifecycle import lifecycle_overview
 from context_integrity.models import AuthorityPolicy, InventoryManifest
 from context_integrity.rendering import (
     render_authority_json,
     render_authority_text,
     render_explanation,
     render_json,
+    render_lifecycle_json,
+    render_lifecycle_text,
     render_policy,
     render_policy_list,
     render_text,
@@ -106,7 +110,8 @@ def explain(
     if source is None:
         typer.echo("Source is not an inventoried context candidate.", err=True)
         raise typer.Exit(2)
-    typer.echo(render_explanation(source), nl=False)
+    entry = next(e for e in lifecycle_overview(manifest).sources if e.source.path == path)
+    typer.echo(render_explanation(source, entry), nl=False)
     for warning in manifest.warnings:
         if warning.path in {None, path}:
             typer.echo(f"Warning: {warning.code}: {warning.message}")
@@ -120,7 +125,7 @@ app.add_typer(authority_app, name="authority")
 
 def requested_policy(manifest: InventoryManifest, policy_id: str) -> AuthorityPolicy:
     policy = next(
-        (p for p in effective_policies(manifest.authority_config) if p.id == policy_id), None
+        (p for p in effective_policies(manifest.repository_config) if p.id == policy_id), None
     )
     if policy is None:
         raise typer.BadParameter("Unknown authority policy ID.")
@@ -136,7 +141,7 @@ def authority_list(
     _, manifest = load_inventory(path)
     typer.echo(
         render_policy_list(
-            effective_policies(manifest.authority_config), format == OutputFormat.JSON
+            effective_policies(manifest.repository_config), format == OutputFormat.JSON
         ),
         nl=False,
     )
@@ -178,6 +183,69 @@ def authority_resolve(
             raise typer.Exit(4) from exc
     else:
         typer.echo(rendered, nl=False)
+
+
+lifecycle_app = typer.Typer(help="Inspect explicit source lifecycle.", no_args_is_help=True)
+app.add_typer(lifecycle_app, name="lifecycle")
+
+
+def _lifecycle_output(
+    manifest: InventoryManifest,
+    format: OutputFormat,
+    output: Path | None,
+    source_path: str | None = None,
+) -> None:
+    overview = lifecycle_overview(manifest)
+    if source_path is not None:
+        try:
+            normalized = normalize_path(source_path)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        entries = tuple(e for e in overview.sources if e.source.path == normalized)
+        if not entries:
+            typer.echo("Source is not an inventoried context candidate.", err=True)
+            raise typer.Exit(2)
+        # Keep the same schema with one source and its direct relations only.
+        edges = tuple(
+            e for e in overview.supersession if normalized in {e.source.path, e.superseded_by.path}
+        )
+        overview = replace(overview, sources=entries, supersession=edges)
+    rendered = (
+        render_lifecycle_json(overview)
+        if format == OutputFormat.JSON
+        else render_lifecycle_text(overview, detail=source_path is not None)
+    )
+    if output:
+        try:
+            output.write_text(rendered, encoding="utf-8")
+        except (OSError, ValueError) as exc:
+            typer.echo("Output file could not be written.", err=True)
+            raise typer.Exit(4) from exc
+    else:
+        typer.echo(rendered, nl=False)
+
+
+@lifecycle_app.command("list")
+def lifecycle_list(
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """List effective lifecycle, provenance, and direct supersession."""
+    _, manifest = load_inventory(path)
+    _lifecycle_output(manifest, format, output)
+
+
+@lifecycle_app.command("show")
+def lifecycle_show(
+    source_path: Annotated[str, typer.Argument()],
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Inspect one source's lifecycle and revision without resolving an authority policy."""
+    _, manifest = load_inventory(path)
+    _lifecycle_output(manifest, format, output, source_path)
 
 
 if __name__ == "__main__":

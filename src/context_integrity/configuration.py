@@ -1,23 +1,25 @@
-"""Strict local authority configuration parsing and descriptor-safe loading."""
+"""Strict versioned repository configuration parsing and descriptor-safe loading."""
 
 import os
 import tomllib
 from hashlib import sha256
 
 from context_integrity.acquisition import normalize_path, read_source_bytes
+from context_integrity.lifecycle import validate_supersession
 from context_integrity.models import (
     AuthorityClass,
     AuthorityPolicy,
     AuthorityTier,
-    RepositoryAuthorityConfig,
-    SourceAuthorityMetadata,
+    LifecycleState,
+    RepositoryConfig,
+    SourceMetadata,
+    SupersessionSpec,
 )
 from context_integrity.repository import RepositoryContext
 
 CONFIG_PATH = ".context-integrity.toml"
 
-# Phase 1 document metadata can correct document roles, but it cannot synthesize
-# executable evidence or emulate the lifecycle model reserved for a later phase.
+# Document metadata cannot synthesize executable evidence or bypass lifecycle filtering.
 SOURCE_METADATA_AUTHORITY_CLASSES = frozenset(
     {
         AuthorityClass.VERIFICATION_EVIDENCE,
@@ -32,7 +34,7 @@ SOURCE_METADATA_AUTHORITY_CLASSES = frozenset(
 
 
 class ConfigurationError(Exception):
-    """Authority interpretation cannot proceed safely."""
+    """Repository interpretation cannot proceed safely."""
 
 
 def _table(value: object, allowed: set[str]) -> dict:
@@ -53,14 +55,26 @@ def _text(value: object) -> str:
     return value
 
 
-def parse_config(data: bytes) -> RepositoryAuthorityConfig:
-    """Parse only the Phase 1 schema; unknown keys fail closed."""
+def _path(value: object) -> str:
+    raw = _text(value)
+    # POSIX repository paths only, reject Windows drive/UNC ambiguity too.
+    if "\\" in raw or ":" in raw or raw.endswith("/"):
+        raise ValueError("Unsafe configuration path.")
+    return normalize_path(raw)
+
+
+def parse_config(data: bytes) -> RepositoryConfig:
+    """Parse v1 authority-only or v2 lifecycle config; unknown keys fail closed."""
     try:
-        root = _table(
-            tomllib.loads(data.decode("utf-8")), {"schema_version", "authority", "source_metadata"}
-        )
-        if type(root.get("schema_version")) is not int or root["schema_version"] != 1:
+        raw_root = tomllib.loads(data.decode("utf-8"))
+        version = raw_root.get("schema_version")
+        if type(version) is not int or version not in {1, 2}:
             raise ValueError("Unsupported configuration schema version.")
+        root = _table(
+            raw_root,
+            {"schema_version", "authority", "source_metadata"}
+            | ({"supersession"} if version == 2 else set()),
+        )
         digest = sha256(data).hexdigest()
         authority = _table(root.get("authority", {}), {"policies"})
         policies = []
@@ -76,7 +90,7 @@ def parse_config(data: bytes) -> RepositoryAuthorityConfig:
                     _text(entry.get("description")),
                     tiers,
                     "repository_config",
-                    "config-v1",
+                    f"config-v{version}",
                     digest,
                 )
             )
@@ -84,12 +98,17 @@ def parse_config(data: bytes) -> RepositoryAuthorityConfig:
             raise ValueError("Duplicate policy ID.")
         metadata = []
         for raw in _array(root.get("source_metadata", [])):
-            entry = _table(raw, {"path", "authority_class", "authority_eligible", "reason"})
-            raw_path = _text(entry.get("path"))
-            # POSIX repository paths only, also reject Windows drive/UNC ambiguity.
-            if "\\" in raw_path or ":" in raw_path or raw_path.endswith("/"):
-                raise ValueError("Unsafe metadata path.")
-            path = normalize_path(raw_path)
+            entry = _table(
+                raw,
+                {"path", "authority_class", "authority_eligible", "reason"}
+                | ({"lifecycle"} if version == 2 else set()),
+            )
+            path = _path(entry.get("path"))
+            lifecycle = LifecycleState(_text(entry["lifecycle"])) if "lifecycle" in entry else None
+            if lifecycle == LifecycleState.UNKNOWN:
+                raise ValueError("Unknown lifecycle is fallback only.")
+            if lifecycle is not None and path == CONFIG_PATH:
+                raise ValueError("Configuration cannot manage its own lifecycle.")
             eligible = entry.get("authority_eligible")
             if "authority_eligible" in entry and type(eligible) is not bool:
                 raise ValueError("authority_eligible must be boolean.")
@@ -100,42 +119,51 @@ def parse_config(data: bytes) -> RepositoryAuthorityConfig:
             )
             if override is not None and override not in SOURCE_METADATA_AUTHORITY_CLASSES:
                 raise ValueError("Authority class is reserved from Phase 1 source metadata.")
-            if override is None and eligible is None:
-                raise ValueError(
-                    "Source metadata must specify an authority override or eligibility."
-                )
+            if override is None and eligible is None and lifecycle is None:
+                raise ValueError("Source metadata must specify an override or eligibility.")
             metadata.append(
-                SourceAuthorityMetadata(
+                SourceMetadata(
                     path,
                     _text(entry.get("reason")),
                     override,
                     eligible,
+                    lifecycle,
                 )
             )
         if len({m.path for m in metadata}) != len(metadata):
             raise ValueError("Duplicate source metadata path.")
-        return RepositoryAuthorityConfig(tuple(policies), tuple(metadata), digest)
+        supersession = []
+        for raw in _array(root.get("supersession", [])):
+            entry = _table(raw, {"source", "superseded_by", "reason"})
+            source, target = _path(entry.get("source")), _path(entry.get("superseded_by"))
+            if CONFIG_PATH in {source, target}:
+                raise ValueError("Configuration cannot be a supersession endpoint.")
+            supersession.append(SupersessionSpec(source, target, _text(entry.get("reason"))))
+        validate_supersession(tuple(supersession), tuple(metadata))
+        return RepositoryConfig(
+            tuple(policies), tuple(metadata), digest, version, tuple(supersession)
+        )
     except (ValueError, TypeError, KeyError, RecursionError) as exc:
         # Parser exceptions can contain arbitrary repository text; keep errors path/body-free.
         raise ConfigurationError("Invalid .context-integrity.toml configuration.") from exc
 
 
-def load_config(context: RepositoryContext) -> RepositoryAuthorityConfig:
+def load_config(context: RepositoryContext) -> RepositoryConfig:
     try:
         os.lstat(context.root / CONFIG_PATH)
     except FileNotFoundError:
-        return RepositoryAuthorityConfig()
+        return RepositoryConfig()
     except OSError as exc:
-        raise ConfigurationError("Authority configuration could not be inspected safely.") from exc
+        raise ConfigurationError("Repository configuration could not be inspected safely.") from exc
     data = read_source_bytes(context, CONFIG_PATH)
     if data is None:
-        raise ConfigurationError("Authority configuration could not be read safely.")
+        raise ConfigurationError("Repository configuration could not be read safely.")
     return parse_config(data)
 
 
 def verify_config_revision(
-    context: RepositoryContext, config: RepositoryAuthorityConfig, observed_hash: str | None
+    context: RepositoryContext, config: RepositoryConfig, observed_hash: str | None
 ) -> None:
     current = load_config(context)
     if current.content_sha256 != config.content_sha256 or observed_hash != config.content_sha256:
-        raise ConfigurationError("Authority configuration changed during inventory observation.")
+        raise ConfigurationError("Repository configuration changed during inventory observation.")

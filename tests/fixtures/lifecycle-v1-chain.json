@@ -1,0 +1,289 @@
+{
+  "config_sha256": "73da0ff884e1cfa2d94fc6cb7c2c61a0216d63483a4415d436b19e940d2aaf42",
+  "repository": {
+    "git": {
+      "available": false,
+      "dirty": null,
+      "head": null
+    },
+    "id": "repo_fixture",
+    "identity_basis": "fixture",
+    "name": "lifecycle-fixture"
+  },
+  "schema_version": 1,
+  "sources": [
+    {
+      "authority_class": "unknown",
+      "kind": "configuration",
+      "lifecycle": "unknown",
+      "lifecycle_authority_eligible": true,
+      "lifecycle_origin": "fallback_unknown",
+      "lifecycle_reason": "no_historical_signal",
+      "path": ".context-integrity.toml",
+      "revision": {
+        "content_sha256": "73da0ff884e1cfa2d94fc6cb7c2c61a0216d63483a4415d436b19e940d2aaf42",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_.context-integrity.toml",
+      "superseded_by": null,
+      "supersedes": []
+    },
+    {
+      "authority_class": "decision",
+      "kind": "decision_record",
+      "lifecycle": "superseded",
+      "lifecycle_authority_eligible": false,
+      "lifecycle_origin": "supersession",
+      "lifecycle_reason": "Explicit replacement",
+      "path": "docs/adr/a.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/adr/a.md",
+      "superseded_by": {
+        "config_sha256": "73da0ff884e1cfa2d94fc6cb7c2c61a0216d63483a4415d436b19e940d2aaf42",
+        "reason": "Explicit replacement",
+        "source": {
+          "authority_class": "decision",
+          "kind": "decision_record",
+          "lifecycle": "superseded",
+          "path": "docs/adr/a.md",
+          "revision": {
+            "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+            "git_head": null,
+            "git_status": "unknown",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "source_id": "src_docs/adr/a.md"
+        },
+        "superseded_by": {
+          "authority_class": "decision",
+          "kind": "decision_record",
+          "lifecycle": "superseded",
+          "path": "docs/adr/b.md",
+          "revision": {
+            "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+            "git_head": null,
+            "git_status": "unknown",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "source_id": "src_docs/adr/b.md"
+        }
+      },
+      "supersedes": []
+    },
+    {
+      "authority_class": "decision",
+      "kind": "decision_record",
+      "lifecycle": "superseded",
+      "lifecycle_authority_eligible": false,
+      "lifecycle_origin": "supersession",
+      "lifecycle_reason": "Explicit replacement",
+      "path": "docs/adr/b.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/adr/b.md",
+      "superseded_by": {
+        "config_sha256": "73da0ff884e1cfa2d94fc6cb7c2c61a0216d63483a4415d436b19e940d2aaf42",
+        "reason": "Explicit replacement",
+        "source": {
+          "authority_class": "decision",
+          "kind": "decision_record",
+          "lifecycle": "superseded",
+          "path": "docs/adr/b.md",
+          "revision": {
+            "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+            "git_head": null,
+            "git_status": "unknown",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "source_id": "src_docs/adr/b.md"
+        },
+        "superseded_by": {
+          "authority_class": "decision",
+          "kind": "decision_record",
+          "lifecycle": "active",
+          "path": "docs/adr/c.md",
+          "revision": {
+            "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+            "git_head": null,
+            "git_status": "unknown",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "source_id": "src_docs/adr/c.md"
+        }
+      },
+      "supersedes": [
+        {
+          "config_sha256": "73da0ff884e1cfa2d94fc6cb7c2c61a0216d63483a4415d436b19e940d2aaf42",
+          "reason": "Explicit replacement",
+          "source": {
+            "authority_class": "decision",
+            "kind": "decision_record",
+            "lifecycle": "superseded",
+            "path": "docs/adr/a.md",
+            "revision": {
+              "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+              "git_head": null,
+              "git_status": "unknown",
+              "observed_revision_basis": "working_tree_content"
+            },
+            "source_id": "src_docs/adr/a.md"
+          },
+          "superseded_by": {
+            "authority_class": "decision",
+            "kind": "decision_record",
+            "lifecycle": "superseded",
+            "path": "docs/adr/b.md",
+            "revision": {
+              "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+              "git_head": null,
+              "git_status": "unknown",
+              "observed_revision_basis": "working_tree_content"
+            },
+            "source_id": "src_docs/adr/b.md"
+          }
+        }
+      ]
+    },
+    {
+      "authority_class": "decision",
+      "kind": "decision_record",
+      "lifecycle": "active",
+      "lifecycle_authority_eligible": true,
+      "lifecycle_origin": "repository_metadata",
+      "lifecycle_reason": "Declared state",
+      "path": "docs/adr/c.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/adr/c.md",
+      "superseded_by": null,
+      "supersedes": [
+        {
+          "config_sha256": "73da0ff884e1cfa2d94fc6cb7c2c61a0216d63483a4415d436b19e940d2aaf42",
+          "reason": "Explicit replacement",
+          "source": {
+            "authority_class": "decision",
+            "kind": "decision_record",
+            "lifecycle": "superseded",
+            "path": "docs/adr/b.md",
+            "revision": {
+              "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+              "git_head": null,
+              "git_status": "unknown",
+              "observed_revision_basis": "working_tree_content"
+            },
+            "source_id": "src_docs/adr/b.md"
+          },
+          "superseded_by": {
+            "authority_class": "decision",
+            "kind": "decision_record",
+            "lifecycle": "active",
+            "path": "docs/adr/c.md",
+            "revision": {
+              "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+              "git_head": null,
+              "git_status": "unknown",
+              "observed_revision_basis": "working_tree_content"
+            },
+            "source_id": "src_docs/adr/c.md"
+          }
+        }
+      ]
+    },
+    {
+      "authority_class": "historical",
+      "kind": "architecture",
+      "lifecycle": "historical",
+      "lifecycle_authority_eligible": false,
+      "lifecycle_origin": "path_heuristic",
+      "lifecycle_reason": "directory_rule",
+      "path": "docs/history/architecture.md",
+      "revision": {
+        "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "source_id": "src_docs/history/architecture.md",
+      "superseded_by": null,
+      "supersedes": []
+    }
+  ],
+  "supersession": [
+    {
+      "config_sha256": "73da0ff884e1cfa2d94fc6cb7c2c61a0216d63483a4415d436b19e940d2aaf42",
+      "reason": "Explicit replacement",
+      "source": {
+        "authority_class": "decision",
+        "kind": "decision_record",
+        "lifecycle": "superseded",
+        "path": "docs/adr/a.md",
+        "revision": {
+          "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+          "git_head": null,
+          "git_status": "unknown",
+          "observed_revision_basis": "working_tree_content"
+        },
+        "source_id": "src_docs/adr/a.md"
+      },
+      "superseded_by": {
+        "authority_class": "decision",
+        "kind": "decision_record",
+        "lifecycle": "superseded",
+        "path": "docs/adr/b.md",
+        "revision": {
+          "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+          "git_head": null,
+          "git_status": "unknown",
+          "observed_revision_basis": "working_tree_content"
+        },
+        "source_id": "src_docs/adr/b.md"
+      }
+    },
+    {
+      "config_sha256": "73da0ff884e1cfa2d94fc6cb7c2c61a0216d63483a4415d436b19e940d2aaf42",
+      "reason": "Explicit replacement",
+      "source": {
+        "authority_class": "decision",
+        "kind": "decision_record",
+        "lifecycle": "superseded",
+        "path": "docs/adr/b.md",
+        "revision": {
+          "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+          "git_head": null,
+          "git_status": "unknown",
+          "observed_revision_basis": "working_tree_content"
+        },
+        "source_id": "src_docs/adr/b.md"
+      },
+      "superseded_by": {
+        "authority_class": "decision",
+        "kind": "decision_record",
+        "lifecycle": "active",
+        "path": "docs/adr/c.md",
+        "revision": {
+          "content_sha256": "cb1914ff7583d60f69515e3d950e07763de058935c6b5a6a25af9af1b8fac887",
+          "git_head": null,
+          "git_status": "unknown",
+          "observed_revision_basis": "working_tree_content"
+        },
+        "source_id": "src_docs/adr/c.md"
+      }
+    }
+  ],
+  "warnings": []
+}

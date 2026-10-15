@@ -16,7 +16,15 @@ def test_enum_contract():
     for enum in enums:
         for member in enum:
             assert json.loads(json.dumps(member)) == member.value
-    assert set(LifecycleState) == {"historical", "unknown"}
+    assert set(LifecycleState) == {
+        "unknown",
+        "draft",
+        "active",
+        "superseded",
+        "historical",
+        "expired",
+        "invalid",
+    }
     assert set(ClassificationConfidence) == {"explicit", "strong", "heuristic", "unknown"}
 
 

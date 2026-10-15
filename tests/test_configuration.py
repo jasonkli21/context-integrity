@@ -46,7 +46,7 @@ def test_config_absent_and_valid(tmp_path):
         b"[",
         b"\xff",
         b"",
-        b"schema_version = 2",
+        b"schema_version = 3",
         b"schema_version = true",
         b"schema_version = '1'",
         b"schema_version = 1\ninclude = 'other.toml'",
@@ -129,20 +129,35 @@ def test_config_unreadable_fail_closed(tmp_path, monkeypatch):
         scan_repository(tmp_path)
 
 
+@pytest.mark.parametrize("schema_version", [1, 2])
 @pytest.mark.parametrize("change", ["replace", "remove", "symlink", "appear", "after_read"])
-def test_config_revision_consistency(tmp_path, monkeypatch, change):
+def test_config_revision_consistency(tmp_path, monkeypatch, change, schema_version):
     from context_integrity import inventory
 
+    valid = VALID.replace(b"schema_version = 1", f"schema_version = {schema_version}".encode())
+    if schema_version == 2:
+        valid += b"""
+[[source_metadata]]
+path="a.md"
+lifecycle="active"
+reason="Active"
+"""
+        valid += b"""
+[[supersession]]
+source="b.md"
+superseded_by="a.md"
+reason="Replacement"
+"""
     config = tmp_path / CONFIG_PATH
     if change != "appear":
-        config.write_bytes(VALID)
+        config.write_bytes(valid)
     original = inventory.enumerate_candidates
     original_read = inventory.read_source
 
     def mutate():
         if change in {"replace", "after_read"}:
             replacement = tmp_path / "replacement"
-            replacement.write_bytes(VALID + b"\n# changed\n")
+            replacement.write_bytes(valid + b"\n# changed\n")
             replacement.replace(config)
         elif change == "remove":
             config.unlink()
@@ -150,7 +165,7 @@ def test_config_revision_consistency(tmp_path, monkeypatch, change):
             config.unlink()
             config.symlink_to(tmp_path / "missing")
         else:
-            config.write_bytes(VALID)
+            config.write_bytes(valid)
 
     def enumerate_changed(context):
         paths = original(context)
@@ -178,7 +193,7 @@ def test_ignored_config_still_observed(git_repo, git):
     assert source.revision.git_status == "unknown"
     assert source.kind == "configuration"
     assert source.authority_class == source.lifecycle == "unknown"
-    assert source.revision.content_sha256 == manifest.authority_config.content_sha256
+    assert source.revision.content_sha256 == manifest.repository_config.content_sha256
 
 
 def test_config_read_failure_and_size_growth(tmp_path, monkeypatch):

@@ -10,11 +10,11 @@ Context Integrity is being built around the idea that:
 
 ## Status
 
-**Phase 1 implemented and verified; independent review findings F-001–F-004 addressed.**
+**Phase 2 lifecycle/supersession implemented and verified; independent Phase 2 review pending.**
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
 
-Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Claims, supersession, contradiction detection, architectural drift, context compilation, and LLM-assisted analysis remain deferred.
+Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Claims, contradiction detection, architectural drift, context compilation, and LLM-assisted analysis remain deferred.
 
 See [`docs/current-state.md`](docs/current-state.md) for the exact current state.
 
@@ -82,7 +82,7 @@ The projects intentionally do **not** share a database or implementation lifecyc
 │   ├── architecture.md               # system boundaries and architecture invariants
 │   ├── current-state.md              # concise status snapshot
 │   ├── plans/
-│   │   └── phase-1-implementation-plan.md
+│   │   └── phase-2-implementation-plan.md
 │   ├── adr/                          # durable architectural decisions
 │   ├── implementation-reports/       # evidence of what an implementation session changed
 │   ├── reviews/                      # independent review findings
@@ -144,8 +144,9 @@ SHA-256, Git HEAD/status, and the semantics intentionally left uninferred.
 
 Classifications are **provisional path/name conventions**, not a judgment that a document's
 claims are true. Authority precedence depends on the question and can be inspected with
-`authority resolve`. Lifecycle is `historical` only for explicit historical directory conventions;
-otherwise it is `unknown`. Recency never implies supersession. Exact known filenames
+`authority resolve`. Without lifecycle configuration, historical directory conventions produce
+`historical`; otherwise lifecycle is `unknown`. Schema v2 adds explicit lifecycle and supersession.
+Recency never implies supersession. Exact known filenames
 precede directory rules, so `docs/adr/README.md` remains a README.
 
 Git mode includes tracked and untracked nonignored context files. The root authority config
@@ -165,7 +166,7 @@ time, and application version. `--summary-only` omits only the human source tabl
 Warnings appear in both output formats. `--fail-on-warning` returns 5 after rendering.
 Other exits are 0 for success (including no authority candidates), 2 for usage/invalid
 source/unknown policy, 3 for a failed scan, 4 for an output write failure, and 6 for invalid,
-unsafe, or inconsistent authority configuration.
+unsafe, or inconsistent repository configuration.
 
 Repository identity prefers a normalized `origin` network remote (credentials are removed).
 The local fallback hashes the repository name plus resolved location; moving a local-only
@@ -199,7 +200,8 @@ repository config and inventory. Built-in policies have the stable version `buil
 A tier can contain multiple equally preferred authority classes. Every eligible source in
 the highest observed tier is returned, with lower-tier sources retained separately. No
 mtime, Git time, filename number, or same-tier tie breaker determines authority. Historical
-sources are excluded before explicit eligibility is checked. Unknown or unrelated authority
+sources, drafts, superseded sources, expired sources, and invalid sources are excluded before
+explicit eligibility is checked. Unknown and active lifecycle states pass this lifecycle gate. Unknown or unrelated authority
 classes are excluded as `not_in_policy`; they remain valid inventory sources.
 
 **This resolves observed source-role precedence only. It does not establish claim correctness
@@ -234,12 +236,12 @@ letter. Tiers must be nonempty, with no repeated class anywhere in a policy; `un
 `historical` cannot be active tiers. Unknown config keys fail validation. There are no
 includes, imports, inheritance, commands, or remote policy fetches.
 
-Metadata requires a repository-relative POSIX path, at least one of `authority_class` or
-boolean `authority_eligible`, and a nonblank `reason`. Overrides preserve kind, lifecycle,
+Schema v1 metadata requires a repository-relative POSIX path, at least one of `authority_class` or
+boolean `authority_eligible`, and a nonblank `reason`. Authority overrides preserve kind, lifecycle,
 and kind confidence, recording explicit authority evidence. Eligibility defaults to true;
 false preserves the source in inventory but excludes it from authority resolution.
 `explain` shows both overrides and reasons. Missing metadata paths produce the structured
-warning `authority_metadata_source_missing`. Metadata cannot override kind or lifecycle;
+warning `authority_metadata_source_missing`. Schema v1 metadata cannot override kind or lifecycle;
 source metadata cannot declare `executable_truth` or `historical`. Use `authority_eligible = false`
 for policy-independent exclusion. `executable_truth` remains a valid policy tier for evidence
 provided through a future executable-evidence boundary. ADR acceptance is not inferred from
@@ -260,6 +262,90 @@ source bodies and ends with a newline. Inventory schema v1 gains no new keys.
 
 Implementation evidence and the acceptance mapping are in the
 [Phase 1 report](docs/implementation-reports/phase-1-implementation-report.md).
+
+## Using lifecycle and supersession
+
+```bash
+uv run context-integrity lifecycle list .
+uv run context-integrity lifecycle list . --format json --output /tmp/lifecycle.json
+uv run context-integrity lifecycle show docs/adr/0008-storage.md .
+uv run context-integrity lifecycle show docs/adr/0008-storage.md . --format json
+```
+
+Both commands support `--format text|json` and `--output PATH`. `show` reports identity,
+revision, effective lifecycle, origin/reason, direct successor/predecessors, and lifecycle
+eligibility for active authority. It does not run a question-specific authority policy.
+Source-not-found exits 2; output failure exits 4; invalid or unsafe config exits 6.
+`explain` shows built-in rules, explicit lifecycle metadata, the resolved replacement,
+effective lifecycle, and lifecycle eligibility. `scan` uses the existing lifecycle field
+and summary counts for effective states.
+
+| Lifecycle | Passes active-authority lifecycle gate? |
+| --- | --- |
+| `unknown` | Yes; fallback means unestablished, not active |
+| `active` | Yes |
+| `draft`, `superseded`, `historical`, `expired`, `invalid` | No |
+
+Other authority gates still apply. Exclusions use `<state>_lifecycle` before
+`explicitly_ineligible` and `not_in_policy`; policy tiers and equal-precedence behavior
+are unchanged.
+
+Schema v1 remains supported with its authority-only behavior. Choose schema v2 to add
+lifecycle metadata and supersession, alongside the same authority policy/metadata syntax:
+
+```toml
+schema_version = 2
+
+[[source_metadata]]
+path = "docs/adr/0008-storage.md"
+lifecycle = "superseded"
+reason = "Replaced by ADR-0019"
+
+[[source_metadata]]
+path = "docs/adr/0019-storage-v2.md"
+lifecycle = "active"
+reason = "Accepted current storage decision"
+
+[[supersession]]
+source = "docs/adr/0008-storage.md"
+superseded_by = "docs/adr/0019-storage-v2.md"
+reason = "ADR-0019 replaces ADR-0008"
+```
+
+Explicit metadata accepts the six established states; `unknown` remains fallback only.
+One entry can combine `authority_class`, boolean `authority_eligible`, and `lifecycle`
+with one required nonblank reason. No source-kind override is supported. Explicit lifecycle
+outranks a historical path heuristic. A non-historical override restores the kind-derived
+authority role unless an explicit authority-class override supplies the role.
+
+Supersession is directional: A -> B sets A to `superseded` only when both endpoints are
+observed. It never makes B active. One direct successor per source, chains, and converging
+predecessors are supported; self edges, duplicate outgoing edges, cycles, and contradictory
+explicit lifecycle declarations fail config validation. An outgoing edge permits explicit
+`superseded` metadata only. No transitive edges are fabricated. Paths use normalized
+repository-relative POSIX syntax; traversal, absolute paths, and Windows path ambiguity
+are rejected. Lifecycle metadata and supersession cannot target `.context-integrity.toml`.
+
+Missing endpoints emit `supersession_source_missing` and/or `supersession_target_missing`.
+An unresolved edge alone cannot change lifecycle. Independently declared `superseded`
+metadata remains effective. Missing lifecycle metadata paths emit
+`lifecycle_metadata_source_missing`; combined authority metadata may also emit the existing
+authority warning. Config is never rewritten, and its raw-byte hash must match the bytes
+used for observation, lifecycle, and authority; inconsistent reads fail closed.
+
+Lifecycle JSON has a separate schema version 1: repository identity/Git metadata, config
+hash, source IDs/paths/kinds/authority classes/revisions, lifecycle origin/reason/eligibility,
+direct `superseded_by` and `supersedes`, resolved edge list, and warnings. Edges carry both
+endpoint records and their revisions, explicit reason, and config hash. `show` uses the same
+schema with one source and its direct edges, retaining scan warnings. Output is deterministic,
+with sorted repository-relative paths, no timestamps, absolute root, or source bodies, and
+a newline at EOF. Inventory and authority JSON v1 gain no graph fields or new keys.
+
+Lifecycle is explicit source metadata only: no dates, Git timestamps, filename numbering,
+body text, or model inference establish state or supersession. Expiration is never automatic.
+No mutation commands, claims, database, or external integration are included.
+See the [Phase 2 implementation report](docs/implementation-reports/phase-2-implementation-report.md)
+for verification and the acceptance mapping.
 
 ## Development workflow
 

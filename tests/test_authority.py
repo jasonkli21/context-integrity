@@ -16,9 +16,9 @@ from context_integrity.models import AuthorityClass as A
 from context_integrity.models import (
     AuthorityPolicy,
     AuthorityTier,
-    RepositoryAuthorityConfig,
+    RepositoryConfig,
     RepositoryRef,
-    SourceAuthorityMetadata,
+    SourceMetadata,
 )
 from context_integrity.rendering import (
     authority_dict,
@@ -177,7 +177,7 @@ reason="Stale entry"
 def test_metadata_and_policy_merge(authority_repo):
     write(authority_repo, CONFIG_PATH, CONFIG)
     manifest = scan_repository(authority_repo)
-    policies = effective_policies(manifest.authority_config)
+    policies = effective_policies(manifest.repository_config)
     assert [p.id for p in policies] == sorted([*EXPECTED, "custom"])
     selected = next(p for p in policies if p.id == "architectural_intent")
     assert selected.origin == "repository_config"
@@ -214,7 +214,7 @@ def test_metadata_and_policy_merge(authority_repo):
 
 def test_eligibility_omission_defaults_true(authority_repo):
     manifest = scan_repository(authority_repo)
-    metadata = (SourceAuthorityMetadata("docs/adr/0001.md", "Eligible", authority_eligible=True),)
+    metadata = (SourceMetadata("docs/adr/0001.md", "Eligible", authority_eligible=True),)
     result = resolve_authority(manifest, policy("architectural_intent"), metadata)
     assert len(result.highest_candidates) == 2
 
@@ -312,7 +312,7 @@ def test_authority_golden(authority_repo, scenario):
         sources=tuple(replace(s, id="src_" + s.path) for s in manifest.sources),
     )
     id = "delivered_behavior" if scenario == "missing-executable" else "architectural_intent"
-    selected = next(p for p in effective_policies(manifest.authority_config) if p.id == id)
+    selected = next(p for p in effective_policies(manifest.repository_config) if p.id == id)
     rendered = render_authority_json(resolve_authority(manifest, selected))
     golden = Path(__file__).parent / "fixtures" / f"authority-v1-{scenario}.json"
     assert rendered == golden.read_text()
@@ -391,10 +391,10 @@ def test_cli_scan_and_explain_metadata(authority_repo):
     result = runner.invoke(app, ["scan", str(authority_repo), "--format", "json"])
     assert result.exit_code == 0
     data = json.loads(result.stdout)
-    assert "authority_config" not in data
+    assert "repository_config" not in data
     sources = {s["path"]: s for s in data["sources"]}
     assert sources["docs/misc.md"]["authority_class"] == "verification_evidence"
-    assert "authority_metadata" not in sources["docs/misc.md"]
+    assert "source_metadata" not in sources["docs/misc.md"]
     result = runner.invoke(app, ["explain", "docs/adr/0001.md", "--root", str(authority_repo)])
     assert result.exit_code == 0
     assert "authority_eligible: false" in result.output
@@ -403,7 +403,7 @@ def test_cli_scan_and_explain_metadata(authority_repo):
 
 def test_custom_policy_addition():
     custom = AuthorityPolicy("custom", "Custom", (AuthorityTier((A.PLAN,)),))
-    merged = effective_policies(RepositoryAuthorityConfig(policies=(custom,)))
+    merged = effective_policies(RepositoryConfig(policies=(custom,)))
     assert len(merged) == 6
     assert next(p for p in merged if p.id == "custom") == custom
     assert next(p for p in merged if p.id == "future_work") == policy("future_work")

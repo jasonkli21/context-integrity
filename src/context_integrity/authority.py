@@ -1,5 +1,6 @@
 """Question-specific policy definitions and pure observed source-role resolution."""
 
+from context_integrity.lifecycle import lifecycle_authority_eligible
 from context_integrity.models import (
     AuthorityCandidate,
     AuthorityClass,
@@ -9,9 +10,8 @@ from context_integrity.models import (
     AuthorityResolutionStatus,
     AuthorityTier,
     InventoryManifest,
-    LifecycleState,
-    RepositoryAuthorityConfig,
-    SourceAuthorityMetadata,
+    RepositoryConfig,
+    SourceMetadata,
 )
 
 BUILTIN_POLICY_VERSION = "builtin-v1"
@@ -66,7 +66,7 @@ BUILTIN_POLICIES = (
 
 
 def effective_policies(
-    config: RepositoryAuthorityConfig | None = None,
+    config: RepositoryConfig | None = None,
 ) -> tuple[AuthorityPolicy, ...]:
     policies = {p.id: p for p in BUILTIN_POLICIES}
     if config is not None:
@@ -77,9 +77,9 @@ def effective_policies(
 def resolve_authority(
     manifest: InventoryManifest,
     policy: AuthorityPolicy,
-    source_metadata: tuple[SourceAuthorityMetadata, ...] | None = None,
+    source_metadata: tuple[SourceMetadata, ...] | None = None,
 ) -> AuthorityResolution:
-    config = manifest.authority_config or RepositoryAuthorityConfig()
+    config = manifest.repository_config or RepositoryConfig()
     metadata = {
         m.path: m for m in (config.source_metadata if source_metadata is None else source_metadata)
     }
@@ -88,8 +88,8 @@ def resolve_authority(
     excluded = []
     for source in sorted(manifest.sources, key=lambda s: s.path):
         entry = metadata.get(source.path)
-        if source.lifecycle == LifecycleState.HISTORICAL:
-            reason = "historical_lifecycle"
+        if not lifecycle_authority_eligible(source.lifecycle):
+            reason = f"{source.lifecycle.value}_lifecycle"
         elif entry is not None and entry.authority_eligible is False:
             reason = "explicitly_ineligible"
         elif source.authority_class not in tiers:

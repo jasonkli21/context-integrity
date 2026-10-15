@@ -2,6 +2,7 @@
 
 import json
 
+from context_integrity.lifecycle import lifecycle_authority_eligible, lifecycle_entry
 from context_integrity.models import (
     AuthorityPolicy,
     AuthorityResolution,
@@ -9,7 +10,10 @@ from context_integrity.models import (
     ClassificationResult,
     InventoryManifest,
     InventorySummary,
+    LifecycleEntry,
+    LifecycleOverview,
     RepositoryRef,
+    ResolvedSupersession,
     RuleMatch,
     ScanWarning,
     SourceRecord,
@@ -154,7 +158,7 @@ def render_text(manifest: InventoryManifest, summary_only: bool = False) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_explanation(source: SourceRecord) -> str:
+def render_explanation(source: SourceRecord, entry: LifecycleEntry | None = None) -> str:
     lines = [
         f"Source: {display(source.path)}",
         "",
@@ -169,8 +173,11 @@ def render_explanation(source: SourceRecord) -> str:
         f"- {m.rule_id}: {m.dimension} -> {m.result} ({m.confidence}; {display(m.basis)})"
         for m in source.classification.basis
     )
-    if source.authority_metadata is not None:
-        metadata = source.authority_metadata
+    if source.source_metadata is not None and (
+        source.source_metadata.authority_class_override is not None
+        or source.source_metadata.authority_eligible is not None
+    ):
+        metadata = source.source_metadata
         eligible = (
             str(metadata.authority_eligible).lower()
             if metadata.authority_eligible is not None
@@ -185,6 +192,31 @@ def render_explanation(source: SourceRecord) -> str:
                 f"- reason: {display(metadata.reason)}",
             ]
         )
+    entry = entry or lifecycle_entry(source)
+    builtin = next(m for m in source.classification.basis if m.dimension == "lifecycle")
+    lines.extend(["", f"Built-in lifecycle: {builtin.result} ({builtin.rule_id})"])
+    lines.extend(
+        [
+            "",
+            "Effective lifecycle:",
+            f"- state: {source.lifecycle}",
+            f"- origin: {entry.origin}",
+            f"- reason: {display(entry.reason)}",
+            "- lifecycle authority eligibility: "
+            + str(lifecycle_authority_eligible(source.lifecycle)).lower(),
+            "- direct superseded_by: "
+            + (display(entry.superseded_by.superseded_by.path) if entry.superseded_by else "none"),
+        ]
+    )
+    metadata = source.source_metadata
+    if metadata and metadata.lifecycle_override is not None:
+        lines.extend(
+            [
+                "Explicit lifecycle metadata:",
+                f"- lifecycle: {metadata.lifecycle_override}",
+                f"- reason: {display(metadata.reason)}",
+            ]
+        )
     rev = source.revision
     lines.extend(
         [
@@ -196,7 +228,7 @@ def render_explanation(source: SourceRecord) -> str:
             f"- observed basis: {rev.observed_revision_basis}",
             "",
             "Not inferred:",
-            "- active, superseded, expired, or invalid status; supersession relationships",
+            "- lifecycle or supersession from recency, filenames, Git dates, or source bodies",
             "- authority policy resolution in this explanation (see `authority resolve`), "
             "claim correctness, implementation delivery, or drift",
         ]
@@ -338,4 +370,94 @@ def render_authority_text(resolution: AuthorityResolution) -> str:
         for w in resolution.warnings
     )
     lines.extend(["", "Important:", AUTHORITY_DISCLAIMER])
+    return "\n".join(lines) + "\n"
+
+
+def _supersession_v1(edge: ResolvedSupersession) -> dict:
+    return {
+        "source": _authority_source(edge.source),
+        "superseded_by": _authority_source(edge.superseded_by),
+        "reason": edge.reason,
+        "config_sha256": edge.config_sha256,
+    }
+
+
+def _lifecycle_entry_v1(entry: LifecycleEntry) -> dict:
+    source = entry.source
+    return {
+        **_authority_source(source),
+        "lifecycle_origin": entry.origin.value,
+        "lifecycle_reason": entry.reason,
+        "lifecycle_authority_eligible": lifecycle_authority_eligible(source.lifecycle),
+        "superseded_by": _supersession_v1(entry.superseded_by) if entry.superseded_by else None,
+        "supersedes": [_supersession_v1(e) for e in entry.supersedes],
+    }
+
+
+def lifecycle_dict(overview: LifecycleOverview) -> dict:
+    """Independent lifecycle JSON v1; inventory/authority projections remain separate."""
+    return {
+        "schema_version": 1,
+        "repository": _repository_v1(overview.repository),
+        "config_sha256": overview.config_sha256,
+        "sources": [
+            _lifecycle_entry_v1(e) for e in sorted(overview.sources, key=lambda e: e.source.path)
+        ],
+        "supersession": [_supersession_v1(e) for e in overview.supersession],
+        "warnings": [_warning_v1(w) for w in overview.warnings],
+    }
+
+
+def render_lifecycle_json(overview: LifecycleOverview) -> str:
+    return json.dumps(lifecycle_dict(overview), indent=2, sort_keys=True, ensure_ascii=True) + "\n"
+
+
+def render_lifecycle_text(overview: LifecycleOverview, detail: bool = False) -> str:
+    lines = [
+        "Context Integrity — Source Lifecycle",
+        "",
+        f"Repository: {display(overview.repository.name)}",
+        f"Config sha256: {overview.config_sha256 or 'absent'}",
+        "",
+    ]
+    for entry in overview.sources:
+        source = entry.source
+        lines.extend(
+            [
+                f"Source: {display(source.path)}",
+                f"  source_id: {display(source.id)}",
+                f"  lifecycle: {source.lifecycle}",
+                f"  origin: {entry.origin}",
+                f"  reason: {display(entry.reason)}",
+                "  superseded_by: "
+                + (
+                    display(entry.superseded_by.superseded_by.path)
+                    if entry.superseded_by
+                    else "none"
+                ),
+                "  supersedes: "
+                + (", ".join(display(e.source.path) for e in entry.supersedes) or "none"),
+            ]
+        )
+        if entry.superseded_by:
+            lines.append(f"  supersession reason: {display(entry.superseded_by.reason)}")
+        if detail:
+            rev = source.revision
+            lines.extend(
+                [
+                    f"  kind: {source.kind}",
+                    f"  authority_class: {source.authority_class}",
+                    f"  sha256: {rev.content_sha256 or 'unavailable'}",
+                    f"  git HEAD: {rev.git_head or 'unavailable'}",
+                    f"  git status: {rev.git_status}",
+                    f"  observed basis: {rev.observed_revision_basis}",
+                    "  lifecycle authority eligibility: "
+                    + str(lifecycle_authority_eligible(source.lifecycle)).lower(),
+                ]
+            )
+        lines.append("")
+    lines.extend(
+        f"Warning: {w.code} [{display(w.path) if w.path else 'repository'}]: {display(w.message)}"
+        for w in overview.warnings
+    )
     return "\n".join(lines) + "\n"
