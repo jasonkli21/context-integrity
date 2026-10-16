@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-15
 **Current phase:** Phase 3 — Claims and Provenance
 **Active plan:** `docs/plans/phase-3-implementation-plan.md`
-**Status:** Implemented and verified offline; independent Phase 3 review pending.
+**Status:** Implemented, offline-verified, and Phase 3 independent review findings addressed.
 
 ## Delivered
 
@@ -31,9 +31,10 @@
 ## Verification
 
 `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed:
-Ruff lint/format and **419 tests**, Python 3.12.13/macOS. Baseline: **353 tests** at
+Ruff lint/format and **426 tests**, Python 3.12.13/macOS. Baseline: **353 tests** at
 `14ce25d6fcc3ecf65a8aaf79c177323ac3cb5772`. Focused claims/config gate: **121 passed**.
-Original Phase 0–2 goldens remain byte-identical; two new claims goldens pass.
+Review-fix focused claims/config gate: **128 passed**. Original Phase 0–2 goldens remain
+byte-identical; claims JSON v1 goldens include structured diagnostics.
 Real-checkout empty claims list and synthetic v3 list/show/output smoke checks passed.
 
 Acceptance evidence: `docs/implementation-reports/phase-3-implementation-report.md`.
@@ -41,13 +42,14 @@ Prior independent review navigation: `docs/reviews/README.md`.
 
 ## Known limitations / findings
 
-No intentionally unresolved implementation findings; independent Phase 3 review pending.
-Claims are explicit config assertions only; dependency bodies are not parsed or treated as
-proof. Ordinary code and other non-inventoried paths stay unresolved. No automatic validity,
-staleness, claim authority, contradiction, drift, persistence, or external integration.
-Scans remain sequential observations rather than atomic snapshots; safe reads target POSIX.
+No intentionally unresolved implementation findings. Phase 3 review findings F-001
+(structured claim diagnostic ownership and `show` scoping) and F-002 (domain validation and
+explicit producer provenance) are fixed and tested. Claims remain explicit config assertions
+only; dependency bodies are not parsed or treated as proof. Ordinary code and other
+non-inventoried paths stay unresolved. No automatic validity, staleness, claim authority,
+contradiction, drift, persistence, or external integration. Scans remain sequential
+observations rather than atomic snapshots; safe reads target POSIX.
 
 ## Next expected step
 
-Independent Phase 3 review against the active plan, architecture, and code/tests; verify
-findings separately before proceeding to Phase 4 — Documentation / Instruction Drift.
+Proceed to Phase 4 — Documentation / Instruction Drift.

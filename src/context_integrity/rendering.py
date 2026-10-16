@@ -529,6 +529,18 @@ def claims_dict(overview: ClaimsOverview) -> dict:
             _warning_v1(w)
             for w in sorted(overview.warnings, key=lambda w: (w.path or "", w.code, w.message))
         ],
+        "diagnostics": [
+            {
+                "claim_id": d.claim_id,
+                "code": d.code,
+                "path": d.path,
+                "message": d.message,
+            }
+            for d in sorted(
+                overview.diagnostics,
+                key=lambda d: (d.path, d.code, d.claim_id, d.message),
+            )
+        ],
     }
 
 
@@ -602,11 +614,17 @@ def render_claims_text(overview: ClaimsOverview, detail: bool = False) -> str:
             "",
             "Claim validity is not derived from source lifecycle or authority resolution.",
             f"Warnings: {len(overview.warnings)}",
+            f"Claim diagnostics: {len(overview.diagnostics)}",
         ]
     )
     lines.extend(
         f"Warning: {display(w.code)} [{display(w.path) if w.path else 'repository'}]: "
         f"{display(w.message)}"
         for w in overview.warnings
+    )
+    lines.extend(
+        f"Diagnostic: claim {display(d.claim_id)} {display(d.code)} "
+        f"[{display(d.path)}]: {display(d.message)}"
+        for d in overview.diagnostics
     )
     return "\n".join(lines) + "\n"

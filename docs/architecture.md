@@ -1008,6 +1008,13 @@ A model extraction must record:
 - prompt/extractor version;
 - confidence or verification status.
 
+Claim identity and type identifiers are domain invariants and must be validated by the
+claim model boundary, regardless of producer. Provenance must name its extraction method
+and version explicitly; a producer must not inherit another producer's attribution by
+default. Claim-scoped diagnostics carry the claim ID as structured data. A filtered claim
+view includes only diagnostics for claims in that view, while repository observation
+warnings remain separately scoped.
+
 ---
 
 # 14. Integrity Engine Architecture

@@ -1,7 +1,6 @@
 """Strict versioned repository configuration parsing and descriptor-safe loading."""
 
 import os
-import re
 import tomllib
 from hashlib import sha256
 
@@ -17,6 +16,7 @@ from context_integrity.models import (
     RepositoryConfig,
     SourceMetadata,
     SupersessionSpec,
+    validate_unique_claim_ids,
 )
 from context_integrity.repository import RepositoryContext
 
@@ -150,8 +150,6 @@ def parse_config(data: bytes) -> RepositoryConfig:
                 raw, {"id", "claim_type", "subject", "predicate", "value", "scope", "depends_on"}
             )
             claim_id, claim_type = _text(entry.get("id")), _text(entry.get("claim_type"))
-            if any(not re.fullmatch(r"[a-z][a-z0-9_-]*", v) for v in (claim_id, claim_type)):
-                raise ValueError("Invalid claim ID or type.")
             dependencies = tuple(_path(p) for p in _array(entry.get("depends_on", [])))
             if CONFIG_PATH in dependencies or len(set(dependencies)) != len(dependencies):
                 raise ValueError("Self dependency or duplicate claim dependency.")
@@ -166,8 +164,7 @@ def parse_config(data: bytes) -> RepositoryConfig:
                     tuple(sorted(dependencies)),
                 )
             )
-        if len({c.id for c in claims}) != len(claims):
-            raise ValueError("Duplicate claim ID.")
+        validate_unique_claim_ids(tuple(claims))
         return RepositoryConfig(
             tuple(policies), tuple(metadata), digest, version, tuple(supersession), tuple(claims)
         )

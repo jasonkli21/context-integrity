@@ -403,12 +403,15 @@ remains unresolved, and emits `claim_dependency_revision_unavailable`. **Every c
 Both commands support `--format text|json` and `--output PATH`. List text shows ID, type,
 validity, and completeness; show adds the statement, declaration, and dependency revisions.
 Unknown claim exits 2, output write failure exits 4, and configuration errors exit 6.
-Show JSON uses the same schema with one claim and retains all observation warnings.
+Show JSON uses the same schema with one claim, repository observation warnings, and only
+that claim's diagnostics.
 
 Claims JSON has its own schema v1 with explicit fields for statements, validity,
 provenance completeness, declaration provenance, dependencies (`resolved`, nullable
-`source_id`/`revision`), and warnings. Claims sort by ID and dependencies by path; JSON
-ends with a newline and omits timestamps, absolute roots, and dependency bodies.
+`source_id`/`revision`), repository observation warnings, and claim-scoped diagnostics with
+an explicit `claim_id`. List includes diagnostics for all claims; show includes diagnostics
+only for its selected claim. Claims sort by ID and dependencies by path; JSON ends with a
+newline and omits timestamps, absolute roots, and dependency bodies.
 Inventory, authority, and lifecycle JSON v1 contracts are unchanged. No claim verification,
 authority resolution, prose extraction, or contradiction/drift evaluation runs.
 See the [Phase 3 implementation report](docs/implementation-reports/phase-3-implementation-report.md).

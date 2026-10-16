@@ -68,6 +68,14 @@
     }
   ],
   "config_sha256": "7be854d0806178789713b1df071cc7d2baf0408722f26676bdc1b0d6db871805",
+  "diagnostics": [
+    {
+      "claim_id": "owns_policy",
+      "code": "claim_dependency_missing",
+      "message": "Dependency is absent from inventory.",
+      "path": "missing.md"
+    }
+  ],
   "repository": {
     "git": {
       "available": false,
@@ -79,11 +87,5 @@
     "name": "claims-fixture"
   },
   "schema_version": 1,
-  "warnings": [
-    {
-      "code": "claim_dependency_missing",
-      "message": "Claim owns_policy: dependency is absent from inventory.",
-      "path": "missing.md"
-    }
-  ]
+  "warnings": []
 }

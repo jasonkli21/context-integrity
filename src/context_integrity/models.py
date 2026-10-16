@@ -277,6 +277,17 @@ class ClaimValidity(StrEnum):
     UNVERIFIED = "unverified"
 
 
+def _validate_claim_identifier(value: str, label: str) -> None:
+    if not isinstance(value, str) or not re.fullmatch(r"[a-z][a-z0-9_-]*", value):
+        raise ValueError(f"Invalid claim {label}.")
+
+
+def validate_unique_claim_ids(claims: tuple[ClaimSpec, ...] | tuple[ClaimRecord, ...]) -> None:
+    ids = [claim.id for claim in claims]
+    if len(ids) != len(set(ids)):
+        raise ValueError("Duplicate claim ID.")
+
+
 @dataclass(frozen=True)
 class ClaimSpec:
     id: ClaimId
@@ -287,6 +298,10 @@ class ClaimSpec:
     scope: str | None = None
     depends_on: tuple[str, ...] = ()
 
+    def __post_init__(self) -> None:
+        _validate_claim_identifier(self.id, "ID")
+        _validate_claim_identifier(self.claim_type, "type")
+
 
 @dataclass(frozen=True)
 class ClaimProvenance:
@@ -294,8 +309,19 @@ class ClaimProvenance:
     path: str
     revision: SourceRevision
     locator: str
-    extraction_method: str = "repository_config_explicit"
-    extractor_version: str = "claims-v1"
+    extraction_method: str
+    extractor_version: str
+
+
+@dataclass(frozen=True)
+class ClaimDiagnostic:
+    claim_id: ClaimId
+    code: str
+    path: str
+    message: str
+
+    def __post_init__(self) -> None:
+        _validate_claim_identifier(self.claim_id, "ID")
 
 
 @dataclass(frozen=True)
@@ -319,6 +345,10 @@ class ClaimRecord:
     dependencies: tuple[ClaimDependency, ...]
     provenance_complete: bool
 
+    def __post_init__(self) -> None:
+        _validate_claim_identifier(self.id, "ID")
+        _validate_claim_identifier(self.claim_type, "type")
+
 
 @dataclass(frozen=True)
 class ClaimsOverview:
@@ -326,4 +356,5 @@ class ClaimsOverview:
     config_sha256: str | None
     claims: tuple[ClaimRecord, ...]
     warnings: tuple[ScanWarning, ...]
+    diagnostics: tuple[ClaimDiagnostic, ...] = ()
     schema_version: int = 1

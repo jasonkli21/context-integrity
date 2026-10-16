@@ -49,7 +49,9 @@ be embedded in the same commit's contents.
 - `claims list [PATH]` and `claims show CLAIM_ID [PATH]` support text/JSON and `--output`.
   Text list is concise; show exposes the statement and declaration/dependency revisions.
   Unknown claim exits 2, output failure exits 4, config errors exit 6; normal success exits 0.
-  Show uses the same JSON schema with one claim and all observation warnings.
+  At initial implementation, show used the same JSON schema with one claim and all scan and
+  dependency warnings. The independent review fix below replaces claim dependency warnings
+  with structurally owned diagnostics and scopes them in show.
 - Separate explicit claims JSON v1 projects statements/scope, validity, completeness,
   declaration provenance, dependency identities/revisions/resolution, config hash,
   repository metadata, and warnings. Claims sort by ID, dependencies by normalized path,
@@ -124,4 +126,42 @@ Claims are explicit assertions in config only. Dependencies resolve only to obse
 inventory candidates; a file existing on disk does not guarantee it is inventoried.
 Observations remain sequential rather than atomic, and descriptor-safe reads target POSIX.
 Raw revisions allow later comparison but Phase 3 performs no revalidation judgment.
-Independent architectural review and verification remain the next step.
+Phase 3 independent review resolution and verification follow.
+
+## Independent review resolution — 2026-10-15
+
+The Phase 3 independent review identified two findings; both are addressed in the follow-up
+fix commit.
+
+- **F-001:** Claims overview now keeps repository observation warnings separate from
+  `ClaimDiagnostic` records. Each diagnostic carries `claim_id`, code, path, and message.
+  Claims list returns diagnostics for all claims; claims show returns only the selected
+  claim's diagnostics and retains repository-level warnings. The claims JSON v1 projection
+  was refined before first independent acceptance to include a deterministic `diagnostics`
+  array. No message parsing is used for ownership or filtering.
+- **F-002:** Claim ID/type syntax is enforced by both `ClaimSpec` and `ClaimRecord`; the config
+  parser reuses that domain validation and retains sanitized `ConfigurationError` behavior.
+  Claim aggregation rejects duplicate public IDs. `ClaimProvenance` requires extraction
+  method and version explicitly, and the config producer supplies its attribution directly.
+- The architecture now records these durable domain and diagnostic ownership invariants.
+  README describes the machine contract and filtered-show behavior. The completed Phase 3
+  plan remains unchanged as historical planning evidence.
+
+Verification after the fixes:
+
+```bash
+UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 uv run pytest tests/test_claims.py tests/test_configuration.py -q
+# 128 passed
+UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 uv run ruff check .
+# All checks passed
+UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 uv run ruff format --check .
+# 54 files already formatted
+UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check
+# Ruff passed; 426 tests passed
+```
+
+Focused coverage includes two claims sharing the same missing dependency, list/show ownership
+and filtering in both directions, repository-level warning behavior, golden diagnostics,
+terminal-control escaping, direct invalid domain construction, duplicate IDs at aggregation,
+and required producer attribution. Original inventory, authority, and lifecycle JSON v1
+contracts remain unchanged.

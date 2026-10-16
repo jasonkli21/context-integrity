@@ -3,14 +3,15 @@
 from context_integrity.configuration import CONFIG_PATH, ConfigurationError
 from context_integrity.models import (
     ClaimDependency,
+    ClaimDiagnostic,
     ClaimProvenance,
     ClaimRecord,
     ClaimsOverview,
     ClaimValidity,
     InventoryManifest,
     RepositoryConfig,
-    ScanWarning,
     SourceRevision,
+    validate_unique_claim_ids,
 )
 
 
@@ -37,8 +38,9 @@ def claims_overview(manifest: InventoryManifest) -> ClaimsOverview:
         or declaration.revision.content_sha256 != config.content_sha256
     ):
         raise ConfigurationError("Claim declaration revision is unavailable or inconsistent.")
+    validate_unique_claim_ids(config.claims)
     claims = []
-    warnings = list(manifest.warnings)
+    diagnostics = []
     for spec in sorted(config.claims, key=lambda c: c.id):
         dependencies = []
         for path in sorted(spec.depends_on):
@@ -53,13 +55,14 @@ def claims_overview(manifest: InventoryManifest) -> ClaimsOverview:
                 )
             )
             if not resolved:
-                warnings.append(
-                    ScanWarning(
+                diagnostics.append(
+                    ClaimDiagnostic(
+                        spec.id,
                         "claim_dependency_revision_unavailable"
                         if source
                         else "claim_dependency_missing",
                         path,
-                        f"Claim {spec.id}: dependency "
+                        "Dependency "
                         + (
                             "content revision is unavailable."
                             if source
@@ -77,7 +80,12 @@ def claims_overview(manifest: InventoryManifest) -> ClaimsOverview:
                 spec.scope,
                 ClaimValidity.UNVERIFIED,
                 ClaimProvenance(
-                    declaration.id, CONFIG_PATH, declaration.revision, f"claim:{spec.id}"
+                    declaration.id,
+                    CONFIG_PATH,
+                    declaration.revision,
+                    f"claim:{spec.id}",
+                    "repository_config_explicit",
+                    "claims-v1",
                 ),
                 tuple(dependencies),
                 all(d.resolved for d in dependencies),
@@ -87,5 +95,6 @@ def claims_overview(manifest: InventoryManifest) -> ClaimsOverview:
         manifest.repository,
         config.content_sha256,
         tuple(claims),
-        tuple(sorted(warnings, key=lambda w: (w.path or "", w.code, w.message))),
+        manifest.warnings,
+        tuple(sorted(diagnostics, key=lambda d: (d.path, d.code, d.claim_id, d.message))),
     )

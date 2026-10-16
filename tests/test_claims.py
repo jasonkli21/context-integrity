@@ -14,7 +14,14 @@ from context_integrity.cli import app
 from context_integrity.configuration import CONFIG_PATH, ConfigurationError, parse_config
 from context_integrity.inventory import scan_repository
 from context_integrity.lifecycle import lifecycle_overview
-from context_integrity.models import ClaimId, ClaimSpec, ClaimValidity, RepositoryRef
+from context_integrity.models import (
+    ClaimDiagnostic,
+    ClaimId,
+    ClaimSpec,
+    ClaimValidity,
+    RepositoryRef,
+    ScanWarning,
+)
 from context_integrity.rendering import (
     render_authority_json,
     render_claims_json,
@@ -241,9 +248,9 @@ def test_unresolved_dependencies_do_not_expand_inventory(tmp_path):
     assert all(
         not d.resolved and d.source_id is None and d.revision is None for d in claim.dependencies
     )
-    warnings = [w for w in overview.warnings if w.code == "claim_dependency_missing"]
-    assert {w.path for w in warnings} == {"missing.md", "ordinary.py", "docs/link.md"}
-    assert all("owns_policy" in w.message for w in warnings)
+    diagnostics = [d for d in overview.diagnostics if d.code == "claim_dependency_missing"]
+    assert {d.path for d in diagnostics} == {"missing.md", "ordinary.py", "docs/link.md"}
+    assert {d.claim_id for d in diagnostics} == {"owns_policy"}
 
 
 def test_unavailable_revision_is_distinct_and_resolver_does_no_io(tmp_path, monkeypatch):
@@ -273,7 +280,7 @@ def test_unavailable_revision_is_distinct_and_resolver_does_no_io(tmp_path, monk
     assert dependency.revision == unavailable.revision
     assert not dependency.resolved and not claim.provenance_complete
     assert claim.validity == "unverified"
-    assert [w.code for w in overview.warnings] == ["claim_dependency_revision_unavailable"]
+    assert [d.code for d in overview.diagnostics] == ["claim_dependency_revision_unavailable"]
 
 
 @pytest.mark.parametrize("problem", ["missing", "hash_mismatch", "unavailable"])
@@ -329,6 +336,7 @@ def test_claims_json_goldens(tmp_path, scenario):
             for c in reversed(overview.claims)
         ),
         warnings=tuple(reversed(overview.warnings)),
+        diagnostics=tuple(reversed(overview.diagnostics)),
     )
     assert render_claims_json(reordered) == rendered
     assert render_claims_json(claims_overview(scan_repository(tmp_path))) == render_claims_json(
@@ -394,7 +402,9 @@ def test_terminal_control_safety(tmp_path):
     assert "docs/evil\\nrow.md" in text and "missing\\nrow.md" in text
     assert json.loads(render_claims_json(overview))["claims"][0]["subject"] == unsafe
     # Renderer safety also covers fields normally restricted by parser validation.
-    claim = replace(overview.claims[0], id=ClaimId(unsafe), claim_type=unsafe)
+    claim = overview.claims[0]
+    object.__setattr__(claim, "id", ClaimId(unsafe))
+    object.__setattr__(claim, "claim_type", unsafe)
     assert unsafe not in render_claims_text(replace(overview, claims=(claim,)))
 
 
@@ -410,7 +420,9 @@ def test_cli_list_show_and_output(tmp_path, command, format):
         data = json.loads(result.output)
         assert len(data["claims"]) == (1 if command == "show" else 2)
         assert data["schema_version"] == 1
-        assert data["warnings"][0]["code"] == "claim_dependency_missing"
+        assert data["diagnostics"]
+        if command == "show":
+            assert {d["claim_id"] for d in data["diagnostics"]} == {"owns_policy"}
     else:
         assert "owns_policy" in result.output and "unverified" in result.output
         if command == "show":
@@ -447,6 +459,70 @@ def test_claim_spec_is_immutable_and_has_no_validity_input():
     with pytest.raises(AttributeError):
         spec.id = "other"
     assert "validity" not in {f.name for f in fields(spec)}
+
+
+@pytest.mark.parametrize("field,value", [("id", "Bad ID"), ("claim_type", "Bad Type")])
+def test_claim_domain_rejects_malformed_ids_and_types(field, value):
+    args = [ClaimId("stable"), "type", "subject", "predicate", "value"]
+    args[0 if field == "id" else 1] = ClaimId(value) if field == "id" else value
+    with pytest.raises(ValueError):
+        ClaimSpec(*args)
+
+
+def test_claim_diagnostic_requires_valid_claim_id():
+    with pytest.raises(ValueError, match="Invalid claim ID"):
+        ClaimDiagnostic(ClaimId("Bad ID"), "issue", "a.md", "bad")
+
+
+def test_claim_record_rejects_invalid_domain_identity(tmp_path):
+    configure(tmp_path)
+    claim = claims_overview(scan_repository(tmp_path)).claims[0]
+    with pytest.raises(ValueError, match="Invalid claim ID"):
+        replace(claim, id=ClaimId("Bad ID"))
+
+
+def test_claim_aggregation_rejects_duplicate_ids(tmp_path):
+    configure(tmp_path)
+    manifest = scan_repository(tmp_path)
+    spec = manifest.repository_config.claims[0]
+    config = replace(manifest.repository_config, claims=(spec, spec))
+    with pytest.raises(ValueError, match="Duplicate claim ID"):
+        claims_overview(replace(manifest, repository_config=config))
+
+
+def test_claim_provenance_requires_explicit_producer_metadata(tmp_path):
+    configure(tmp_path)
+    claim = claims_overview(scan_repository(tmp_path)).claims[0]
+    assert claim.provenance.extraction_method == "repository_config_explicit"
+    assert claim.provenance.extractor_version == "claims-v1"
+    with pytest.raises(TypeError):
+        type(claim.provenance)(
+            claim.provenance.source_id,
+            claim.provenance.path,
+            claim.provenance.revision,
+            claim.provenance.locator,
+        )
+
+
+def test_show_scopes_diagnostics_and_retains_global_warnings(tmp_path, monkeypatch):
+    entries = CLAIM.replace('"docs/architecture.md"', '"missing/a.md"') + CLAIM.replace(
+        'id = "owns_policy"', 'id = "second"'
+    ).replace('"docs/architecture.md"', '"missing/a.md"')
+    configure(tmp_path, entries)
+    manifest = scan_repository(tmp_path)
+    manifest = replace(manifest, warnings=(ScanWarning("global_issue", None, "global"),))
+    monkeypatch.setattr("context_integrity.cli.load_inventory", lambda path: (None, manifest))
+    listed = runner.invoke(app, ["claims", "list", "--format", "json"])
+    shown = runner.invoke(app, ["claims", "show", "owns_policy", "--format", "json"])
+    shown_second = runner.invoke(app, ["claims", "show", "second", "--format", "json"])
+    assert listed.exit_code == shown.exit_code == shown_second.exit_code == 0
+    list_data, show_data = json.loads(listed.output), json.loads(shown.output)
+    second_data = json.loads(shown_second.output)
+    assert {d["claim_id"] for d in list_data["diagnostics"]} == {"owns_policy", "second"}
+    assert len({(d["claim_id"], d["path"]) for d in list_data["diagnostics"]}) == 2
+    assert {d["claim_id"] for d in show_data["diagnostics"]} == {"owns_policy"}
+    assert {d["claim_id"] for d in second_data["diagnostics"]} == {"second"}
+    assert show_data["warnings"] == [{"code": "global_issue", "path": None, "message": "global"}]
 
 
 def test_ignored_config_is_declaration_but_ignored_dependency_is_unresolved(git_repo):

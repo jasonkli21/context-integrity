@@ -271,8 +271,9 @@ def _claims_output(
         if not claims:
             typer.echo("Unknown claim ID.", err=True)
             raise typer.Exit(2)
-        # Same schema and observation warnings, with only the requested claim.
-        overview = replace(overview, claims=claims)
+        # Global observation warnings remain visible; claim diagnostics are scoped.
+        diagnostics = tuple(d for d in overview.diagnostics if d.claim_id == claim_id)
+        overview = replace(overview, claims=claims, diagnostics=diagnostics)
     rendered = (
         render_claims_json(overview)
         if format == OutputFormat.JSON

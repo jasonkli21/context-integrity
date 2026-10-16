@@ -62,6 +62,7 @@
     }
   ],
   "config_sha256": "a637834846c5c33552ccc9c7592dcb75382d9dd0c59f88f90fa3282a10a95ffd",
+  "diagnostics": [],
   "repository": {
     "git": {
       "available": false,
