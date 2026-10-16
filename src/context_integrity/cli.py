@@ -12,6 +12,7 @@ from context_integrity import __version__
 from context_integrity.acquisition import normalize_path
 from context_integrity.authority import effective_policies, resolve_authority
 from context_integrity.claims import claims_overview
+from context_integrity.compiler import compile_context
 from context_integrity.configuration import ConfigurationError
 from context_integrity.contracts import effective_contracts, resolve_contract, validate_contract
 from context_integrity.integrity import integrity_overview
@@ -23,6 +24,8 @@ from context_integrity.rendering import (
     render_authority_text,
     render_claims_json,
     render_claims_text,
+    render_compiled_context_json,
+    render_compiled_context_text,
     render_contract_validation_json,
     render_contract_validation_text,
     render_contracts,
@@ -422,6 +425,33 @@ def contracts_validate(
         render_contract_validation_json(overview)
         if format == OutputFormat.JSON
         else render_contract_validation_text(overview)
+    )
+    _write_contract_output(rendered, output)
+
+
+@app.command("compile")
+def compile_command(
+    contract_id: Annotated[str, typer.Argument()],
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    task: Annotated[str | None, typer.Option()] = None,
+    budget_bytes: Annotated[int | None, typer.Option(min=1)] = None,
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Compile deterministic bounded context; incomplete results retain exit zero."""
+    _, manifest = load_inventory(path)
+    try:
+        contract = resolve_contract(manifest.repository_config, contract_id)
+        compiled = compile_context(manifest, contract, task=task, budget_bytes=budget_bytes)
+    except ConfigurationError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(6) from exc
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    rendered = (
+        render_compiled_context_json(compiled)
+        if format == OutputFormat.JSON
+        else render_compiled_context_text(compiled)
     )
     _write_contract_output(rendered, output)
 

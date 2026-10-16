@@ -211,6 +211,12 @@ class RepositoryConfig:
             not isinstance(c, ContextContract) for c in self.context_contracts
         ):
             raise ValueError("Repository contracts must be a typed tuple.")
+        if self.schema_version < 6 and any(
+            c.budget_bytes is not None
+            or any(r.priority or r.authority_policy is not None for r in c.rules)
+            for c in self.context_contracts
+        ):
+            raise ValueError("Compiler policy requires configuration schema v6.")
         contract_ids = [c.id for c in self.context_contracts]
         if len(set(contract_ids)) != len(contract_ids):
             raise ValueError("Duplicate contract ID.")
@@ -509,9 +515,15 @@ class ContextContractRule:
     lifecycles: tuple[LifecycleState, ...] = ()
     min_count: int | None = None
     max_count: int | None = None
+    priority: int = 0
+    authority_policy: str | None = None
 
     def __post_init__(self) -> None:
         _contract_identifier(self.id)
+        if type(self.priority) is not int or self.priority < 0:
+            raise ValueError("Priority must be a nonnegative integer.")
+        if self.authority_policy is not None:
+            _contract_identifier(self.authority_policy)
         if not isinstance(self.mode, ContextRuleMode):
             raise ValueError("Invalid contract rule mode.")
         dimensions = (self.paths, self.kinds, self.authority_classes, self.lifecycles)
@@ -556,8 +568,10 @@ class ContextContract:
     description: str
     rules: tuple[ContextContractRule, ...]
     config_revision: str | None = None
+    budget_bytes: int | None = None
 
     def __post_init__(self) -> None:
+        _positive_budget(self.budget_bytes)
         _contract_identifier(self.id)
         _contract_identifier(self.task_class)
         if not isinstance(self.description, str) or not self.description.strip():
@@ -612,3 +626,142 @@ class ContractValidationOverview:
     findings: tuple[ContractFinding, ...]
     warnings: tuple[ScanWarning, ...]
     schema_version: int = 1
+
+
+class CompilationStatus(StrEnum):
+    COMPLETE = "complete"
+    INCOMPLETE = "incomplete"
+
+
+class CandidateDecisionKind(StrEnum):
+    SELECTED = "selected"
+    EXCLUDED_BY_CONTRACT = "excluded_by_contract"
+    INELIGIBLE_LIFECYCLE = "ineligible_lifecycle"
+    INELIGIBLE_AUTHORITY = "ineligible_authority"
+    LOWER_AUTHORITY_TIER = "lower_authority_tier"
+    BLOCKED_BY_RULE_MAX = "blocked_by_rule_max"
+    BLOCKED_BY_BUDGET = "blocked_by_budget"
+    UNVERIFIABLE_REVISION = "unverifiable_revision"
+    UNVERIFIABLE_SIZE = "unverifiable_size"
+    REDUNDANT = "redundant"
+    NOT_SELECTED = "not_selected"
+
+
+def _positive_budget(value: int | None) -> None:
+    if value is not None and (type(value) is not int or value <= 0):
+        raise ValueError("Byte budget must be a positive integer.")
+
+
+@dataclass(frozen=True)
+class CompilationBudget:
+    configured_bytes: int | None
+    requested_bytes: int | None
+    used_bytes: int
+
+    def __post_init__(self) -> None:
+        _positive_budget(self.configured_bytes)
+        _positive_budget(self.requested_bytes)
+        if type(self.used_bytes) is not int or self.used_bytes < 0:
+            raise ValueError("Used bytes must be a nonnegative integer.")
+        if self.effective_bytes is not None and self.used_bytes > self.effective_bytes:
+            raise ValueError("Compilation exceeds byte budget.")
+
+    @property
+    def effective_bytes(self) -> int | None:
+        return self.requested_bytes if self.requested_bytes is not None else self.configured_bytes
+
+    @property
+    def remaining_bytes(self) -> int | None:
+        return None if self.effective_bytes is None else self.effective_bytes - self.used_bytes
+
+    @property
+    def origin(self) -> str:
+        return (
+            "override"
+            if self.requested_bytes is not None
+            else ("contract" if self.configured_bytes is not None else "unbounded")
+        )
+
+
+@dataclass(frozen=True)
+class CompiledRuleDecision:
+    rule_id: str
+    reason: CandidateDecisionKind
+    authority_policy: str | None = None
+    tier_index: int | None = None
+    highest_tier_index: int | None = None
+    equal_tier_paths: tuple[str, ...] = ()
+    authority_exclusion: str | None = None
+
+
+@dataclass(frozen=True)
+class CompiledSourceDecision:
+    source: SourceRecord
+    decision: CandidateDecisionKind
+    matched_rule_ids: tuple[str, ...]
+    contributing_rule_ids: tuple[str, ...]
+    rule_decisions: tuple[CompiledRuleDecision, ...]
+
+
+@dataclass(frozen=True)
+class CompiledDependency:
+    source_id: SourceId
+    path: str
+    source_revision: SourceRevision
+
+    def __post_init__(self) -> None:
+        _validate_integrity_path(self.path)
+        if not usable_content_revision(self.source_revision):
+            raise ValueError("Compiled dependency requires a content SHA256.")
+
+
+def usable_content_revision(revision: SourceRevision) -> bool:
+    return isinstance(revision.content_sha256, str) and bool(
+        re.fullmatch(r"[0-9a-f]{64}", revision.content_sha256)
+    )
+
+
+@dataclass(frozen=True)
+class CompiledContext:
+    repository: RepositoryRef
+    task: str | None
+    contract: ContextContract
+    config_sha256: str | None
+    status: CompilationStatus
+    budget: CompilationBudget
+    selected_sources: tuple[SourceRecord, ...]
+    decisions: tuple[CompiledSourceDecision, ...]
+    validation: ContractValidationOverview
+    dependencies: tuple[CompiledDependency, ...]
+    warnings: tuple[ScanWarning, ...]
+    authority_policies: tuple[AuthorityPolicy, ...] = ()
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        if self.task is not None and not isinstance(self.task, str):
+            raise ValueError("Task metadata must be text.")
+        paths = tuple(s.path for s in self.selected_sources)
+        if len(set(paths)) != len(paths) or len({s.id for s in self.selected_sources}) != len(
+            paths
+        ):
+            raise ValueError("Compiled sources must be unique.")
+        if any(type(s.size_bytes) is not int or s.size_bytes < 0 for s in self.selected_sources):
+            raise ValueError("Compiled sources require observed sizes.")
+        if self.budget.used_bytes != sum(s.size_bytes for s in self.selected_sources):
+            raise ValueError("Compiled budget must count unique source bytes.")
+        expected = tuple(
+            CompiledDependency(s.id, s.path, s.revision) for s in self.selected_sources
+        )
+        if self.dependencies != expected:
+            raise ValueError("Compiled dependencies must match selected sources.")
+        if (
+            self.validation.contract != self.contract
+            or tuple(s.path for s in self.validation.package.resolved_sources) != paths
+            or self.config_sha256 != self.validation.config_sha256
+        ):
+            raise ValueError("Compiled validation must describe the selected package.")
+        expected_status = (
+            CompilationStatus.INCOMPLETE if self.validation.findings else CompilationStatus.COMPLETE
+        )
+        if self.status != expected_status or not isinstance(self.status, CompilationStatus):
+            raise ValueError("Compiled status must reflect final validation.")

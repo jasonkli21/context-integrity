@@ -6,6 +6,7 @@ import tomllib
 from hashlib import sha256
 
 from context_integrity.acquisition import normalize_path, read_source_bytes
+from context_integrity.authority import effective_policies
 from context_integrity.lifecycle import validate_supersession
 from context_integrity.models import (
     AuthorityClass,
@@ -74,11 +75,11 @@ def _path(value: object) -> str:
 
 
 def parse_config(data: bytes) -> RepositoryConfig:
-    """Parse strict schemas v1-v5; unknown keys fail closed."""
+    """Parse strict schemas v1-v6; unknown keys fail closed."""
     try:
         raw_root = tomllib.loads(data.decode("utf-8"))
         version = raw_root.get("schema_version")
-        if type(version) is not int or version not in {1, 2, 3, 4, 5}:
+        if type(version) is not int or version not in {1, 2, 3, 4, 5, 6}:
             raise ValueError("Unsupported configuration schema version.")
         root = _table(
             raw_root,
@@ -207,7 +208,11 @@ def parse_config(data: bytes) -> RepositoryConfig:
             raise ValueError("Duplicate drift dependency ID.")
         contracts = []
         for raw in _array(root.get("context_contracts", [])):
-            entry = _table(raw, {"id", "task_class", "description", "rules"})
+            entry = _table(
+                raw,
+                {"id", "task_class", "description", "rules"}
+                | ({"budget_bytes"} if version >= 6 else set()),
+            )
             rules = []
             for raw_rule in _array(entry.get("rules")):
                 rule = _table(
@@ -221,7 +226,8 @@ def parse_config(data: bytes) -> RepositoryConfig:
                         "lifecycles",
                         "min_count",
                         "max_count",
-                    },
+                    }
+                    | ({"priority", "authority_policy"} if version >= 6 else set()),
                 )
                 rules.append(
                     ContextContractRule(
@@ -238,6 +244,10 @@ def parse_config(data: bytes) -> RepositoryConfig:
                         ),
                         min_count=rule.get("min_count"),
                         max_count=rule.get("max_count"),
+                        priority=rule.get("priority", 0),
+                        authority_policy=_text(rule["authority_policy"])
+                        if "authority_policy" in rule
+                        else None,
                     )
                 )
             contracts.append(
@@ -247,8 +257,16 @@ def parse_config(data: bytes) -> RepositoryConfig:
                     _text(entry.get("description")),
                     tuple(rules),
                     digest,
+                    entry.get("budget_bytes"),
                 )
             )
+        policy_ids = {p.id for p in effective_policies(RepositoryConfig(policies=tuple(policies)))}
+        if any(
+            r.authority_policy is not None and r.authority_policy not in policy_ids
+            for c in contracts
+            for r in c.rules
+        ):
+            raise ValueError("Unknown contract authority policy.")
         return RepositoryConfig(
             tuple(policies),
             tuple(metadata),

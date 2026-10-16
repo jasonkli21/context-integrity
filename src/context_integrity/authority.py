@@ -12,6 +12,7 @@ from context_integrity.models import (
     InventoryManifest,
     RepositoryConfig,
     SourceMetadata,
+    SourceRecord,
 )
 
 BUILTIN_POLICY_VERSION = "builtin-v1"
@@ -79,6 +80,16 @@ def resolve_authority(
     policy: AuthorityPolicy,
     source_metadata: tuple[SourceMetadata, ...] | None = None,
 ) -> AuthorityResolution:
+    return resolve_authority_for_sources(manifest, policy, manifest.sources, source_metadata)
+
+
+def resolve_authority_for_sources(
+    manifest: InventoryManifest,
+    policy: AuthorityPolicy,
+    sources: tuple[SourceRecord, ...],
+    source_metadata: tuple[SourceMetadata, ...] | None = None,
+) -> AuthorityResolution:
+    """Resolve the same authority semantics over an explicit observed candidate subset."""
     config = manifest.repository_config or RepositoryConfig()
     metadata = {
         m.path: m for m in (config.source_metadata if source_metadata is None else source_metadata)
@@ -86,7 +97,7 @@ def resolve_authority(
     tiers = {c: i for i, tier in enumerate(policy.tiers) for c in tier.classes}
     candidates = []
     excluded = []
-    for source in sorted(manifest.sources, key=lambda s: s.path):
+    for source in sorted(sources, key=lambda s: s.path):
         entry = metadata.get(source.path)
         reason = active_authority_exclusion_reason(
             source.lifecycle, entry.authority_eligible if entry else None

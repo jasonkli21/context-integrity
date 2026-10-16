@@ -14,6 +14,7 @@ from context_integrity.models import (
     ClaimRecord,
     ClaimsOverview,
     ClassificationResult,
+    CompiledContext,
     ContextContract,
     ContractValidationOverview,
     IntegrityOverview,
@@ -831,4 +832,104 @@ def render_contract_validation_text(overview: ContractValidationOverview) -> str
         lines.append(
             f"Warning: {display(w.code)} [{display(w.path or 'repository')}]: {display(w.message)}"
         )
+    return "\n".join(lines) + "\n"
+
+
+def compiled_context_dict(compiled: CompiledContext) -> dict:
+    """Separate compiled-context JSON v1; prior projections remain untouched."""
+    if compiled.schema_version != 1:
+        raise ValueError("Unsupported compiled context schema version.")
+    contract = _contract_v1(compiled.contract)
+    contract["budget_bytes"] = compiled.contract.budget_bytes
+    policy_rules = {r.id: r for r in compiled.contract.rules}
+    for rule in contract["rules"]:
+        policy = policy_rules[rule["id"]]
+        rule.update(priority=policy.priority, authority_policy=policy.authority_policy)
+    budget = compiled.budget
+    return {
+        "schema_version": 1,
+        "repository": _repository_v1(compiled.repository),
+        "task": {"text": compiled.task, "task_class": compiled.contract.task_class},
+        "contract": contract,
+        "config_sha256": compiled.config_sha256,
+        "status": compiled.status.value,
+        "authority_policies": [policy_dict(p) for p in compiled.authority_policies],
+        "budget": {
+            "configured_bytes": budget.configured_bytes,
+            "requested_bytes": budget.requested_bytes,
+            "effective_bytes": budget.effective_bytes,
+            "origin": budget.origin,
+            "used_bytes": budget.used_bytes,
+            "remaining_bytes": budget.remaining_bytes,
+        },
+        "selected_sources": [_source_v1(s) for s in compiled.selected_sources],
+        "decisions": [
+            {
+                "source_id": d.source.id,
+                "path": d.source.path,
+                "revision": _revision_v1(d.source.revision),
+                "size_bytes": d.source.size_bytes,
+                "decision": d.decision.value,
+                "matched_rule_ids": list(d.matched_rule_ids),
+                "contributing_rule_ids": list(d.contributing_rule_ids),
+                "rule_decisions": [
+                    {
+                        "rule_id": r.rule_id,
+                        "reason": r.reason.value,
+                        "authority_policy": r.authority_policy,
+                        "tier_index": r.tier_index,
+                        "highest_tier_index": r.highest_tier_index,
+                        "equal_tier_paths": list(r.equal_tier_paths),
+                        "authority_exclusion": r.authority_exclusion,
+                    }
+                    for r in d.rule_decisions
+                ],
+            }
+            for d in compiled.decisions
+        ],
+        "validation": contract_validation_dict(compiled.validation),
+        "dependencies": [
+            {
+                "source_id": d.source_id,
+                "path": d.path,
+                "source_revision": _revision_v1(d.source_revision),
+            }
+            for d in compiled.dependencies
+        ],
+        "warnings": [_warning_v1(w) for w in compiled.warnings],
+    }
+
+
+def render_compiled_context_json(compiled: CompiledContext) -> str:
+    return (
+        json.dumps(compiled_context_dict(compiled), indent=2, sort_keys=True, ensure_ascii=True)
+        + "\n"
+    )
+
+
+def render_compiled_context_text(compiled: CompiledContext) -> str:
+    budget = compiled.budget
+    limit = budget.effective_bytes if budget.effective_bytes is not None else "unbounded"
+    lines = [
+        "Compiled Context",
+        f"Contract: {display(compiled.contract.id)}",
+        f"Task class: {display(compiled.contract.task_class)}",
+        f"Status: {compiled.status.value}",
+        f"Budget: {budget.used_bytes} / {limit} bytes ({budget.origin})",
+        f"Config sha256: {display(compiled.config_sha256 or 'unavailable')}",
+    ]
+    if compiled.task is not None:
+        lines.append(f"Task: {display(compiled.task)}")
+    for decision in compiled.decisions:
+        lines.append(f"  {display(decision.source.path)}: {decision.decision.value}")
+        for relation in decision.rule_decisions:
+            lines.append(f"    {display(relation.rule_id)}: {relation.reason.value}")
+            if relation.authority_policy:
+                lines.append(
+                    f"      policy={display(relation.authority_policy)} tier={relation.tier_index} "
+                    f"highest={relation.highest_tier_index} "
+                    "equal-tier alternatives: "
+                    + ", ".join(display(p) for p in relation.equal_tier_paths)
+                )
+    lines.append(render_contract_validation_text(compiled.validation).rstrip("\n"))
     return "\n".join(lines) + "\n"

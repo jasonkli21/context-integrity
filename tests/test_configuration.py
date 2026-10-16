@@ -46,7 +46,7 @@ def test_config_absent_and_valid(tmp_path):
         b"[",
         b"\xff",
         b"",
-        b"schema_version = 6",
+        b"schema_version = 7",
         b"schema_version = true",
         b"schema_version = '1'",
         b"schema_version = 1\ninclude = 'other.toml'",

@@ -10,11 +10,11 @@ Context Integrity is being built around the idea that:
 
 ## Status
 
-**Phase 5 deterministic Context Contracts implemented and offline-verified; review findings F-001–F-003 fixed.**
+**Phase 6 deterministic Task Context Compiler implemented and offline-verified; independent review pending.**
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
 
-Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Explicit claims retain declaration and dependency revisions, with independent unverified validity. Deterministic integrity checks now surface structural instruction references, current-state navigation and delivery-evidence gaps, and explicit document review dependencies on changed paths. Repository-defined Context Contracts validate explicitly supplied source packages against metadata selectors and source-count constraints. Contradiction detection, architectural drift, context compilation, and LLM-assisted analysis remain deferred.
+Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Explicit claims retain declaration and dependency revisions, with independent unverified validity. Deterministic integrity checks now surface structural instruction references, current-state navigation and delivery-evidence gaps, and explicit document review dependencies on changed paths. Repository-defined Context Contracts validate explicitly supplied source packages against metadata selectors and source-count constraints. The compiler selects a bounded context manifest from an explicit contract, applying lifecycle and rule-scoped authority policy before deterministic selection. Contradiction detection, architectural drift, and LLM-assisted analysis remain deferred.
 
 See [`docs/current-state.md`](docs/current-state.md) for the exact current state.
 
@@ -560,6 +560,72 @@ fields rather than message prose. List/show have separate deliberate JSON v1 sha
 Stable JSON contains no timestamps, absolute root, or source bodies. Observations are
 sequential, not atomic snapshots. See the
 [Phase 5 implementation report](docs/implementation-reports/phase-5-implementation-report.md).
+
+## Task Context Compiler (configuration v6)
+
+Schema v6 retains v1–v5 and adds a positive integer `budget_bytes` on contracts,
+nonnegative integer `priority` (default 0) and optional `authority_policy` on rules.
+Booleans are invalid integers; unknown keys and unknown policy IDs fail closed.
+Earlier schemas reject these fields and are never silently upgraded.
+
+```toml
+schema_version = 6
+[[context_contracts]]
+id = "implementation-task"
+task_class = "implementation"
+description = "Instructions and architecture for implementation"
+budget_bytes = 80000
+[[context_contracts.rules]]
+id = "instructions"
+mode = "required"
+paths = ["AGENTS.md"]
+priority = 100
+authority_policy = "operating_instructions"
+[[context_contracts.rules]]
+id = "architecture"
+mode = "optional"
+kinds = ["architecture"]
+max_count = 2
+priority = 50
+authority_policy = "architectural_intent"
+```
+
+```bash
+uv run context-integrity compile implementation-task .
+uv run context-integrity compile implementation-task . --budget-bytes 40000
+uv run context-integrity compile implementation-task . --task "Implement a change" \
+  --format json --output /tmp/compiled-context.json
+```
+
+Compilation requires the exact configured contract and its observed config revision.
+Candidates come only from inventory. An omitted lifecycle selector permits `unknown` and
+`active`; explicit lifecycle selectors can request historical context. Excluded rules
+always win. A rule's authority policy resolves only its eligible matching candidates,
+and only the highest observed tier is selectable. Equally ranked alternatives remain
+visible; lexical selection does not assert semantic preference. Across overlapping rules,
+a source must meet every matching rule's lifecycle/authority restriction, so selecting it
+through an optional rule cannot bypass another rule's policy.
+
+Required selection greedily favors sources covering more unsatisfied rules, then higher
+rule priorities, then relative paths. Optional rules fill afterward by priority and ID.
+Each source counts once toward budget and each matching rule's maximum. Extra required
+matches are omitted unless they help another required or optional rule. CLI budget overrides
+contract budget; otherwise selection is unbounded. The compiler never exceeds a finite
+budget or falls back to lower authority to fit. Missing content hashes or observed sizes
+remain inspectable omissions. Greedy selection is deterministic, not globally optimal.
+
+Final Phase 5 validation determines `complete` or `incomplete`; both return exit 0.
+Fatal categories remain usage/unknown contract/invalid budget 2, repository 3, output 4,
+and configuration 6. Task text is opaque metadata and does not affect selection.
+
+Compiled-context JSON v1 is a separate deliberate projection with structured decisions,
+rule-scoped authority metadata, config/source revisions, unique dependencies, budget,
+and final contract validation. Earlier JSON projections remain unchanged; use compile
+output to inspect v6 compiler policy fields. Stable output contains no absolute root,
+timestamps, or source bodies. This is a rebuildable selection manifest, observed
+sequentially, with no source-body bundle, semantic retrieval, integrity gating, token
+budgeting, cache, LLM, database, CI enforcement, or Codebase Intelligence integration.
+See the [Phase 6 implementation report](docs/implementation-reports/phase-6-implementation-report.md).
 
 ## Development workflow
 

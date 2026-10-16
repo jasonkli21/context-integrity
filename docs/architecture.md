@@ -328,6 +328,8 @@ Answers:
 
 ## Layer 6 — Context Compilation
 
+Phase 6 delivers deterministic inventory-source compilation from an explicit contract.
+
 Answers:
 
 - Given a task and budget, what valid context should be assembled?
@@ -585,8 +587,14 @@ Validation produces rebuildable rule results and deterministic findings with con
 identity. Finding identity excludes prose; the separate JSON v1 projection includes config
 and resolved source content revisions. Contracts/rules are presented by ID and paths
 lexically. Validation does not retrieve, rank, complete, rewrite, budget, or persist a package,
-and does not run integrity checks as a side effect. Compiler and governance behavior remain
-separate future layers.
+and does not run integrity checks as a side effect. The Phase 6 compiler and future
+governance behavior remain separate layers.
+
+Phase 6 adds strict configuration v6, retaining v1–v5: positive `budget_bytes` on a
+contract, nonnegative rule `priority`, and optional rule `authority_policy` referencing
+an effective built-in or configured policy. Older schemas reject these fields. Validator
+matching/count behavior and its JSON v1 projection remain unchanged; compiler policy is
+projected in the separate compiled-context schema.
 
 The broader future contract may add:
 
@@ -633,7 +641,16 @@ CompiledContext
 - dependencies
 ```
 
-A compiled context is derived output and therefore invalidatable.
+Phase 6 implements a selection manifest with selected source records, structured per-source
+and per-rule decisions, rule-scoped authority tiers/equal alternatives, budget accounting,
+final Phase 5 validation, and unique source dependencies. Config revision, contract identity,
+source identity/content revision, repository identity and compiled schema version retain its
+derivation. Missing or unusable content SHA256/size prevents selection. Output has no source
+bodies; it is derived and rebuildable. No atomic snapshot is claimed.
+
+`complete` means the selected paths satisfy the bound contract, not semantic correctness or
+integrity cleanliness. Phase 4 findings are not evaluated by compilation; they remain
+available through `check`. Compilation does not claim to resolve contradictions.
 
 ---
 
@@ -755,15 +772,17 @@ Later responsibilities:
 
 ## 7.10 `compiler`
 
-Responsibilities, later:
+Responsibilities, delivered in Phase 6:
 
-- merge source and code candidates;
-- filter invalid/superseded context;
-- apply authority;
-- deduplicate;
-- rank;
-- enforce budget;
-- emit dependency/provenance metadata.
+- acquire candidates from the observed inventory;
+- apply explicit/default lifecycle selection and global contract exclusions;
+- reuse subset-aware authority resolution within each rule;
+- deduplicate and select required coverage before optional fill;
+- enforce source-count maxima and byte budget;
+- run the shared Phase 5 validator on final selected paths;
+- emit structured decisions and dependency/provenance metadata.
+
+Later: merge code candidates and structural relevance from `EvidenceProvider`.
 
 ## 7.11 `storage`
 
@@ -1097,9 +1116,31 @@ An LLM can be a specialized evaluator for rules that explicitly permit probabili
 
 # 15. Context Compiler Architecture
 
-The context compiler is deliberately later because it depends on earlier integrity semantics.
+Phase 6 delivers the deterministic local part of this pipeline. The explicit contract ID
+selects policy; optional task text is opaque metadata. Candidate acquisition uses only the
+current inventory. No task classification, structural code retrieval, general contradiction
+resolution, source-body bundling, persistence, or integrity gating is delivered.
 
-Pipeline:
+Compiler lifecycle selection defaults to `unknown | active` unless a rule explicitly
+selects lifecycle states. Phase 5 validation has no such implicit filter. Excluded matches
+are globally rejected before authority resolution. Authority is resolved inside each rule's
+matching lifecycle-eligible candidate subset, reusing existing lifecycle/authority eligibility.
+Only that subset's highest eligible tier is selectable; budget cannot lower the tier. Equal
+tier alternatives remain inspectable and lexical narrowing asserts no semantic preference.
+For overlaps, every matching selection rule's lifecycle/authority restriction must hold;
+selection through a different rule cannot bypass it. Maxima count all raw selector matches,
+exactly as the final validator does.
+
+Required selection repeatedly maximizes unsatisfied-rule coverage, then highest and summed
+applicable required priorities, then repository-relative path. Authority tiers have already
+filtered each rule and are not compared across unrelated policies. Optional rules fill by
+priority descending and ID ascending, candidates by path. Source bytes count once and are
+checked before selection. CLI budget overrides the contract budget, then defaults to
+unbounded. Unfittable requirements yield an inspectable incomplete package. Greedy selection
+is not a global optimizer. The final Phase 5 validator alone determines contract completeness.
+Earlier JSON projections remain unchanged; compiled-context JSON v1 includes v6 policy.
+
+Broader pipeline (code relevance and general contradictions remain future work):
 
 ```text
 Task
@@ -1219,9 +1260,9 @@ At minimum:
 
 ```text
 inventory_schema_version
-configuration_schema_version       # later
+configuration_schema_version       # implemented through v6
 evidence_contract_version          # later
-compiled_context_schema_version    # later
+compiled_context_schema_version    # implemented v1
 ```
 
 Version fields should represent semantic schema versions, not application build versions.
