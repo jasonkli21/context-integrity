@@ -1,0 +1,86 @@
+{
+  "config_sha256": null,
+  "contract": {
+    "config_revision": null,
+    "description": "Fixture contract",
+    "id": "test",
+    "rules": [
+      {
+        "authority_classes": [],
+        "id": "rule",
+        "kinds": [],
+        "lifecycles": [],
+        "max_count": null,
+        "min_count": 1,
+        "mode": "required",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    ],
+    "task_class": "implementation"
+  },
+  "findings": [
+    {
+      "affected_paths": [
+        "missing.md"
+      ],
+      "code": "package_source_unavailable",
+      "contract_id": "test",
+      "id": "contract_8fb2b415ecbfe586e178bae5850548e9",
+      "message": "Package source is absent from the current inventory.",
+      "rule_id": null,
+      "severity": "medium"
+    }
+  ],
+  "package": {
+    "duplicate_paths": [],
+    "requested_paths": [
+      "AGENTS.md",
+      "missing.md"
+    ],
+    "resolved_paths": [
+      "AGENTS.md"
+    ],
+    "sources": [
+      {
+        "path": "AGENTS.md",
+        "revision": {
+          "content_sha256": "3cdce1db3302a4620afaa8b941420de5b5fe53706434b48102c35bce70e76e75",
+          "git_head": null,
+          "git_status": "untracked",
+          "observed_revision_basis": "working_tree_content"
+        },
+        "source_id": "src_464090d845755467a0bab470c3eaa170"
+      }
+    ],
+    "unresolved_paths": [
+      "missing.md"
+    ]
+  },
+  "repository": {
+    "git": {
+      "available": true,
+      "dirty": true,
+      "head": null
+    },
+    "id": "repo_117fc5264566c8adf434f3eb7d37b8df",
+    "identity_basis": "git_remote",
+    "name": "basic-context"
+  },
+  "rules": [
+    {
+      "id": "rule",
+      "match_count": 1,
+      "matched_paths": [
+        "AGENTS.md"
+      ],
+      "max_count": null,
+      "min_count": 1,
+      "mode": "required",
+      "satisfied": true
+    }
+  ],
+  "schema_version": 1,
+  "warnings": []
+}

@@ -10,11 +10,11 @@ Context Integrity is being built around the idea that:
 
 ## Status
 
-**Phase 4 deterministic documentation / instruction drift implemented and offline-verified; independent review pending.**
+**Phase 5 deterministic Context Contracts implemented and offline-verified; independent review pending.**
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
 
-Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Explicit claims retain declaration and dependency revisions, with independent unverified validity. Deterministic integrity checks now surface structural instruction references, current-state navigation and delivery-evidence gaps, and explicit document review dependencies on changed paths. Contradiction detection, architectural drift, context compilation, and LLM-assisted analysis remain deferred.
+Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Explicit claims retain declaration and dependency revisions, with independent unverified validity. Deterministic integrity checks now surface structural instruction references, current-state navigation and delivery-evidence gaps, and explicit document review dependencies on changed paths. Repository-defined Context Contracts validate explicitly supplied source packages against metadata selectors and source-count constraints. Contradiction detection, architectural drift, context compilation, and LLM-assisted analysis remain deferred.
 
 See [`docs/current-state.md`](docs/current-state.md) for the exact current state.
 
@@ -476,6 +476,90 @@ newline and omits timestamps, absolute roots, and dependency bodies.
 Inventory, authority, and lifecycle JSON v1 contracts are unchanged. No claim verification,
 authority resolution, prose extraction, or contradiction/drift evaluation runs.
 See the [Phase 3 implementation report](docs/implementation-reports/phase-3-implementation-report.md).
+
+## Context Contracts (configuration v5)
+
+Schema v5 retains v1-v4 configuration and adds repository-defined `context_contracts`.
+Older schema versions reject this key. There are no built-in contracts. For example,
+add the following to `.context-integrity.toml` (use `schema_version = 5` once at the top):
+
+```toml
+schema_version = 5
+
+[[context_contracts]]
+id = "implementation-task"
+task_class = "implementation"
+description = "Context for active implementation work."
+
+[[context_contracts.rules]]
+id = "instructions"
+mode = "required"
+paths = ["AGENTS.md"]
+max_count = 1
+
+[[context_contracts.rules]]
+id = "plan"
+mode = "required"
+kinds = ["implementation_plan"]
+lifecycles = ["unknown", "active"]
+
+[[context_contracts.rules]]
+id = "architecture"
+mode = "optional"
+kinds = ["architecture"]
+authority_classes = ["architecture_product"]
+max_count = 1
+
+[[context_contracts.rules]]
+id = "historical"
+mode = "excluded"
+lifecycles = ["historical", "superseded", "expired", "invalid"]
+```
+
+```bash
+uv run context-integrity contracts list .
+uv run context-integrity contracts show implementation-task . --format json
+uv run context-integrity contracts validate implementation-task . \
+  --source AGENTS.md --source docs/plans/phase-5-implementation-plan.md
+uv run context-integrity contracts validate implementation-task . \
+  --source AGENTS.md --format json --output /tmp/contract-validation.json
+```
+
+Every command supports `--format text|json` and `--output FILE`. Validation allows an
+empty package. Findings return exit 0; unknown contracts or unsafe package paths return 2,
+repository failures 3, output failures 4, and configuration failures 6.
+
+Rules match exact repository-relative `paths`, `kinds`, `authority_classes`, and
+`lifecycles`: AND across dimensions, OR within a dimension. Omitted or empty dimensions
+impose no constraint; at least one nonempty dimension is required. Paths use POSIX `/`
+separators; harmless `./` and repeated separators normalize before resolution, while
+absolute paths, traversal, drive/backslash ambiguity, NULs and trailing slashes are rejected.
+Paths are literal: glob and regex expressions are never expanded. Contract, task-class,
+and rule identifiers use `[a-z][a-z0-9_-]*`; rule IDs are unique per contract, contract IDs
+per repository, and descriptions must be nonblank.
+
+Required rules default to minimum 1 with no maximum; an explicit minimum must be positive.
+Optional rules have minimum 0 and an optional nonnegative maximum. Excluded rules have
+minimum/maximum 0; custom counts cannot weaken that exclusion. Counts must be integers,
+not booleans. Selector values must be unique. Currentness is explicit through lifecycle
+selectors; historical sources may satisfy rules that allow them. Authority-class matching
+does not invoke repository-wide authority precedence resolution.
+
+Sources resolve only against the current context inventory. Duplicate normalized inputs
+count once and emit `duplicate_package_source` warnings. Missing or non-inventoried files
+emit `package_source_unavailable`; they do not trigger extra reads. Required shortfalls,
+overfilled rules, and exclusions emit `required_context_missing`, `context_rule_overfilled`,
+and `excluded_context_present`. Validation never fills, ranks, rewrites, or removes context.
+
+Contract-validation JSON v1 is separate from earlier JSON contracts. It includes the
+contract/config revision, normalized package paths (including duplicates and unresolved
+paths), resolved source IDs/content revisions, every rule result, findings, and observation
+warnings. Contracts/rules sort by ID, paths lexically, findings by contract/rule/code/paths/ID
+(all initially medium severity), and warnings by path/code/message. Finding IDs use semantic
+fields rather than message prose. List/show have separate deliberate JSON v1 shapes.
+Stable JSON contains no timestamps, absolute root, or source bodies. Observations are
+sequential, not atomic snapshots. See the
+[Phase 5 implementation report](docs/implementation-reports/phase-5-implementation-report.md).
 
 ## Development workflow
 

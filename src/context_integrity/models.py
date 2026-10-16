@@ -202,8 +202,16 @@ class RepositoryConfig:
     claims: tuple[ClaimSpec, ...] = ()
     instruction_policy: InstructionPolicySpec | None = None
     drift_dependencies: tuple[DriftDependencySpec, ...] = ()
+    context_contracts: tuple[ContextContract, ...] = ()
 
     def __post_init__(self) -> None:
+        if not isinstance(self.context_contracts, tuple) or any(
+            not isinstance(c, ContextContract) for c in self.context_contracts
+        ):
+            raise ValueError("Repository contracts must be a typed tuple.")
+        contract_ids = [c.id for c in self.context_contracts]
+        if len(set(contract_ids)) != len(contract_ids):
+            raise ValueError("Duplicate contract ID.")
         ids = [dependency.id for dependency in self.drift_dependencies]
         if len(ids) != len(set(ids)):
             raise ValueError("Duplicate drift dependency ID.")
@@ -474,5 +482,131 @@ class IntegrityOverview:
     config_sha256: str | None
     change_set: ChangeSet
     findings: tuple[IntegrityFinding, ...]
+    warnings: tuple[ScanWarning, ...]
+    schema_version: int = 1
+
+
+class ContextRuleMode(StrEnum):
+    REQUIRED = "required"
+    OPTIONAL = "optional"
+    EXCLUDED = "excluded"
+
+
+def _contract_identifier(value: str) -> None:
+    if not isinstance(value, str) or not re.fullmatch(r"[a-z][a-z0-9_-]*", value):
+        raise ValueError("Invalid contract identifier.")
+
+
+@dataclass(frozen=True)
+class ContextContractRule:
+    id: str
+    mode: ContextRuleMode
+    paths: tuple[str, ...] = ()
+    kinds: tuple[SourceKind, ...] = ()
+    authority_classes: tuple[AuthorityClass, ...] = ()
+    lifecycles: tuple[LifecycleState, ...] = ()
+    min_count: int | None = None
+    max_count: int | None = None
+
+    def __post_init__(self) -> None:
+        _contract_identifier(self.id)
+        if not isinstance(self.mode, ContextRuleMode):
+            raise ValueError("Invalid contract rule mode.")
+        dimensions = (self.paths, self.kinds, self.authority_classes, self.lifecycles)
+        for values, cls in zip(
+            dimensions, (str, SourceKind, AuthorityClass, LifecycleState), strict=True
+        ):
+            if not isinstance(values, tuple) or any(not isinstance(v, cls) for v in values):
+                raise ValueError("Contract selectors must be typed tuples.")
+            if len(set(values)) != len(values):
+                raise ValueError("Duplicate contract selector value.")
+        if not any(dimensions):
+            raise ValueError("Contract rule requires a selector.")
+        for path in self.paths:
+            _validate_integrity_path(path)
+        for count in (self.min_count, self.max_count):
+            if count is not None and (type(count) is not int or count < 0):
+                raise ValueError("Contract counts must be nonnegative integers.")
+        minimum = self.min_count
+        maximum = self.max_count
+        if self.mode == ContextRuleMode.REQUIRED:
+            minimum = 1 if minimum is None else minimum
+            if minimum < 1:
+                raise ValueError("Required rules need a positive minimum.")
+        else:
+            minimum = 0 if minimum is None else minimum
+            if minimum != 0:
+                raise ValueError("Optional/excluded rules cannot require a minimum.")
+        if self.mode == ContextRuleMode.EXCLUDED:
+            maximum = 0 if maximum is None else maximum
+            if maximum != 0:
+                raise ValueError("Excluded rules must exclude every match.")
+        if maximum is not None and maximum < minimum:
+            raise ValueError("Contract maximum is less than minimum.")
+        object.__setattr__(self, "min_count", minimum)
+        object.__setattr__(self, "max_count", maximum)
+
+
+@dataclass(frozen=True)
+class ContextContract:
+    id: str
+    task_class: str
+    description: str
+    rules: tuple[ContextContractRule, ...]
+    config_revision: str | None = None
+
+    def __post_init__(self) -> None:
+        _contract_identifier(self.id)
+        _contract_identifier(self.task_class)
+        if not isinstance(self.description, str) or not self.description.strip():
+            raise ValueError("Contract description must be nonblank.")
+        if (
+            not isinstance(self.rules, tuple)
+            or not self.rules
+            or any(not isinstance(r, ContextContractRule) for r in self.rules)
+        ):
+            raise ValueError("Contract requires a nonempty tuple of rules.")
+        if len({r.id for r in self.rules}) != len(self.rules):
+            raise ValueError("Duplicate contract rule ID.")
+
+
+@dataclass(frozen=True)
+class ContextPackage:
+    requested_paths: tuple[str, ...]
+    resolved_sources: tuple[SourceRecord, ...]
+    unresolved_paths: tuple[str, ...]
+    duplicate_paths: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ContextRuleResult:
+    rule_id: str
+    mode: ContextRuleMode
+    matched_paths: tuple[str, ...]
+    match_count: int
+    min_count: int
+    max_count: int | None
+    satisfied: bool
+
+
+@dataclass(frozen=True)
+class ContractFinding:
+    id: str
+    contract_id: str
+    rule_id: str | None
+    code: str
+    severity: FindingSeverity
+    message: str
+    affected_paths: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ContractValidationOverview:
+    repository: RepositoryRef
+    config_sha256: str | None
+    contract: ContextContract
+    package: ContextPackage
+    rule_results: tuple[ContextRuleResult, ...]
+    findings: tuple[ContractFinding, ...]
     warnings: tuple[ScanWarning, ...]
     schema_version: int = 1

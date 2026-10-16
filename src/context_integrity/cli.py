@@ -13,6 +13,7 @@ from context_integrity.acquisition import normalize_path
 from context_integrity.authority import effective_policies, resolve_authority
 from context_integrity.claims import claims_overview
 from context_integrity.configuration import ConfigurationError
+from context_integrity.contracts import effective_contracts, resolve_contract, validate_contract
 from context_integrity.integrity import integrity_overview
 from context_integrity.inventory import inventory_repository
 from context_integrity.lifecycle import lifecycle_overview
@@ -22,6 +23,9 @@ from context_integrity.rendering import (
     render_authority_text,
     render_claims_json,
     render_claims_text,
+    render_contract_validation_json,
+    render_contract_validation_text,
+    render_contracts,
     render_explanation,
     render_integrity_json,
     render_integrity_text,
@@ -345,6 +349,81 @@ def check(
             raise typer.Exit(4) from exc
     else:
         typer.echo(rendered, nl=False)
+
+
+contracts_app = typer.Typer(
+    help="Inspect and validate explicit context packages.", no_args_is_help=True
+)
+app.add_typer(contracts_app, name="contracts")
+
+
+def _write_contract_output(rendered: str, output: Path | None) -> None:
+    if output is None:
+        typer.echo(rendered, nl=False)
+        return
+    try:
+        output.write_text(rendered, encoding="utf-8")
+    except (OSError, ValueError) as exc:
+        typer.echo("Output file could not be written.", err=True)
+        raise typer.Exit(4) from exc
+
+
+@contracts_app.command("list")
+def contracts_list(
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """List repository-defined contracts."""
+    _, manifest = load_inventory(path)
+    _write_contract_output(
+        render_contracts(
+            effective_contracts(manifest.repository_config), format == OutputFormat.JSON
+        ),
+        output,
+    )
+
+
+@contracts_app.command("show")
+def contracts_show(
+    contract_id: Annotated[str, typer.Argument()],
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Show a contract's explicit selectors and cardinalities."""
+    _, manifest = load_inventory(path)
+    try:
+        contract = resolve_contract(manifest.repository_config, contract_id)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    _write_contract_output(
+        render_contracts((contract,), format == OutputFormat.JSON, detail=True),
+        output,
+    )
+
+
+@contracts_app.command("validate")
+def contracts_validate(
+    contract_id: Annotated[str, typer.Argument()],
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    source: Annotated[list[str] | None, typer.Option("--source")] = None,
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Validate supplied inventory sources; findings retain exit zero."""
+    _, manifest = load_inventory(path)
+    try:
+        contract = resolve_contract(manifest.repository_config, contract_id)
+        overview = validate_contract(manifest, contract, tuple(source or ()))
+    except ValueError as exc:
+        raise typer.BadParameter("Unknown contract or invalid package source path.") from exc
+    rendered = (
+        render_contract_validation_json(overview)
+        if format == OutputFormat.JSON
+        else render_contract_validation_text(overview)
+    )
+    _write_contract_output(rendered, output)
 
 
 if __name__ == "__main__":

@@ -568,7 +568,27 @@ This enables invalidating generated summaries or compiled contexts after source 
 
 ## 6.13 ContextContract
 
-Later:
+Phase 5 implements repository-defined contracts in strict configuration v5, retaining
+schemas v1-v4. A contract has an ID, task-class identifier, description, typed rules, and
+config content revision. Rules use required/optional/excluded modes and exact path, kind,
+authority-class, and lifecycle selectors. Dimensions combine with AND; values within each
+dimension combine with OR. Omitted/empty dimensions impose no constraint, and at least one
+must be nonempty. Rules and contracts enforce their invariants at construction boundaries.
+
+Validation resolves an explicitly supplied package against the current inventory, counts
+unique normalized sources, and reports unavailable sources and duplicate inputs. Required
+rules default to minimum 1, optional to minimum 0, and excluded to minimum/maximum 0;
+source-count maxima are otherwise unbounded unless configured. There is no implicit
+current-lifecycle filter or authority-policy winner selection. Matches use metadata only.
+
+Validation produces rebuildable rule results and deterministic findings with contract/rule
+identity. Finding identity excludes prose; the separate JSON v1 projection includes config
+and resolved source content revisions. Contracts/rules are presented by ID and paths
+lexically. Validation does not retrieve, rank, complete, rewrite, budget, or persist a package,
+and does not run integrity checks as a side effect. Compiler and governance behavior remain
+separate future layers.
+
+The broader future contract may add:
 
 ```text
 ContextContract

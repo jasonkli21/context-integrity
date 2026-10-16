@@ -14,6 +14,8 @@ from context_integrity.models import (
     ClaimRecord,
     ClaimsOverview,
     ClassificationResult,
+    ContextContract,
+    ContractValidationOverview,
     IntegrityOverview,
     InventoryManifest,
     InventorySummary,
@@ -689,4 +691,144 @@ def render_integrity_text(overview: IntegrityOverview) -> str:
         lines.extend(f"  {display(p)}" for p in f.affected_paths)
     for w in overview.warnings:
         lines.append(f"Warning: {display(w.code)}: {display(w.path or '')}: {display(w.message)}")
+    return "\n".join(lines) + "\n"
+
+
+def _contract_v1(contract: ContextContract) -> dict:
+    return {
+        "id": contract.id,
+        "task_class": contract.task_class,
+        "description": contract.description,
+        "config_revision": contract.config_revision,
+        "rules": [
+            {
+                "id": r.id,
+                "mode": r.mode.value,
+                "paths": sorted(r.paths),
+                "kinds": sorted(v.value for v in r.kinds),
+                "authority_classes": sorted(v.value for v in r.authority_classes),
+                "lifecycles": sorted(v.value for v in r.lifecycles),
+                "min_count": r.min_count,
+                "max_count": r.max_count,
+            }
+            for r in sorted(contract.rules, key=lambda r: r.id)
+        ],
+    }
+
+
+def render_contracts(
+    contracts: tuple[ContextContract, ...], as_json: bool = False, detail: bool = False
+) -> str:
+    ordered = sorted(contracts, key=lambda c: c.id)
+    if as_json:
+        data = {"schema_version": 1}
+        if detail:
+            data["contract"] = _contract_v1(ordered[0])
+        else:
+            data["contracts"] = [_contract_v1(c) for c in ordered]
+        return json.dumps(data, indent=2, sort_keys=True, ensure_ascii=True) + "\n"
+    lines = ["Context Contracts"]
+    for contract in ordered:
+        lines.extend(
+            [
+                f"Contract: {display(contract.id)}",
+                f"Task class: {display(contract.task_class)}",
+                f"Description: {display(contract.description)}",
+                f"Rules: {len(contract.rules)}",
+            ]
+        )
+        if detail:
+            lines.append(f"Config sha256: {display(contract.config_revision or 'unavailable')}")
+            for rule in _contract_v1(contract)["rules"]:
+                lines.append(
+                    f"  {display(rule['id'])}: {rule['mode']} "
+                    f"min={rule['min_count']} max={rule['max_count']}"
+                )
+                for key in ("paths", "kinds", "authority_classes", "lifecycles"):
+                    lines.append(f"    {key}: " + ", ".join(display(v) for v in rule[key]))
+    return "\n".join(lines) + "\n"
+
+
+def contract_validation_dict(overview: ContractValidationOverview) -> dict:
+    """Deliberate contract-validation JSON v1, independent of existing projections."""
+    if overview.schema_version != 1:
+        raise ValueError("Unsupported contract validation schema version.")
+    package = overview.package
+    return {
+        "schema_version": 1,
+        "repository": _repository_v1(overview.repository),
+        "config_sha256": overview.config_sha256,
+        "contract": _contract_v1(overview.contract),
+        "package": {
+            "requested_paths": list(package.requested_paths),
+            "resolved_paths": [s.path for s in package.resolved_sources],
+            "unresolved_paths": list(package.unresolved_paths),
+            "duplicate_paths": list(package.duplicate_paths),
+            "sources": [
+                {"path": s.path, "source_id": s.id, "revision": _revision_v1(s.revision)}
+                for s in package.resolved_sources
+            ],
+        },
+        "rules": [
+            {
+                "id": r.rule_id,
+                "mode": r.mode.value,
+                "matched_paths": list(r.matched_paths),
+                "match_count": r.match_count,
+                "min_count": r.min_count,
+                "max_count": r.max_count,
+                "satisfied": r.satisfied,
+            }
+            for r in overview.rule_results
+        ],
+        "findings": [
+            {
+                "id": f.id,
+                "contract_id": f.contract_id,
+                "rule_id": f.rule_id,
+                "code": f.code,
+                "severity": f.severity.value,
+                "message": f.message,
+                "affected_paths": list(f.affected_paths),
+            }
+            for f in overview.findings
+        ],
+        "warnings": [_warning_v1(w) for w in overview.warnings],
+    }
+
+
+def render_contract_validation_json(overview: ContractValidationOverview) -> str:
+    return (
+        json.dumps(contract_validation_dict(overview), indent=2, sort_keys=True, ensure_ascii=True)
+        + "\n"
+    )
+
+
+def render_contract_validation_text(overview: ContractValidationOverview) -> str:
+    lines = [
+        "Context Contract Validation",
+        f"Contract: {display(overview.contract.id)}",
+        f"Task class: {display(overview.contract.task_class)}",
+        f"Selected sources: {len(overview.package.resolved_sources)}",
+        f"Findings: {len(overview.findings)}",
+        "Rules",
+    ]
+    for r in overview.rule_results:
+        lines.append(
+            f"  {'PASS' if r.satisfied else 'FAIL'} {display(r.rule_id)} "
+            f"{r.mode.value} matches={r.match_count} min={r.min_count} "
+            f"max={r.max_count if r.max_count is not None else 'unbounded'}"
+        )
+        lines.extend(f"    {display(p)}" for p in r.matched_paths)
+    for f in overview.findings:
+        lines.append(
+            f"{f.severity.value}: {f.code} [{display(f.rule_id or 'package')}]: "
+            f"{display(f.message)}"
+        )
+        lines.extend(f"  {display(p)}" for p in f.affected_paths)
+    lines.append(f"Warnings: {len(overview.warnings)}")
+    for w in overview.warnings:
+        lines.append(
+            f"Warning: {display(w.code)} [{display(w.path or 'repository')}]: {display(w.message)}"
+        )
     return "\n".join(lines) + "\n"

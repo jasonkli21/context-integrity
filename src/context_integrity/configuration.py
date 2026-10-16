@@ -13,10 +13,14 @@ from context_integrity.models import (
     AuthorityTier,
     ClaimId,
     ClaimSpec,
+    ContextContract,
+    ContextContractRule,
+    ContextRuleMode,
     DriftDependencySpec,
     InstructionPolicySpec,
     LifecycleState,
     RepositoryConfig,
+    SourceKind,
     SourceMetadata,
     SupersessionSpec,
     validate_unique_claim_ids,
@@ -70,18 +74,19 @@ def _path(value: object) -> str:
 
 
 def parse_config(data: bytes) -> RepositoryConfig:
-    """Parse v1 authority, v2 lifecycle, v3 claims, or v4 drift policy; unknown keys fail closed."""
+    """Parse strict schemas v1-v5; unknown keys fail closed."""
     try:
         raw_root = tomllib.loads(data.decode("utf-8"))
         version = raw_root.get("schema_version")
-        if type(version) is not int or version not in {1, 2, 3, 4}:
+        if type(version) is not int or version not in {1, 2, 3, 4, 5}:
             raise ValueError("Unsupported configuration schema version.")
         root = _table(
             raw_root,
             {"schema_version", "authority", "source_metadata"}
             | ({"supersession"} if version >= 2 else set())
             | ({"claims"} if version >= 3 else set())
-            | ({"instruction_policy", "drift_dependencies"} if version >= 4 else set()),
+            | ({"instruction_policy", "drift_dependencies"} if version >= 4 else set())
+            | ({"context_contracts"} if version >= 5 else set()),
         )
         digest = sha256(data).hexdigest()
         authority = _table(root.get("authority", {}), {"policies"})
@@ -200,6 +205,50 @@ def parse_config(data: bytes) -> RepositoryConfig:
             )
         if len({d.id for d in dependencies}) != len(dependencies):
             raise ValueError("Duplicate drift dependency ID.")
+        contracts = []
+        for raw in _array(root.get("context_contracts", [])):
+            entry = _table(raw, {"id", "task_class", "description", "rules"})
+            rules = []
+            for raw_rule in _array(entry.get("rules")):
+                rule = _table(
+                    raw_rule,
+                    {
+                        "id",
+                        "mode",
+                        "paths",
+                        "kinds",
+                        "authority_classes",
+                        "lifecycles",
+                        "min_count",
+                        "max_count",
+                    },
+                )
+                rules.append(
+                    ContextContractRule(
+                        id=_text(rule.get("id")),
+                        mode=ContextRuleMode(_text(rule.get("mode"))),
+                        paths=tuple(_path(p) for p in _array(rule.get("paths", []))),
+                        kinds=tuple(SourceKind(_text(v)) for v in _array(rule.get("kinds", []))),
+                        authority_classes=tuple(
+                            AuthorityClass(_text(v))
+                            for v in _array(rule.get("authority_classes", []))
+                        ),
+                        lifecycles=tuple(
+                            LifecycleState(_text(v)) for v in _array(rule.get("lifecycles", []))
+                        ),
+                        min_count=rule.get("min_count"),
+                        max_count=rule.get("max_count"),
+                    )
+                )
+            contracts.append(
+                ContextContract(
+                    _text(entry.get("id")),
+                    _text(entry.get("task_class")),
+                    _text(entry.get("description")),
+                    tuple(rules),
+                    digest,
+                )
+            )
         return RepositoryConfig(
             tuple(policies),
             tuple(metadata),
@@ -209,6 +258,7 @@ def parse_config(data: bytes) -> RepositoryConfig:
             tuple(claims),
             instruction_policy,
             tuple(sorted(dependencies, key=lambda d: d.id)),
+            tuple(sorted(contracts, key=lambda c: c.id)),
         )
     except (ValueError, TypeError, KeyError, RecursionError) as exc:
         # Parser exceptions can contain arbitrary repository text; keep errors path/body-free.
