@@ -88,6 +88,8 @@ def resolve_authority_for_sources(
     policy: AuthorityPolicy,
     sources: tuple[SourceRecord, ...],
     source_metadata: tuple[SourceMetadata, ...] | None = None,
+    *,
+    allow_non_current_lifecycle: bool = False,
 ) -> AuthorityResolution:
     """Resolve the same authority semantics over an explicit observed candidate subset."""
     config = manifest.repository_config or RepositoryConfig()
@@ -99,8 +101,12 @@ def resolve_authority_for_sources(
     excluded = []
     for source in sorted(sources, key=lambda s: s.path):
         entry = metadata.get(source.path)
-        reason = active_authority_exclusion_reason(
-            source.lifecycle, entry.authority_eligible if entry else None
+        reason = (
+            ("explicitly_ineligible" if entry and entry.authority_eligible is False else None)
+            if allow_non_current_lifecycle
+            else active_authority_exclusion_reason(
+                source.lifecycle, entry.authority_eligible if entry else None
+            )
         )
         if reason is not None:
             pass

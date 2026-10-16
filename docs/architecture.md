@@ -649,8 +649,15 @@ derivation. Missing or unusable content SHA256/size prevents selection. Output h
 bodies; it is derived and rebuildable. No atomic snapshot is claimed.
 
 `complete` means the selected paths satisfy the bound contract, not semantic correctness or
-integrity cleanliness. Phase 4 findings are not evaluated by compilation; they remain
-available through `check`. Compilation does not claim to resolve contradictions.
+integrity cleanliness. Compiled output carries `integrity_state` with `not_evaluated` by
+default; callers may supply an existing deterministic Phase 4 overview, whose finding IDs,
+severity and evidence references are retained. The selection core does not perform integrity
+I/O or resolve contradictions.
+
+The compiler selection boundary uses `CompilerCandidate`, an evidence-shaped item carrying
+identity, location, size, lifecycle/authority inputs, revision and optional derivation/evidence
+location. Phase 6 adapts inventory `SourceRecord` values into candidates. Phase 7 may provide
+other candidate origins without moving authority or lifecycle interpretation into the provider.
 
 ---
 
@@ -775,6 +782,7 @@ Later responsibilities:
 Responsibilities, delivered in Phase 6:
 
 - acquire candidates from the observed inventory;
+- adapt inventory records to the compiler candidate/provenance boundary;
 - apply explicit/default lifecycle selection and global contract exclusions;
 - reuse subset-aware authority resolution within each rule;
 - deduplicate and select required coverage before optional fill;
@@ -782,7 +790,7 @@ Responsibilities, delivered in Phase 6:
 - run the shared Phase 5 validator on final selected paths;
 - emit structured decisions and dependency/provenance metadata.
 
-Later: merge code candidates and structural relevance from `EvidenceProvider`.
+Later: accept code candidates and structural relevance from `EvidenceProvider`.
 
 ## 7.11 `storage`
 
@@ -1124,21 +1132,26 @@ resolution, source-body bundling, persistence, or integrity gating is delivered.
 Compiler lifecycle selection defaults to `unknown | active` unless a rule explicitly
 selects lifecycle states. Phase 5 validation has no such implicit filter. Excluded matches
 are globally rejected before authority resolution. Authority is resolved inside each rule's
-matching lifecycle-eligible candidate subset, reusing existing lifecycle/authority eligibility.
+matching lifecycle-eligible candidate subset. An explicit lifecycle selector defines that
+rule's candidate universe for authority tier ranking; explicit `authority_eligible = false`
+still excludes a source. Calls to the standalone authority resolver retain its active-lifecycle
+gate.
 Only that subset's highest eligible tier is selectable; budget cannot lower the tier. Equal
 tier alternatives remain inspectable and lexical narrowing asserts no semantic preference.
 For overlaps, every matching selection rule's lifecycle/authority restriction must hold;
 selection through a different rule cannot bypass it. Maxima count all raw selector matches,
 exactly as the final validator does.
 
-Required selection repeatedly maximizes unsatisfied-rule coverage, then highest and summed
-applicable required priorities, then repository-relative path. Authority tiers have already
-filtered each rule and are not compared across unrelated policies. Optional rules fill by
-priority descending and ID ascending, candidates by path. Source bytes count once and are
-checked before selection. CLI budget overrides the contract budget, then defaults to
-unbounded. Unfittable requirements yield an inspectable incomplete package. Greedy selection
-is not a global optimizer. The final Phase 5 validator alone determines contract completeness.
-Earlier JSON projections remain unchanged; compiled-context JSON v1 includes v6 policy.
+Required selection first uses deterministic coverage/priority/path greedy ordering. If that
+leaves required deficits, a deterministic exact feasibility search over eligible required
+candidates repairs the package when possible, minimizing bytes and then selected paths while
+respecting maxima and budget. If no feasible set exists, the best greedy inspectable package
+is retained. Authority tiers have already filtered each rule and are not compared across
+unrelated policies. Optional rules fill by priority descending and ID ascending, candidates by
+path. Source bytes count once and are checked before selection. CLI budget overrides the
+contract budget, then defaults to unbounded. The final Phase 5 validator alone determines
+contract completeness. Earlier JSON projections remain unchanged; compiled-context JSON v2
+adds the integrity evaluation state.
 
 Broader pipeline (code relevance and general contradictions remain future work):
 

@@ -606,21 +606,26 @@ visible; lexical selection does not assert semantic preference. Across overlappi
 a source must meet every matching rule's lifecycle/authority restriction, so selecting it
 through an optional rule cannot bypass another rule's policy.
 
-Required selection greedily favors sources covering more unsatisfied rules, then higher
-rule priorities, then relative paths. Optional rules fill afterward by priority and ID.
+Required selection first favors sources covering more unsatisfied rules, then higher
+rule priorities, then relative paths. If that greedy pass leaves required deficits, a
+deterministic feasibility search repairs the set when a complete package fits, minimizing
+bytes and then selected paths. Optional rules fill afterward by priority and ID.
 Each source counts once toward budget and each matching rule's maximum. Extra required
 matches are omitted unless they help another required or optional rule. CLI budget overrides
 contract budget; otherwise selection is unbounded. The compiler never exceeds a finite
 budget or falls back to lower authority to fit. Missing content hashes or observed sizes
-remain inspectable omissions. Greedy selection is deterministic, not globally optimal.
+remain inspectable omissions. If no feasible required set exists, the deterministic greedy
+result remains inspectable as incomplete.
 
 Final Phase 5 validation determines `complete` or `incomplete`; both return exit 0.
 Fatal categories remain usage/unknown contract/invalid budget 2, repository 3, output 4,
 and configuration 6. Task text is opaque metadata and does not affect selection.
 
-Compiled-context JSON v1 is a separate deliberate projection with structured decisions,
+Compiled-context JSON v2 is a separate deliberate projection with structured decisions,
 rule-scoped authority metadata, config/source revisions, unique dependencies, budget,
-and final contract validation. Earlier JSON projections remain unchanged; use compile
+final contract validation, and explicit `integrity_state` (`not_evaluated` unless a
+deterministic integrity overview is supplied). A supplied overview retains finding identity,
+severity, and evidence references. Earlier JSON projections remain unchanged; use compile
 output to inspect v6 compiler policy fields. Stable output contains no absolute root,
 timestamps, or source bodies. This is a rebuildable selection manifest, observed
 sequentially, with no source-body bundle, semantic retrieval, integrity gating, token

@@ -66,6 +66,8 @@
         "instructions"
       ],
       "decision": "selected",
+      "derivation": null,
+      "evidence_location": null,
       "matched_rule_ids": [
         "instructions"
       ],
@@ -95,6 +97,8 @@
     {
       "contributing_rule_ids": [],
       "decision": "not_selected",
+      "derivation": null,
+      "evidence_location": null,
       "matched_rule_ids": [],
       "path": "docs/architecture.md",
       "revision": {
@@ -120,6 +124,10 @@
       }
     }
   ],
+  "integrity_state": {
+    "evaluation_status": "not_evaluated",
+    "findings": []
+  },
   "repository": {
     "git": {
       "available": true,
@@ -130,7 +138,7 @@
     "identity_basis": "git_remote",
     "name": "basic-context"
   },
-  "schema_version": 1,
+  "schema_version": 2,
   "selected_sources": [
     {
       "authority_class": "operating_instruction",

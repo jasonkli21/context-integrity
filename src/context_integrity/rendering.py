@@ -836,8 +836,8 @@ def render_contract_validation_text(overview: ContractValidationOverview) -> str
 
 
 def compiled_context_dict(compiled: CompiledContext) -> dict:
-    """Separate compiled-context JSON v1; prior projections remain untouched."""
-    if compiled.schema_version != 1:
+    """Separate compiled-context JSON v2; prior projections remain untouched."""
+    if compiled.schema_version != 2:
         raise ValueError("Unsupported compiled context schema version.")
     contract = _contract_v1(compiled.contract)
     contract["budget_bytes"] = compiled.contract.budget_bytes
@@ -847,7 +847,7 @@ def compiled_context_dict(compiled: CompiledContext) -> dict:
         rule.update(priority=policy.priority, authority_policy=policy.authority_policy)
     budget = compiled.budget
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "repository": _repository_v1(compiled.repository),
         "task": {"text": compiled.task, "task_class": compiled.contract.task_class},
         "contract": contract,
@@ -866,6 +866,8 @@ def compiled_context_dict(compiled: CompiledContext) -> dict:
         "decisions": [
             {
                 "source_id": d.source.id,
+                "evidence_location": d.source.evidence_location,
+                "derivation": d.source.derivation,
                 "path": d.source.path,
                 "revision": _revision_v1(d.source.revision),
                 "size_bytes": d.source.size_bytes,
@@ -888,6 +890,32 @@ def compiled_context_dict(compiled: CompiledContext) -> dict:
             for d in compiled.decisions
         ],
         "validation": contract_validation_dict(compiled.validation),
+        "integrity_state": {
+            "evaluation_status": compiled.integrity_state.evaluation_status.value,
+            "findings": [
+                {
+                    "id": f.id,
+                    "rule_id": f.rule_id,
+                    "code": f.code,
+                    "severity": f.severity.value,
+                    "affected_paths": list(f.affected_paths),
+                    "evidence": [
+                        {
+                            "role": e.role,
+                            "path": e.path,
+                            "source_id": e.source_id,
+                            "source_revision": _revision_v1(e.source_revision)
+                            if e.source_revision
+                            else None,
+                            "derivation": e.derivation,
+                        }
+                        for e in f.evidence
+                    ],
+                    "dependency_id": f.dependency_id,
+                }
+                for f in compiled.integrity_state.findings
+            ],
+        },
         "dependencies": [
             {
                 "source_id": d.source_id,

@@ -494,6 +494,27 @@ class IntegrityOverview:
     schema_version: int = 1
 
 
+class IntegrityEvaluationStatus(StrEnum):
+    NOT_EVALUATED = "not_evaluated"
+    EVALUATED = "evaluated"
+
+
+@dataclass(frozen=True)
+class CompiledIntegrityState:
+    evaluation_status: IntegrityEvaluationStatus = IntegrityEvaluationStatus.NOT_EVALUATED
+    findings: tuple[IntegrityFinding, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.evaluation_status, IntegrityEvaluationStatus):
+            raise ValueError("Invalid integrity evaluation status.")
+        if not isinstance(self.findings, tuple) or any(
+            not isinstance(f, IntegrityFinding) for f in self.findings
+        ):
+            raise ValueError("Integrity findings must be a typed tuple.")
+        if self.evaluation_status == IntegrityEvaluationStatus.NOT_EVALUATED and self.findings:
+            raise ValueError("Unevaluated integrity state cannot contain findings.")
+
+
 class ContextRuleMode(StrEnum):
     REQUIRED = "required"
     OPTIONAL = "optional"
@@ -696,7 +717,7 @@ class CompiledRuleDecision:
 
 @dataclass(frozen=True)
 class CompiledSourceDecision:
-    source: SourceRecord
+    source: CompilerCandidate
     decision: CandidateDecisionKind
     matched_rule_ids: tuple[str, ...]
     contributing_rule_ids: tuple[str, ...]
@@ -713,6 +734,35 @@ class CompiledDependency:
         _validate_integrity_path(self.path)
         if not usable_content_revision(self.source_revision):
             raise ValueError("Compiled dependency requires a content SHA256.")
+
+
+@dataclass(frozen=True)
+class CompilerCandidate:
+    """Selection-core item; SourceRecord is an optional inventory adapter payload."""
+
+    id: str
+    path: str
+    kind: SourceKind
+    authority_class: AuthorityClass
+    lifecycle: LifecycleState
+    revision: SourceRevision
+    size_bytes: int | None
+    source: SourceRecord | None = None
+    evidence_location: str | None = None
+    derivation: str | None = None
+
+    @classmethod
+    def from_source(cls, source: SourceRecord) -> CompilerCandidate:
+        return cls(
+            source.id,
+            source.path,
+            source.kind,
+            source.authority_class,
+            source.lifecycle,
+            source.revision,
+            source.size_bytes,
+            source=source,
+        )
 
 
 def usable_content_revision(revision: SourceRevision) -> bool:
@@ -734,8 +784,9 @@ class CompiledContext:
     validation: ContractValidationOverview
     dependencies: tuple[CompiledDependency, ...]
     warnings: tuple[ScanWarning, ...]
+    integrity_state: CompiledIntegrityState = CompiledIntegrityState()
     authority_policies: tuple[AuthorityPolicy, ...] = ()
-    schema_version: int = 1
+    schema_version: int = 2
 
     def __post_init__(self) -> None:
         if self.task is not None and not isinstance(self.task, str):

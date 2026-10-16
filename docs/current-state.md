@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-16
 **Current phase:** Phase 6 — Task Context Compiler
 **Active plan:** `docs/plans/phase-6-implementation-plan.md`
-**Status:** Implemented and offline-verified; independent Phase 6 review pending.
+**Status:** Implemented, review findings F-001–F-004 fixed, and offline-verified.
 
 ## Delivered
 
@@ -17,25 +17,31 @@
   before deterministic required-first coverage and optional fill. Overlapping rules cannot
   bypass each other's selection restrictions. Unique sources count once; maxima and budget
   are checked before selection, with no lower-authority budget fallback.
-- Text and separate compiled-context JSON v1 retain structured selection/omission reasons,
+- Text and separate compiled-context JSON v2 retain structured selection/omission reasons,
   revisions, policy provenance, dependencies, byte budget and final Phase 5 validation.
   Complete/incomplete both retain exit 0; task text is opaque metadata. Stable JSON contains
   no source bodies, absolute root or runtime timestamps.
+- Required greedy selection now invokes deterministic feasibility repair before retaining an
+  incomplete result. Explicit lifecycle selectors define the authority candidate universe,
+  while explicit authority ineligibility remains enforced. Compiler candidates carry optional
+  provider provenance, and compiled-context JSON v2 records integrity evaluation state and
+  supplied deterministic finding references.
 
 ## Verification
 
 `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed: Ruff lint/format
-and **719 tests**, Python 3.12.13/macOS. Focused compiler/contracts/authority/configuration:
-**293 passed**. Executable CLI smoke, prior golden comparisons and `git diff --check` passed.
-Acceptance evidence: `docs/implementation-reports/phase-6-implementation-report.md`.
+and **721 tests**, Python 3.12.13/macOS. Focused compiler/contracts/authority/configuration:
+**295 passed**. Compiled-context JSON v2 golden and `git diff --check` passed. Acceptance
+evidence: `docs/implementation-reports/phase-6-implementation-report.md` and
+`docs/implementation-reports/phase-6-review-fixes-report.md`.
 
 ## Known limitations / findings
 
-Independent Phase 6 review is pending, including the documented conservative intersection
-of overlapping rule policies. Greedy selection is deterministic, not globally optimal.
-Compilation proves declared contract completeness, not semantic correctness or integrity
-cleanliness. Missing usable content hashes/sizes prevent selection. Observations are
-sequential rather than atomic.
+The compiler still uses conservative intersection of overlapping rule policies. The
+feasibility repair applies to required candidates; optional fill remains deterministic and
+greedy. Compilation proves declared contract completeness, not semantic correctness or
+integrity cleanliness. Missing usable content hashes/sizes prevent selection. Observations
+are sequential rather than atomic. EvidenceProvider integration remains Phase 7 work.
 
 The separately pending Phase 4 final independent verification remains pending; Phase 4/5
 accepted review fixes retain their verified status. There is no semantic task retrieval,
@@ -44,5 +50,5 @@ database/cache, Codebase Intelligence integration or CI enforcement.
 
 ## Next expected step
 
-Independent Phase 6 review; complete the separately pending Phase 4 final independent
-verification. Then Phase 7 — Codebase Intelligence EvidenceProvider integration.
+Complete the separately pending Phase 4 final independent verification. Then Phase 7 —
+Codebase Intelligence EvidenceProvider integration.

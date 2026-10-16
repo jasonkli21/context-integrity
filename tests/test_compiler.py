@@ -19,14 +19,23 @@ from context_integrity.contracts import validate_contract
 from context_integrity.inventory import scan_repository
 from context_integrity.models import (
     AuthorityClass,
+    ChangeScope,
+    ChangeSet,
     CompilationBudget,
     CompilationStatus,
     CompiledDependency,
+    CompilerCandidate,
     ContextContract,
     ContextContractRule,
+    FindingSeverity,
+    IntegrityEvaluationStatus,
+    IntegrityEvidence,
+    IntegrityFinding,
+    IntegrityOverview,
     LifecycleState,
     RepositoryConfig,
     SourceMetadata,
+    make_source_id,
 )
 from context_integrity.models import (
     CandidateDecisionKind as Reason,
@@ -381,9 +390,11 @@ def test_provenance_determinism_models_and_golden(git_repo):
             replace(manifest, sources=manifest.sources[::-1]), contract, task="opaque task"
         )
     )
-    assert rendered == (Path(__file__).parent / "fixtures/compiled-context-v1.json").read_text()
+    assert json.loads(rendered)["schema_version"] == 2
+    assert json.loads(rendered)["integrity_state"]["evaluation_status"] == "not_evaluated"
+    assert rendered == (Path(__file__).parent / "fixtures/compiled-context-v2.json").read_text()
     data = json.loads(rendered)
-    assert data["schema_version"] == 1
+    assert data["schema_version"] == 2
     assert result.config_sha256 == contract.config_revision
     assert result.dependencies[0].source_revision == result.selected_sources[0].revision
     assert str(git_repo) not in rendered and "Instructions" not in rendered
@@ -487,16 +498,100 @@ def test_direct_config_gates_compiler_policy(field):
         RepositoryConfig(schema_version=5, context_contracts=(contract,))
 
 
-def test_authority_eligibility_is_reused_even_with_explicit_history(git_repo):
+def test_explicit_history_lifecycle_composes_with_authority_policy(git_repo):
     manifest = source_change(scan_repository(git_repo), lifecycle=LifecycleState.HISTORICAL)
-    result = compile_rules(
-        manifest,
-        rule(lifecycles=(LifecycleState.HISTORICAL,), authority_policy="operating_instructions"),
+    historical_rule = rule(
+        lifecycles=(LifecycleState.HISTORICAL,), authority_policy="operating_instructions"
     )
-    assert not result.selected_sources
+    manifest, contract = bind(manifest, historical_rule)
+    result = compile_context(manifest, contract)
+    assert selected(result) == ("AGENTS.md",)
     relation = decisions(result)["AGENTS.md"].rule_decisions[0]
-    assert relation.reason == Reason.INELIGIBLE_AUTHORITY
-    assert relation.authority_exclusion is not None
+    assert relation.reason == Reason.SELECTED
+    assert relation.tier_index == 0
+    manifest = replace(
+        manifest,
+        repository_config=replace(
+            manifest.repository_config,
+            source_metadata=(SourceMetadata("AGENTS.md", "excluded", authority_eligible=False),),
+        ),
+    )
+    rejected = compile_context(manifest, contract)
+    assert not rejected.selected_sources
+    assert decisions(rejected)["AGENTS.md"].rule_decisions[0].reason == Reason.INELIGIBLE_AUTHORITY
+
+
+def test_required_selection_repairs_feasible_budget_solution(git_repo):
+    manifest = scan_repository(git_repo)
+    template = manifest.sources[0]
+    candidates = []
+    for path, size in (("ab.md", 5), ("a.md", 2), ("b.md", 2), ("c.md", 3)):
+        candidates.append(
+            replace(
+                template,
+                id=make_source_id(manifest.repository.id, path),
+                path=path,
+                size_bytes=size,
+                revision=replace(template.revision, content_sha256=(str(len(path)) * 64)),
+            )
+        )
+    manifest = replace(manifest, sources=tuple(candidates))
+    rules = (
+        rule("a", paths=("ab.md", "a.md")),
+        rule("b", paths=("ab.md", "b.md")),
+        rule("c", paths=("c.md",)),
+    )
+    result = compile_rules(manifest, *rules, budget=7)
+    assert selected(result) == ("a.md", "b.md", "c.md")
+    assert result.status == CompilationStatus.COMPLETE
+    assert result.budget.used_bytes == 7
+    assert all(item.satisfied for item in result.validation.rule_results)
+    reversed_result = compile_rules(
+        replace(manifest, sources=manifest.sources[::-1]), *rules, budget=7
+    )
+    assert render_compiled_context_json(result) == render_compiled_context_json(reversed_result)
+    assert compile_rules(manifest, *rules, budget=6).status == CompilationStatus.INCOMPLETE
+
+
+def test_candidate_abstraction_and_integrity_state(git_repo):
+    manifest = scan_repository(git_repo)
+    source = manifest.sources[0]
+    candidate = CompilerCandidate.from_source(source)
+    evidence_candidate = replace(
+        candidate,
+        source=None,
+        id="provider:item-1",
+        evidence_location="src/module.py:10-18",
+        derivation="symbol_index:v1",
+    )
+    assert evidence_candidate.path == source.path
+    assert evidence_candidate.source is None
+    assert evidence_candidate.evidence_location == "src/module.py:10-18"
+    finding = IntegrityFinding(
+        "finding-1",
+        "rule-1",
+        "issue",
+        FindingSeverity.MEDIUM,
+        "message",
+        (source.path,),
+        (IntegrityEvidence("subject", source.path, source.id, source.revision),),
+    )
+    manifest, contract = bind(manifest, rule())
+    overview = IntegrityOverview(
+        manifest.repository,
+        manifest.repository_config.content_sha256,
+        ChangeSet(ChangeScope.UNAVAILABLE),
+        (finding,),
+        (),
+    )
+    result = compile_context(manifest, contract)
+    assert result.integrity_state.evaluation_status == IntegrityEvaluationStatus.NOT_EVALUATED
+    evaluated = compile_context(manifest, contract, integrity_overview=overview)
+    rendered = json.loads(render_compiled_context_json(evaluated))["integrity_state"]
+    assert rendered["evaluation_status"] == "evaluated"
+    assert rendered["findings"][0]["id"] == "finding-1"
+    assert rendered["findings"][0]["severity"] == "medium"
+    assert rendered["findings"][0]["evidence"][0]["path"] == source.path
 
 
 def test_custom_policy_provenance_and_inventory_only(git_repo):

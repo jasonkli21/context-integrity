@@ -13,9 +13,13 @@ from context_integrity.models import (
     CompilationStatus,
     CompiledContext,
     CompiledDependency,
+    CompiledIntegrityState,
     CompiledRuleDecision,
     CompiledSourceDecision,
+    CompilerCandidate,
     ContextContract,
+    IntegrityEvaluationStatus,
+    IntegrityOverview,
     InventoryManifest,
     LifecycleState,
     usable_content_revision,
@@ -31,6 +35,7 @@ def compile_context(
     *,
     task: str | None = None,
     budget_bytes: int | None = None,
+    integrity_overview: IntegrityOverview | None = None,
 ) -> CompiledContext:
     """Compile a selection manifest, then validate it with the Phase 5 validator.
 
@@ -39,9 +44,17 @@ def compile_context(
     raw matches, exactly as final validation does.
     """
     require_bound_contract(manifest, contract)
+    if integrity_overview is not None and (
+        integrity_overview.repository != manifest.repository
+        or integrity_overview.config_sha256
+        != (manifest.repository_config.content_sha256 if manifest.repository_config else None)
+    ):
+        raise ValueError("Integrity overview must describe the observed repository configuration.")
     budget = CompilationBudget(contract.budget_bytes, budget_bytes, 0)
     rules = tuple(sorted(contract.rules, key=lambda r: r.id))
-    sources = tuple(sorted(manifest.sources, key=lambda s: s.path))
+    sources = tuple(
+        CompilerCandidate.from_source(s) for s in sorted(manifest.sources, key=lambda s: s.path)
+    )
     policies = {p.id: p for p in effective_policies(manifest.repository_config)}
     if any(r.authority_policy is not None and r.authority_policy not in policies for r in rules):
         raise ConfigurationError("Invalid context contract authority policy.")
@@ -66,6 +79,7 @@ def compile_context(
                 tuple(
                     s for s in candidates if s.path in lifecycle_paths and s.path not in excluded
                 ),
+                allow_non_current_lifecycle=bool(rule.lifecycles),
             )
             tiers = {
                 c.source.path: c.tier_index
@@ -146,6 +160,60 @@ def compile_context(
             break
         select(min(ranked, key=lambda item: item[0])[1])
 
+    # Greedy is the common path. If it leaves a required deficit, search the
+    # eligible required candidate set exactly before reporting incomplete.
+    if any(counts[r.id] < r.min_count for r in required):
+        search_candidates = tuple(
+            s
+            for s in sources
+            if eligibility[s.path] is None and any(r in required for r in raw_rules[s.path])
+        )
+        best = None
+
+        def search(index, chosen, chosen_cost, search_counts):
+            nonlocal best
+            if budget.effective_bytes is not None and chosen_cost > budget.effective_bytes:
+                return
+            deficits = [r for r in required if search_counts[r.id] < r.min_count]
+            if not deficits:
+                candidate_result = (chosen_cost, tuple(sorted(chosen)))
+                if best is None or candidate_result < best:
+                    best = candidate_result
+                return
+            if index == len(search_candidates):
+                return
+            if best is not None and chosen_cost > best[0]:
+                return
+            remaining = search_candidates[index:]
+            for rule in deficits:
+                possible = search_counts[rule.id] + sum(
+                    1 for source in remaining if rule in raw_rules[source.path]
+                )
+                if possible < rule.min_count:
+                    return
+            source = search_candidates[index]
+            source_rules = raw_rules[source.path]
+            can_add = not any(
+                r.max_count is not None and search_counts[r.id] >= r.max_count for r in source_rules
+            )
+            if can_add:
+                updated = search_counts.copy()
+                for rule in source_rules:
+                    updated[rule.id] += 1
+                search(index + 1, (*chosen, source.path), chosen_cost + source.size_bytes, updated)
+            search(index + 1, chosen, chosen_cost, search_counts)
+
+        search(0, (), 0, {r.id: 0 for r in rules})
+        if best is not None:
+            selected = set(best[1])
+            used = 0
+            counts = {r.id: 0 for r in rules}
+            for source in sources:
+                if source.path in selected:
+                    used += source.size_bytes
+                    for rule in raw_rules[source.path]:
+                        counts[rule.id] += 1
+
     for rule in sorted(
         (r for r in rules if r.mode == Mode.OPTIONAL), key=lambda r: (-r.priority, r.id)
     ):
@@ -182,8 +250,9 @@ def compile_context(
                 ),
             )
         )
-    chosen = tuple(s for s in sources if s.path in selected)
-    validation = validate_contract(manifest, contract, tuple(s.path for s in chosen))
+    chosen_candidates = tuple(s for s in sources if s.path in selected)
+    chosen = tuple(s.source for s in chosen_candidates if s.source is not None)
+    validation = validate_contract(manifest, contract, tuple(s.path for s in chosen_candidates))
     return CompiledContext(
         manifest.repository,
         task,
@@ -196,6 +265,13 @@ def compile_context(
         validation,
         tuple(CompiledDependency(s.id, s.path, s.revision) for s in chosen),
         validation.warnings,
+        integrity_state=(
+            CompiledIntegrityState()
+            if integrity_overview is None
+            else CompiledIntegrityState(
+                IntegrityEvaluationStatus.EVALUATED, integrity_overview.findings
+            )
+        ),
         authority_policies=tuple(
             policies[id]
             for id in sorted({r.authority_policy for r in rules if r.authority_policy is not None})
