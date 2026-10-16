@@ -205,6 +205,8 @@ class RepositoryConfig:
     context_contracts: tuple[ContextContract, ...] = ()
 
     def __post_init__(self) -> None:
+        if self.context_contracts and self.schema_version < 5:
+            raise ValueError("Repository contracts require configuration schema v5 or newer.")
         if not isinstance(self.context_contracts, tuple) or any(
             not isinstance(c, ContextContract) for c in self.context_contracts
         ):

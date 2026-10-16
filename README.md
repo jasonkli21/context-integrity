@@ -10,7 +10,7 @@ Context Integrity is being built around the idea that:
 
 ## Status
 
-**Phase 5 deterministic Context Contracts implemented and offline-verified; independent review pending.**
+**Phase 5 deterministic Context Contracts implemented and offline-verified; review findings F-001–F-003 fixed.**
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
 

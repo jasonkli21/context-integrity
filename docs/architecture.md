@@ -727,22 +727,30 @@ Responsibilities:
 
 ## 7.8 `integrity`
 
-Responsibilities, later:
+Responsibilities, beginning Phase 4:
+
+- deterministic documentation and instruction integrity checks;
+- dependency-based drift checks;
+- changed-path evidence for local working-tree and explicit Git ranges.
+
+Later responsibilities:
 
 - contradiction rules;
 - staleness;
 - missing evidence;
 - invalidated derived context;
-- architectural drift;
-- instruction drift;
+- semantic architectural drift;
 - contract drift.
 
 ## 7.9 `contracts`
 
-Responsibilities, later:
+Responsibilities, beginning Phase 5:
 
 - context-contract definitions;
 - validation;
+
+Later responsibilities:
+
 - task classification hooks.
 
 ## 7.10 `compiler`

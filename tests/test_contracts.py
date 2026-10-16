@@ -71,6 +71,16 @@ def contract(*rules):
     return ContextContract("test", "implementation", "Fixture contract", rules or (rule(),))
 
 
+def bind_contract(manifest, value):
+    """Build a manifest configuration containing this contract for domain tests."""
+    config = RepositoryConfig(
+        schema_version=5,
+        content_sha256=value.config_revision,
+        context_contracts=(value,),
+    )
+    return replace(manifest, repository_config=config)
+
+
 @pytest.fixture
 def contract_repo(git_repo):
     (git_repo / ".context-integrity.toml").write_text(CONFIG)
@@ -149,7 +159,18 @@ def test_repository_contract_invariants_and_discovery():
     with pytest.raises(ValueError, match="Unknown"):
         resolve_contract(None, "missing")
     c = contract()
-    assert resolve_contract(RepositoryConfig(context_contracts=(c,)), "test") == c
+    assert resolve_contract(RepositoryConfig(schema_version=5, context_contracts=(c,)), "test") == c
+
+
+@pytest.mark.parametrize("version", [1, 2, 3, 4])
+def test_repository_config_rejects_contracts_before_schema_v5(version):
+    with pytest.raises(ValueError, match="schema v5"):
+        RepositoryConfig(schema_version=version, context_contracts=(contract(),))
+
+
+def test_repository_config_accepts_contracts_in_schema_v5():
+    c = contract()
+    assert RepositoryConfig(schema_version=5, context_contracts=(c,)).context_contracts == (c,)
 
 
 @pytest.mark.parametrize(
@@ -283,7 +304,8 @@ def test_rule_cardinality(git_repo, mode, minimum, maximum, paths, code):
     r = rule(
         paths=("AGENTS.md", "docs/architecture.md"), mode=mode, min_count=minimum, max_count=maximum
     )
-    result = validate_contract(scan_repository(git_repo), contract(r), paths)
+    manifest = bind_contract(scan_repository(git_repo), contract(r))
+    result = validate_contract(manifest, contract(r), paths)
     assert [f.code for f in result.findings] == ([code] if code else [])
     assert result.rule_results[0].satisfied is (code is None)
 
@@ -311,21 +333,41 @@ def test_package_resolution_and_determinism(contract_repo):
     )
     assert (
         validate_contract(
-            manifest, contract(rule(paths=("docs/history/old.md",))), ("docs/history/old.md",)
+            bind_contract(manifest, contract(rule(paths=("docs/history/old.md",)))),
+            contract(rule(paths=("docs/history/old.md",))),
+            ("docs/history/old.md",),
         ).findings
         == ()
     )
     assert "FAIL history" in render_contract_validation_text(result)
 
 
+def test_validation_binds_contract_and_provenance_to_manifest_config(contract_repo):
+    manifest = scan_repository(contract_repo)
+    configured = resolve_contract(manifest.repository_config, "implementation")
+    result = validate_contract(manifest, configured, ("AGENTS.md",))
+    assert result.config_sha256 == manifest.repository_config.content_sha256
+    assert result.contract.config_revision == manifest.repository_config.content_sha256
+
+    foreign = replace(configured, id="foreign")
+    modified = replace(configured, description="Modified after observation")
+    stale_revision = replace(configured, config_revision="0" * 64)
+    for candidate in (foreign, modified, stale_revision):
+        with pytest.raises(ValueError, match="not bound"):
+            validate_contract(manifest, candidate, ("AGENTS.md",))
+
+
 @pytest.mark.parametrize("path", ["../secret", "/absolute", "C:drive", "a\\b", "a\0b", ".", "a/"])
 def test_package_path_rejection(git_repo, path):
     with pytest.raises(ValueError):
-        validate_contract(scan_repository(git_repo), contract(), (path,))
+        validate_contract(bind_contract(scan_repository(git_repo), contract()), contract(), (path,))
 
 
 def test_json_golden_and_privacy(git_repo):
-    result = validate_contract(scan_repository(git_repo), contract(), ("AGENTS.md", "missing.md"))
+    c = contract()
+    result = validate_contract(
+        bind_contract(scan_repository(git_repo), c), c, ("AGENTS.md", "missing.md")
+    )
     rendered = render_contract_validation_json(result)
     assert rendered == (Path(__file__).parent / "fixtures/contracts-v1.json").read_text()
     assert str(git_repo) not in rendered and "Instructions" not in rendered

@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-16
 **Current phase:** Phase 5 — Context Contracts
 **Active plan:** `docs/plans/phase-5-implementation-plan.md`
-**Status:** Implemented and offline-verified; independent review pending.
+**Status:** Implemented and offline-verified; Phase 5 review findings F-001–F-003 are fixed and verified.
 
 ## Delivered
 
@@ -22,16 +22,16 @@
 ## Verification
 
 `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed: Ruff lint/format
-and **626 tests**, Python 3.12.13/macOS. Focused contracts: **94 passed**. Disposable executable
-CLI smoke covered passing/failing packages and byte-identical repeated JSON. Earlier JSON
-golden comparisons passed with unchanged fixtures. Acceptance evidence:
+and **632 tests**, Python 3.12.13/macOS. Focused contract/config tests: **160 passed**. The
+review-fix report records the schema invariant and config-bound validation regressions. Earlier
+JSON golden comparisons passed with unchanged fixtures. Acceptance evidence:
 `docs/implementation-reports/phase-5-implementation-report.md`.
 
 ## Known limitations / findings
 
-Phase 5 independent review is pending. Phase 4 review fixes F-001–F-003 retain their committed
-verified status; the separately pending final independent verification was not performed
-in Phase 5. Prior review navigation remains at `docs/reviews/README.md`.
+Phase 4 review fixes F-001–F-003 retain their committed verified status; the separately pending
+Phase 4 final independent verification was not performed during this review-fix work. The
+Phase 5 review handoff remains an external review artifact.
 
 Contracts validate declared metadata/count policy, not semantic completeness or correctness.
 Observations are sequential rather than atomic. There is no hidden lifecycle filter,
@@ -40,5 +40,5 @@ integrity gating, LLM, database, Codebase Intelligence integration, or CI enforc
 
 ## Next expected step
 
-Independent review of Phase 5 and the separately pending Phase 4 final verification;
-then Phase 6 — Task Context Compiler.
+Complete the separately pending Phase 4 final independent verification; then Phase 6 — Task
+Context Compiler.

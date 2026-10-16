@@ -153,3 +153,25 @@ compiler deduplication/selection, code/AST/symbol evidence, Codebase Intelligenc
 claim-semantic predicates, time-based freshness, integrity gating, inheritance/composition,
 glob/regex selector languages, LLMs/embeddings, persistence, cross-repository behavior,
 automatic rewriting, and CI/severity enforcement.
+
+## Review-fix verification — 2026-10-16
+
+Addressed the Phase 5 review handoff findings:
+
+- **F-001:** `RepositoryConfig` rejects nonempty contracts under schema versions 1–4. Direct
+  construction tests cover versions 1–5, and the discovery test now declares schema v5.
+- **F-002:** `validate_contract` requires the exact configured contract from the manifest and
+  requires its `config_revision` to match the observed config digest. Regression tests reject
+  foreign, modified, and revision-mismatched contracts and assert coherent bound provenance.
+- **F-003:** the architecture module boundaries now identify delivered Phase 4 integrity and
+  Phase 5 contract responsibilities separately from future work.
+
+Verification after the fixes:
+
+- `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 uv run pytest tests/test_contracts.py tests/test_configuration.py -q` — **160 passed**.
+- `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` — Ruff lint/format passed; **632 tests passed**.
+- `git diff --check` — passed.
+
+The CLI continues to resolve contracts from the manifest configuration before validation, so
+its command shape and exit behavior are unchanged. The separately pending Phase 4 final
+independent verification was not performed here.

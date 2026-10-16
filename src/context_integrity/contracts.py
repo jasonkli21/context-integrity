@@ -83,6 +83,19 @@ def _finding(
 def validate_contract(
     manifest: InventoryManifest, contract: ContextContract, paths: tuple[str, ...] = ()
 ) -> ContractValidationOverview:
+    config = manifest.repository_config
+    configured = (
+        next((item for item in config.context_contracts if item.id == contract.id), None)
+        if config is not None
+        else None
+    )
+    if (
+        configured is None
+        or configured != contract
+        or contract.config_revision != config.content_sha256
+    ):
+        raise ValueError("Context contract is not bound to the observed repository configuration.")
+
     package = resolve_package(manifest, paths)
     findings = [
         _finding(
@@ -127,7 +140,7 @@ def validate_contract(
     ]
     return ContractValidationOverview(
         manifest.repository,
-        manifest.repository_config.content_sha256 if manifest.repository_config else None,
+        config.content_sha256,
         contract,
         package,
         tuple(results),
