@@ -14,6 +14,7 @@ from context_integrity.models import (
     ClaimRecord,
     ClaimsOverview,
     ClassificationResult,
+    IntegrityOverview,
     InventoryManifest,
     InventorySummary,
     LifecycleEntry,
@@ -627,4 +628,65 @@ def render_claims_text(overview: ClaimsOverview, detail: bool = False) -> str:
         f"[{display(d.path)}]: {display(d.message)}"
         for d in overview.diagnostics
     )
+    return "\n".join(lines) + "\n"
+
+
+def integrity_dict(overview: IntegrityOverview) -> dict:
+    changes = overview.change_set
+    return {
+        "integrity_schema_version": overview.schema_version,
+        "repository": _repository_v1(overview.repository),
+        "config_sha256": overview.config_sha256,
+        "change_set": {
+            "scope": changes.scope.value,
+            "base_revision": changes.base_revision,
+            "target_revision": changes.target_revision,
+            "changed_paths": list(changes.changed_paths),
+            "derivation": changes.derivation,
+        },
+        "findings": [
+            {
+                "id": f.id,
+                "rule_id": f.rule_id,
+                "code": f.code,
+                "severity": f.severity.value,
+                "message": f.message,
+                "affected_paths": list(f.affected_paths),
+                "dependency_id": f.dependency_id,
+                "evidence": [
+                    {
+                        "role": e.role,
+                        "path": e.path,
+                        "source_id": e.source_id,
+                        "source_revision": _revision_v1(e.source_revision)
+                        if e.source_revision
+                        else None,
+                        "derivation": e.derivation,
+                    }
+                    for e in f.evidence
+                ],
+            }
+            for f in overview.findings
+        ],
+        "warnings": [
+            {"code": w.code, "path": w.path, "message": w.message} for w in overview.warnings
+        ],
+    }
+
+
+def render_integrity_json(overview: IntegrityOverview) -> str:
+    return json.dumps(integrity_dict(overview), indent=2, sort_keys=True, ensure_ascii=True) + "\n"
+
+
+def render_integrity_text(overview: IntegrityOverview) -> str:
+    lines = [
+        f"Integrity: {display(overview.repository.name)}",
+        f"Change scope: {overview.change_set.scope.value}",
+        f"Findings: {len(overview.findings)}",
+    ]
+    for f in overview.findings:
+        lines.append(f"{f.severity.value}: {f.code}: {display(f.message)}")
+        lines.extend(f"  {display(p)}" for p in f.affected_paths)
+    for w in overview.warnings:
+        lines.append(f"Warning: {display(w.code)}: {display(w.path or '')}: {display(w.message)}")
     return "\n".join(lines) + "\n"

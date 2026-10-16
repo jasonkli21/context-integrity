@@ -1,6 +1,7 @@
 """Strict versioned repository configuration parsing and descriptor-safe loading."""
 
 import os
+import re
 import tomllib
 from hashlib import sha256
 
@@ -12,6 +13,8 @@ from context_integrity.models import (
     AuthorityTier,
     ClaimId,
     ClaimSpec,
+    DriftDependencySpec,
+    InstructionPolicySpec,
     LifecycleState,
     RepositoryConfig,
     SourceMetadata,
@@ -67,17 +70,18 @@ def _path(value: object) -> str:
 
 
 def parse_config(data: bytes) -> RepositoryConfig:
-    """Parse v1 authority, v2 lifecycle, or v3 claims; unknown keys fail closed."""
+    """Parse v1 authority, v2 lifecycle, v3 claims, or v4 drift policy; unknown keys fail closed."""
     try:
         raw_root = tomllib.loads(data.decode("utf-8"))
         version = raw_root.get("schema_version")
-        if type(version) is not int or version not in {1, 2, 3}:
+        if type(version) is not int or version not in {1, 2, 3, 4}:
             raise ValueError("Unsupported configuration schema version.")
         root = _table(
             raw_root,
             {"schema_version", "authority", "source_metadata"}
             | ({"supersession"} if version >= 2 else set())
-            | ({"claims"} if version == 3 else set()),
+            | ({"claims"} if version >= 3 else set())
+            | ({"instruction_policy", "drift_dependencies"} if version >= 4 else set()),
         )
         digest = sha256(data).hexdigest()
         authority = _table(root.get("authority", {}), {"policies"})
@@ -165,8 +169,46 @@ def parse_config(data: bytes) -> RepositoryConfig:
                 )
             )
         validate_unique_claim_ids(tuple(claims))
+        instruction_policy = None
+        if "instruction_policy" in root:
+            entry = _table(root["instruction_policy"], {"canonical", "compatibility"})
+            canonical = _path(entry.get("canonical"))
+            compatibility = tuple(_path(p) for p in _array(entry.get("compatibility")))
+            paths = (canonical, *compatibility)
+            if CONFIG_PATH in paths or len(set(paths)) != len(paths):
+                raise ValueError("Instruction path collision or self reference.")
+            instruction_policy = InstructionPolicySpec(canonical, tuple(sorted(compatibility)))
+        dependencies = []
+        for raw in _array(root.get("drift_dependencies", [])):
+            entry = _table(raw, {"id", "dependent", "upstream", "reason"})
+            identifier = _text(entry.get("id"))
+            if not re.fullmatch(r"[a-z][a-z0-9_-]*", identifier):
+                raise ValueError("Invalid drift dependency ID.")
+            dependent = _path(entry.get("dependent"))
+            upstream = tuple(_path(p) for p in _array(entry.get("upstream")))
+            if (
+                not upstream
+                or len(set(upstream)) != len(upstream)
+                or dependent in upstream
+                or dependent == CONFIG_PATH
+            ):
+                raise ValueError("Invalid drift dependency paths.")
+            dependencies.append(
+                DriftDependencySpec(
+                    identifier, dependent, tuple(sorted(upstream)), _text(entry.get("reason"))
+                )
+            )
+        if len({d.id for d in dependencies}) != len(dependencies):
+            raise ValueError("Duplicate drift dependency ID.")
         return RepositoryConfig(
-            tuple(policies), tuple(metadata), digest, version, tuple(supersession), tuple(claims)
+            tuple(policies),
+            tuple(metadata),
+            digest,
+            version,
+            tuple(supersession),
+            tuple(claims),
+            instruction_policy,
+            tuple(sorted(dependencies, key=lambda d: d.id)),
         )
     except (ValueError, TypeError, KeyError, RecursionError) as exc:
         # Parser exceptions can contain arbitrary repository text; keep errors path/body-free.

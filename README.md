@@ -10,11 +10,11 @@ Context Integrity is being built around the idea that:
 
 ## Status
 
-**Phase 3 explicit claims and provenance implemented and verified; independent review pending.**
+**Phase 4 deterministic documentation / instruction drift implemented and offline-verified; independent review pending.**
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
 
-Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Explicit claims now retain declaration and dependency revisions, with independent unverified validity. Contradiction detection, architectural drift, context compilation, and LLM-assisted analysis remain deferred.
+Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Explicit claims retain declaration and dependency revisions, with independent unverified validity. Deterministic integrity checks now surface structural instruction references, current-state navigation and delivery-evidence gaps, and explicit document review dependencies on changed paths. Contradiction detection, architectural drift, context compilation, and LLM-assisted analysis remain deferred.
 
 See [`docs/current-state.md`](docs/current-state.md) for the exact current state.
 
@@ -353,6 +353,67 @@ body text, or model inference establish state or supersession. Expiration is nev
 Lifecycle commands do not mutate configuration or evaluate claims. No database or external integration is included.
 See the [Phase 2 implementation report](docs/implementation-reports/phase-2-implementation-report.md)
 for verification and the acceptance mapping.
+
+## Checking documentation and instruction drift
+
+```bash
+uv run context-integrity check .
+uv run context-integrity check . --diff main..HEAD
+uv run context-integrity check . --format json --output /tmp/integrity.json
+```
+
+`check` returns 0 after a successful evaluation, including when findings exist. Repository
+or explicitly requested diff failures return 3, output failures 4, and config failures 6.
+Severity is descriptive; there are no CI thresholds in this phase.
+
+Without `--diff`, change evidence includes modified, deleted, and untracked paths from
+local Git status. `BASE..TARGET` resolves two local commits and compares their paths,
+with renames represented as deletion plus addition. No fetch occurs. Source text and
+inventory always describe the current checkout, even when change evidence uses a range.
+Without Git, text/navigation rules still run and change evidence is marked unavailable.
+
+With no instruction policy, an inventoried root `AGENTS.md` enables structural reference
+checks for existing `CLAUDE.md`, `GEMINI.md`, and `.github/copilot-instructions.md` sources.
+A repository using only `CLAUDE.md` is not required to adopt that convention. Local/nested
+instructions are outside this automatic root policy. References establish a literal path
+relationship only; they do not establish semantic agreement.
+
+Choose schema v4 to retain v3 features and add explicit instruction and review dependencies:
+
+```toml
+schema_version = 4
+
+[instruction_policy]
+canonical = "AGENTS.md"
+compatibility = ["CLAUDE.md", ".github/copilot-instructions.md"]
+
+[[drift_dependencies]]
+id = "architecture-core-model"
+dependent = "docs/architecture.md"
+upstream = ["src/context_integrity/models.py", "src/context_integrity/evidence.py"]
+reason = "Core model/evidence changes require architecture review."
+```
+
+These are exact path dependencies; there is no glob expansion or code analysis. A changed
+upstream with an unchanged dependent emits a review signal. Changing both suppresses that
+simple signal without proving correctness. Missing dependent sources remain visible.
+Schemas v1–v3 reject v4 policy keys.
+
+For usable current-state sources, checks recognize the narrow `**Current phase:** Phase N`,
+`**Active plan:**` followed by a backtick path, `**Status:**`, and `## Next expected step`
+convention. Multiple usable candidates require resolution. A delivered status requires a
+usable `phase-N-implementation-report...` verification record; a plan or generic review
+cannot substitute. Later numeric phase reports signal possible navigation lag. Report
+existence is evidence rather than proof of implementation correctness.
+
+Integrity JSON v1 is a separate projection (`integrity_schema_version: 1`) containing
+repository identity, config hash, change scope and commit revisions, findings, affected
+paths, owned evidence, and warnings. It omits source bodies, timestamps, and absolute
+roots. Finding IDs are stable across content revisions when the rule, code, dependency
+ID, and affected paths stay the same. Findings never mutate authority, lifecycle,
+supersession, or claims; claim validity remains `unverified`.
+
+See the [Phase 4 implementation report](docs/implementation-reports/phase-4-implementation-report.md).
 
 ## Using claims and provenance
 

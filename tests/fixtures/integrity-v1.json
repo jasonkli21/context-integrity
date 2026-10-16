@@ -1,0 +1,68 @@
+{
+  "change_set": {
+    "base_revision": null,
+    "changed_paths": [],
+    "derivation": "local_git",
+    "scope": "unavailable",
+    "target_revision": null
+  },
+  "config_sha256": null,
+  "findings": [
+    {
+      "affected_paths": [
+        "AGENTS.md",
+        "CLAUDE.md"
+      ],
+      "code": "instruction_reference_missing",
+      "dependency_id": null,
+      "evidence": [
+        {
+          "derivation": "inventory",
+          "path": "AGENTS.md",
+          "role": "canonical_instruction",
+          "source_id": "src_93002c02e201edf8e41be324c4165c22",
+          "source_revision": {
+            "content_sha256": "4f0f12338998c7764db2b84ec1058027294bc8aa929dc01ced51ab578e0196b7",
+            "git_head": null,
+            "git_status": "unknown",
+            "observed_revision_basis": "working_tree_content"
+          }
+        },
+        {
+          "derivation": "inventory",
+          "path": "CLAUDE.md",
+          "role": "compatibility_instruction",
+          "source_id": "src_8e250e27226c196ac57c4590cf4cb114",
+          "source_revision": {
+            "content_sha256": "0b9ab0417947c5bd12a7ae00cceea5a078ae187d7a21329b11c30d06e11ffa38",
+            "git_head": null,
+            "git_status": "unknown",
+            "observed_revision_basis": "working_tree_content"
+          }
+        }
+      ],
+      "id": "finding_31ecb690e71b734c6d8254439de4a006",
+      "message": "Compatibility instruction lacks a structural canonical path reference.",
+      "rule_id": "instruction.canonical_reference.v1",
+      "severity": "medium"
+    }
+  ],
+  "integrity_schema_version": 1,
+  "repository": {
+    "git": {
+      "available": false,
+      "dirty": null,
+      "head": null
+    },
+    "id": "repo_fixture",
+    "identity_basis": "local_fallback",
+    "name": "fixture"
+  },
+  "warnings": [
+    {
+      "code": "change_evidence_unavailable",
+      "message": "Local change evidence unavailable; change-dependent checks skipped.",
+      "path": null
+    }
+  ]
+}

@@ -199,6 +199,8 @@ class RepositoryConfig:
     schema_version: int = 1
     supersession: tuple[SupersessionSpec, ...] = ()
     claims: tuple[ClaimSpec, ...] = ()
+    instruction_policy: InstructionPolicySpec | None = None
+    drift_dependencies: tuple[DriftDependencySpec, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -357,4 +359,70 @@ class ClaimsOverview:
     claims: tuple[ClaimRecord, ...]
     warnings: tuple[ScanWarning, ...]
     diagnostics: tuple[ClaimDiagnostic, ...] = ()
+    schema_version: int = 1
+
+
+@dataclass(frozen=True)
+class InstructionPolicySpec:
+    canonical: str
+    compatibility: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DriftDependencySpec:
+    id: str
+    dependent: str
+    upstream: tuple[str, ...]
+    reason: str
+
+
+class FindingSeverity(StrEnum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class ChangeScope(StrEnum):
+    WORKING_TREE = "working_tree"
+    GIT_RANGE = "git_range"
+    UNAVAILABLE = "unavailable"
+
+
+@dataclass(frozen=True)
+class ChangeSet:
+    scope: ChangeScope
+    changed_paths: tuple[str, ...] = ()
+    base_revision: str | None = None
+    target_revision: str | None = None
+    derivation: str = "local_git"
+
+
+@dataclass(frozen=True)
+class IntegrityEvidence:
+    role: str
+    path: str
+    source_id: SourceId | None = None
+    source_revision: SourceRevision | None = None
+    derivation: str = "inventory"
+
+
+@dataclass(frozen=True)
+class IntegrityFinding:
+    id: str
+    rule_id: str
+    code: str
+    severity: FindingSeverity
+    message: str
+    affected_paths: tuple[str, ...]
+    evidence: tuple[IntegrityEvidence, ...]
+    dependency_id: str | None = None
+
+
+@dataclass(frozen=True)
+class IntegrityOverview:
+    repository: RepositoryRef
+    config_sha256: str | None
+    change_set: ChangeSet
+    findings: tuple[IntegrityFinding, ...]
+    warnings: tuple[ScanWarning, ...]
     schema_version: int = 1

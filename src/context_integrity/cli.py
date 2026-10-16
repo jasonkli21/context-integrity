@@ -13,6 +13,7 @@ from context_integrity.acquisition import normalize_path
 from context_integrity.authority import effective_policies, resolve_authority
 from context_integrity.claims import claims_overview
 from context_integrity.configuration import ConfigurationError
+from context_integrity.integrity import integrity_overview
 from context_integrity.inventory import inventory_repository
 from context_integrity.lifecycle import lifecycle_overview
 from context_integrity.models import AuthorityPolicy, InventoryManifest
@@ -22,6 +23,8 @@ from context_integrity.rendering import (
     render_claims_json,
     render_claims_text,
     render_explanation,
+    render_integrity_json,
+    render_integrity_text,
     render_json,
     render_lifecycle_json,
     render_lifecycle_text,
@@ -310,6 +313,38 @@ def claims_show(
     """Show one claim's declaration and dependency revisions without verifying its assertion."""
     _, manifest = load_inventory(path)
     _claims_output(manifest, format, output, claim_id)
+
+
+@app.command()
+def check(
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    diff: Annotated[str | None, typer.Option(help="Local two-commit range BASE..TARGET.")] = None,
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Evaluate deterministic integrity review signals; findings do not fail the command."""
+    context, manifest = load_inventory(path)
+    try:
+        overview = integrity_overview(context, manifest, diff)
+    except ConfigurationError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(6) from exc
+    except RepositoryError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(3) from exc
+    rendered = (
+        render_integrity_json(overview)
+        if format == OutputFormat.JSON
+        else render_integrity_text(overview)
+    )
+    if output:
+        try:
+            output.write_text(rendered, encoding="utf-8")
+        except (OSError, ValueError) as exc:
+            typer.echo("Output file could not be written.", err=True)
+            raise typer.Exit(4) from exc
+    else:
+        typer.echo(rendered, nl=False)
 
 
 if __name__ == "__main__":

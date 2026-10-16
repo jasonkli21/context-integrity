@@ -92,6 +92,12 @@ KIND_RULES = (
         directories=("adr", "adrs", "decisions"),
     ),
     KindRule(
+        "kind.verification.implementation_reports",
+        K.VERIFICATION_RECORD,
+        "directory_rule",
+        paths=("docs/implementation-reports/*",),
+    ),
+    KindRule(
         "kind.plan.directory",
         K.IMPLEMENTATION_PLAN,
         "directory_rule",
@@ -157,7 +163,7 @@ KIND_RULES = (
         K.VERIFICATION_RECORD,
         "filename_pattern",
         C.HEURISTIC,
-        filenames=("*-verification.*", "*verification-record*"),
+        filenames=("*-verification.*", "*verification-record*", "*implementation-report*"),
     ),
     KindRule(
         "kind.release.filename",

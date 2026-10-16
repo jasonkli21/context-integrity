@@ -1044,6 +1044,20 @@ derived_context_integrity
 cross_repository_integrity
 ```
 
+Phase 4 evaluates structural instruction references, narrow current-state navigation and
+phase delivery evidence, and explicit exact-path document review dependencies. Local Git
+changed-path observations belong to `evidence.py`; policy conclusions belong to
+`integrity.py`. Explicit commit ranges scope change evidence, while source text describes
+the current checkout. Text is bounded, descriptor-safe, and matched to inventoried raw-byte
+hashes before evaluation. Failed or inconsistent text reads produce warnings rather than
+fabricated conclusions.
+
+Findings are deterministic review signals with owned path/source/revision evidence. They
+do not mutate authority, lifecycle, supersession, or claim validity. A changed dependent
+suppresses only the simple upstream-without-dependent-change signal. Implementation report
+existence supplies delivery evidence, never infallible proof; plans and generic reviews do
+not satisfy this check. Integrity JSON v1 is separate from existing public projections.
+
 Rules should prefer deterministic evaluation.
 
 An LLM can be a specialized evaluator for rules that explicitly permit probabilistic reasoning.

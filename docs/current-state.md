@@ -1,55 +1,43 @@
 # Current State
 
 **Last updated:** 2026-10-15
-**Current phase:** Phase 3 — Claims and Provenance
-**Active plan:** `docs/plans/phase-3-implementation-plan.md`
-**Status:** Implemented, offline-verified, and Phase 3 independent review findings addressed.
+**Current phase:** Phase 4 — Documentation / Instruction Drift
+**Active plan:** `docs/plans/phase-4-implementation-plan.md`
+**Status:** Implemented and offline-verified; independent Phase 4 review pending.
 
 ## Delivered
 
-- Phase 0 safe inventory, stable source IDs/raw-byte revisions, Git boundary protections,
-  classification, scan/explain/version, and inventory JSON v1 remain intact.
-- Phase 1 question-specific authority policies preserve equal-precedence tiers, all top
-  candidates, and missing stronger tiers. Source-role precedence never proves correctness.
-- Phase 2 explicit lifecycle/supersession, lifecycle-aware authority gating, and lifecycle
-  list/show remain intact. Cumulative Phase 0–2 independent review corrections are implemented;
-  final independent verification of those fixes remains pending.
-- Strict config v1 is authority-only; v2 adds lifecycle/supersession; v3 adds explicit
-  structured claims while preserving v2 behavior. Older versions reject claim keys.
-- Stable configured claim IDs; required type/subject/predicate/value and optional scope and
-  dependency paths. Unknown/malformed fields, unsafe paths, duplicate IDs/dependencies,
-  and config self-dependency fail closed. Bounded config/hash consistency checks remain.
-- Declaration provenance identifies config SourceId/raw-byte SourceRevision, `claim:<id>`,
-  `repository_config_explicit`, and `claims-v1`. Dependencies resolve only against observed
-  inventory identities/revisions; dirty bytes retain content hashes separate from Git HEAD.
-- Missing/unavailable dependencies remain visible, warn, and make provenance incomplete.
-  Every claim remains `unverified`, independently of source lifecycle and completeness.
-- `claims list/show` support text/JSON and output files. Separate deterministic claims JSON
-  v1 exposes statement, validity, declaration/dependency provenance, resolution, and warnings.
-  Original inventory/authority/lifecycle JSON v1 projections and golden fixtures are unchanged.
+- Phase 0–3 inventory, authority, lifecycle/supersession, and explicit claims remain intact.
+  Claim validity remains `unverified`; existing JSON v1 projections are unchanged.
+- Implementation reports have verification-record / verification-evidence classification.
+- Strict config v4 retains v3 and adds instruction policy and exact-path document review
+  dependencies. Schemas v1–v3 reject those keys.
+- `check` evaluates structural canonical instruction references, current-state navigation,
+  phase report evidence, and upstream changes requiring dependent-document review.
+  Findings retain owned evidence and stable IDs without changing canonical state.
+- Local working-tree changes or explicit two-commit ranges supply changed-path evidence.
+  Reads remain bounded, descriptor-safe, and tied to inventoried content hashes.
+- Text and separate integrity JSON v1 output support output files. Findings return success;
+  repository/config/output failures retain fatal exits. Everything runs offline.
 
 ## Verification
 
 `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed:
-Ruff lint/format and **426 tests**, Python 3.12.13/macOS. Baseline: **353 tests** at
-`14ce25d6fcc3ecf65a8aaf79c177323ac3cb5772`. Focused claims/config gate: **121 passed**.
-Review-fix focused claims/config gate: **128 passed**. Original Phase 0–2 goldens remain
-byte-identical; claims JSON v1 goldens include structured diagnostics.
-Real-checkout empty claims list and synthetic v3 list/show/output smoke checks passed.
-
-Acceptance evidence: `docs/implementation-reports/phase-3-implementation-report.md`.
-Prior independent review navigation: `docs/reviews/README.md`.
+Ruff lint/format and **510 tests**, Python 3.12.13/macOS, from a **426-test** baseline at
+`cce525db1eede17dc0158eee30b7a75a0a2d2397`. Focused Phase 4 gate: **83 passed**.
+Existing inventory/authority/lifecycle/claims golden fixtures remain byte-identical.
+Real-checkout text/JSON checks report zero findings; disposable local explicit-diff smoke
+passed. Acceptance evidence: `docs/implementation-reports/phase-4-implementation-report.md`.
 
 ## Known limitations / findings
 
-No intentionally unresolved implementation findings. Phase 3 review findings F-001
-(structured claim diagnostic ownership and `show` scoping) and F-002 (domain validation and
-explicit producer provenance) are fixed and tested. Claims remain explicit config assertions
-only; dependency bodies are not parsed or treated as proof. Ordinary code and other
-non-inventoried paths stay unresolved. No automatic validity, staleness, claim authority,
-contradiction, drift, persistence, or external integration. Scans remain sequential
-observations rather than atomic snapshots; safe reads target POSIX.
+Phase 4 has not received independent review. Findings prove bounded review conditions,
+not semantic correctness or contradiction. Text describes the current checkout, even
+when changed paths come from an explicit commit range. Scans remain sequential rather
+than atomic. No automatic rewriting, validity changes, AST/structural code analysis,
+Codebase Intelligence integration, LLM, database, or CI enforcement was added.
+Prior phase review navigation remains at `docs/reviews/README.md`.
 
 ## Next expected step
 
-Proceed to Phase 4 — Documentation / Instruction Drift.
+Independent review, then Phase 5 — Context Contracts.
