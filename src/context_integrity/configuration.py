@@ -9,6 +9,7 @@ from context_integrity.acquisition import normalize_path, read_source_bytes
 from context_integrity.authority import effective_policies
 from context_integrity.lifecycle import validate_supersession
 from context_integrity.models import (
+    SUPPORTED_CONFIG_SCHEMA_VERSIONS,
     AuthorityClass,
     AuthorityPolicy,
     AuthorityTier,
@@ -79,7 +80,7 @@ def parse_config(data: bytes) -> RepositoryConfig:
     try:
         raw_root = tomllib.loads(data.decode("utf-8"))
         version = raw_root.get("schema_version")
-        if type(version) is not int or version not in {1, 2, 3, 4, 5, 6, 7}:
+        if type(version) is not int or version not in SUPPORTED_CONFIG_SCHEMA_VERSIONS:
             raise ValueError("Unsupported configuration schema version.")
         root = _table(
             raw_root,

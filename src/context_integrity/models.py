@@ -41,6 +41,7 @@ class SourceKind(StrEnum):
 PROVIDER_SOURCE_KINDS = frozenset(
     {SourceKind.SOURCE_CODE, SourceKind.TEST, SourceKind.SCHEMA, SourceKind.MIGRATION}
 )
+SUPPORTED_CONFIG_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7})
 
 
 class AuthorityClass(StrEnum):
@@ -217,6 +218,11 @@ class RepositoryConfig:
     context_contracts: tuple[ContextContract, ...] = ()
 
     def __post_init__(self) -> None:
+        if (
+            type(self.schema_version) is not int
+            or self.schema_version not in SUPPORTED_CONFIG_SCHEMA_VERSIONS
+        ):
+            raise ValueError("Unsupported configuration schema version.")
         if self.context_contracts and self.schema_version < 5:
             raise ValueError("Repository contracts require configuration schema v5 or newer.")
         if not isinstance(self.context_contracts, tuple) or any(
@@ -771,6 +777,55 @@ class CandidateRelevance:
     graph_distance: int | None = None
     change_distance: int | None = None
 
+    def __post_init__(self) -> None:
+        safe_token = re.compile(r"[a-z][a-z0-9_-]{0,79}")
+        if (
+            type(self.rank) is not int
+            or self.rank < 1
+            or type(self.score) is not int
+            or self.score < 0
+            or not isinstance(self.score_components, tuple)
+            or any(
+                not isinstance(item, tuple)
+                or len(item) != 2
+                or not isinstance(item[0], str)
+                or not safe_token.fullmatch(item[0])
+                or type(item[1]) is not int
+                or item[1] < 0
+                for item in self.score_components
+            )
+            or tuple(sorted(self.score_components)) != self.score_components
+            or len({key for key, _ in self.score_components}) != len(self.score_components)
+            or not isinstance(self.reasons, tuple)
+            or any(
+                not isinstance(reason, str) or not safe_token.fullmatch(reason)
+                for reason in self.reasons
+            )
+            or tuple(sorted(set(self.reasons))) != self.reasons
+            or not isinstance(self.matched_entities, tuple)
+            or any(
+                not isinstance(entity, tuple)
+                or len(entity) != 4
+                or not isinstance(entity[0], str)
+                or not safe_token.fullmatch(entity[0])
+                or not isinstance(entity[1], str)
+                or not safe_token.fullmatch(entity[1])
+                or type(entity[2]) is not int
+                or type(entity[3]) is not int
+                or entity[2] < 0
+                or entity[3] < entity[2]
+                for entity in self.matched_entities
+            )
+            or tuple(sorted(set(self.matched_entities))) != self.matched_entities
+            or type(self.matched_entities_omitted) is not int
+            or self.matched_entities_omitted < 0
+            or any(
+                distance is not None and (type(distance) is not int or distance < 0)
+                for distance in (self.graph_distance, self.change_distance)
+            )
+        ):
+            raise ValueError("Invalid normalized candidate relevance.")
+
 
 @dataclass(frozen=True)
 class CompilerCandidate:
@@ -790,6 +845,26 @@ class CompilerCandidate:
     provider_id: str | None = None
     provider_version: str | None = None
     relevance: CandidateRelevance | None = None
+
+    def __post_init__(self) -> None:
+        if self.origin == CandidateOrigin.EVIDENCE_PROVIDER:
+            safe_id = re.compile(r"[a-z][a-z0-9_-]{0,79}(?::[A-Za-z0-9_.+-]{1,100})?")
+            if (
+                not isinstance(self.evidence_location, str)
+                or not self.evidence_location
+                or self.evidence_location.startswith("/")
+                or "\\" in self.evidence_location
+                or any(part in {"", ".", ".."} for part in self.evidence_location.split("/"))
+                or not isinstance(self.derivation, str)
+                or len(self.derivation) > 200
+                or not all(safe_id.fullmatch(part) for part in self.derivation.split(":"))
+                or not isinstance(self.provider_id, str)
+                or not re.fullmatch(r"[a-z][a-z0-9-]{0,79}", self.provider_id)
+                or not isinstance(self.provider_version, str)
+                or not re.fullmatch(r"[A-Za-z0-9_.+-]{1,80}", self.provider_version)
+                or not isinstance(self.relevance, CandidateRelevance)
+            ):
+                raise ValueError("Invalid normalized provider candidate provenance.")
 
     @classmethod
     def from_source(cls, source: SourceRecord) -> CompilerCandidate:

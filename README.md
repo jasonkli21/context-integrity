@@ -82,7 +82,8 @@ The projects intentionally do **not** share a database or implementation lifecyc
 │   ├── architecture.md               # system boundaries and architecture invariants
 │   ├── current-state.md              # concise status snapshot
 │   ├── plans/
-│   │   └── phase-2-implementation-plan.md
+│   │   ├── phase-0-implementation-plan.md … phase-6-implementation-plan.md
+│   │   └── phase-7-implementation-plan.md # current phase plan; see current-state.md
 │   ├── adr/                          # durable architectural decisions
 │   ├── implementation-reports/       # evidence of what an implementation session changed
 │   ├── reviews/                      # independent review findings

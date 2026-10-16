@@ -10,13 +10,21 @@ from typing import Protocol
 
 from context_integrity.acquisition import normalize_path, read_source_bytes
 from context_integrity.models import (
+    PROVIDER_SOURCE_KINDS,
+    AuthorityClass,
     CandidateOrigin,
     ChangeScope,
     ChangeSet,
+    ClassificationConfidence,
+    ClassificationResult,
     CompilerCandidate,
+    GitFileStatus,
+    LifecycleState,
     RepositoryRef,
     ScanWarning,
+    SourceKind,
     SourceRecord,
+    SourceRevision,
     _validate_integrity_path,
     make_source_id,
     usable_content_revision,
@@ -112,13 +120,22 @@ class EvidenceProviderDescriptor:
 
     def __post_init__(self):
         if (
-            not re.fullmatch(r"[a-z][a-z0-9-]*", self.id)
+            not isinstance(self.id, str)
+            or not re.fullmatch(r"[a-z][a-z0-9-]*", self.id)
+            or not isinstance(self.version, str)
             or not re.fullmatch(r"[A-Za-z0-9_.+-]{1,80}", self.version)
             or type(self.contract_version) is not int
             or self.contract_version != 1
-            or "context_candidates" not in self.capabilities
+            or not isinstance(self.capabilities, tuple)
+            or any(not isinstance(c, str) for c in self.capabilities)
             or len(set(self.capabilities)) != len(self.capabilities)
-            or set(self.capabilities) - {"context_candidates", "change_context"}
+            or self.capabilities
+            not in {
+                ("context_candidates",),
+                ("context_candidates", "change_context"),
+            }
+            or "context_candidates" not in self.capabilities
+            or not isinstance(self.derivation, str)
             or not re.fullmatch(r"[a-z0-9_-]{1,80}", self.derivation)
         ):
             raise ValueError("Invalid evidence provider descriptor.")
@@ -157,15 +174,20 @@ class EvidenceRepositorySnapshot:
 
     def __post_init__(self):
         if (
-            not self.repository_id
+            not isinstance(self.repository_id, str)
+            or not self.repository_id
             or type(self.provider_schema_version) is not int
             or self.provider_schema_version != 1
             or self.command != "context"
             or (
                 self.git_head is not None
-                and not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", self.git_head)
+                and (
+                    not isinstance(self.git_head, str)
+                    or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", self.git_head)
+                )
             )
             or (self.git_dirty is not None and type(self.git_dirty) is not bool)
+            or not re.fullmatch(r"[a-z][a-z0-9_-]{0,79}", self.repository_id)
         ):
             raise ValueError("Invalid evidence snapshot.")
 
@@ -176,11 +198,20 @@ class EvidenceCoverage:
     incomplete: bool
 
     def __post_init__(self):
+        if not isinstance(self.signals, tuple) or any(
+            not isinstance(item, tuple) or len(item) != 2 for item in self.signals
+        ):
+            raise ValueError("Invalid evidence coverage.")
         keys = [k for k, _ in self.signals]
         if (
-            keys != sorted(set(keys))
+            len(self.signals) > 128
+            or keys != sorted(set(keys))
             or any(
-                not re.fullmatch(r"[a-z0-9_]+", k) or type(v) not in {int, bool} or v < 0
+                not isinstance(k, str)
+                or not re.fullmatch(r"[a-z0-9_]{1,80}", k)
+                or type(v) not in {int, bool}
+                or v < 0
+                or (type(v) is int and v > 2**63 - 1)
                 for k, v in self.signals
             )
             or type(self.incomplete) is not bool
@@ -201,13 +232,86 @@ class EvidenceProviderState:
     warnings: tuple[ScanWarning, ...] = ()
 
     def __post_init__(self):
+        change_keys = {
+            "range",
+            "base",
+            "head",
+            "changed_files_observed",
+            "changed_symbols_observed",
+            "current_file_mappings",
+            "current_symbol_mappings",
+            "unmapped_symbols",
+            "ambiguous_symbol_keys",
+            "unavailable_symbol_comparisons",
+            "deleted_only_entities",
+        }
         if (
-            not isinstance(self.task, str)
+            not isinstance(self.descriptor, EvidenceProviderDescriptor)
+            or not isinstance(self.snapshot, EvidenceRepositorySnapshot)
+            or not isinstance(self.coverage, EvidenceCoverage)
+            or not isinstance(self.task, str)
             or not self.task.strip()
+            or len(self.task.encode("utf-8", "surrogatepass")) > 16384
+            or any(ord(ch) < 32 and ch not in "\t\n\r" for ch in self.task)
             or not isinstance(self.ranker_version, str)
             or not re.fullmatch(r"[A-Za-z0-9_.+-]{1,100}", self.ranker_version)
             or type(self.acquisition_budget_bytes) is not int
             or not 1 <= self.acquisition_budget_bytes <= 16 * 1024 * 1024
+            or not isinstance(self.change, tuple)
+            or any(not isinstance(item, tuple) or len(item) != 2 for item in self.change)
+            or any(
+                not isinstance(key, str) or type(value) not in {str, int}
+                for key, value in self.change
+            )
+            or tuple(sorted(self.change)) != self.change
+            or len({key for key, _ in self.change}) != len(self.change)
+            or any(
+                not isinstance(key, str)
+                or not re.fullmatch(r"[a-z][a-z0-9_]{0,79}", key)
+                or key not in change_keys
+                or not (
+                    (type(value) is int and value >= 0 and key not in {"range", "base", "head"})
+                    or (
+                        isinstance(value, str)
+                        and key == "range"
+                        and re.fullmatch(r"[A-Za-z0-9_.+-]{1,100}\.\.[A-Za-z0-9_.+-]{1,100}", value)
+                    )
+                    or (
+                        isinstance(value, str)
+                        and key in {"base", "head"}
+                        and re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", value)
+                    )
+                )
+                for key, value in self.change
+            )
+            or (
+                self.fallback_mode is not None
+                and (not isinstance(self.fallback_mode, str) or self.fallback_mode != "centrality")
+            )
+            or not isinstance(self.warnings, tuple)
+            or any(
+                not isinstance(w, ScanWarning)
+                or not isinstance(w.code, str)
+                or not isinstance(w.message, str)
+                or w.path is not None
+                or w.code not in {"provider_incomplete", "provider_snapshot_unknown"}
+                or w.message
+                not in {
+                    (
+                        "Provider analysis or candidate acquisition is incomplete; "
+                        "see provider coverage."
+                    ),
+                    (
+                        "Provider snapshot metadata is partially unavailable; "
+                        "content hashes scope candidates."
+                    ),
+                }
+                for w in self.warnings
+            )
+            or tuple((w.code, w.message) for w in self.warnings)
+            != tuple(sorted({(w.code, w.message) for w in self.warnings}))
+            or ("provider_incomplete" in {w.code for w in self.warnings})
+            != self.coverage.incomplete
             or (self.change and "change_context" not in self.descriptor.capabilities)
         ):
             raise ValueError("Invalid evidence provider state.")
@@ -219,6 +323,13 @@ class EvidenceContextBatch:
     candidates: tuple[CompilerCandidate, ...]
 
     def __post_init__(self):
+        if not isinstance(self.state, EvidenceProviderState):
+            raise EvidenceProviderError("invalid_state")
+        if not isinstance(self.candidates, tuple) or any(
+            not isinstance(candidate, CompilerCandidate) or not isinstance(candidate.path, str)
+            for candidate in self.candidates
+        ):
+            raise EvidenceProviderError("invalid_candidate")
         paths = [c.path for c in self.candidates]
         if len(set(paths)) != len(paths):
             raise EvidenceProviderError("duplicate_path")
@@ -229,7 +340,31 @@ class EvidenceContextBatch:
                 or c.provider_id != self.state.descriptor.id
                 or c.provider_version != self.state.descriptor.version
                 or c.id != make_source_id(self.state.snapshot.repository_id, c.path)
-                or c.source is None
+                or not isinstance(c.source, SourceRecord)
+                or not isinstance(c.kind, SourceKind)
+                or not isinstance(c.authority_class, AuthorityClass)
+                or not isinstance(c.lifecycle, LifecycleState)
+                or not isinstance(c.source.classification, ClassificationResult)
+                or not isinstance(c.source.revision, SourceRevision)
+                or not isinstance(c.source.classification.kind, SourceKind)
+                or not isinstance(c.source.classification.authority_class, AuthorityClass)
+                or not isinstance(c.source.classification.lifecycle, LifecycleState)
+                or not isinstance(c.source.classification.confidence, ClassificationConfidence)
+                or not isinstance(c.source.revision.git_status, GitFileStatus)
+                or c.source.source_metadata is not None
+                or c.kind not in PROVIDER_SOURCE_KINDS
+                or c.source.classification.kind != c.kind
+                or c.source.classification.authority_class != c.authority_class
+                or c.source.classification.lifecycle != c.lifecycle
+                or c.source.classification.confidence != ClassificationConfidence.EXPLICIT
+                or c.source.revision.observed_revision_basis != "provider_content_sha256"
+                or c.source.revision.git_status
+                not in {GitFileStatus.TRACKED_CLEAN, GitFileStatus.UNKNOWN}
+                or c.authority_class.value != "executable_truth"
+                or c.lifecycle.value != "unknown"
+                or c.source.classification.matched_rules != ("provider-role-v1",)
+                or c.source.classification.basis != ()
+                or c.evidence_location != c.path
                 or CompilerCandidate.from_source(c.source)
                 != CompilerCandidate(
                     c.id,
@@ -248,6 +383,7 @@ class EvidenceContextBatch:
                 or c.relevance is None
                 or type(c.relevance.rank) is not int
                 or c.relevance.rank < 1
+                or any(end > c.size_bytes for _, _, _, end in c.relevance.matched_entities)
             ):
                 raise EvidenceProviderError("invalid_candidate")
 

@@ -12,6 +12,13 @@ from context_integrity.configuration import (
     parse_config,
 )
 from context_integrity.inventory import inventory_repository, scan_repository
+from context_integrity.models import (
+    ContextContract,
+    ContextContractRule,
+    ContextRuleMode,
+    RepositoryConfig,
+    SourceKind,
+)
 from context_integrity.repository import discover_repository
 
 VALID = b"""schema_version = 1
@@ -38,6 +45,22 @@ def test_config_absent_and_valid(tmp_path):
     assert config.policies[0].tiers[0].classes == ("plan", "decision")
     assert config.source_metadata[1].authority_eligible is False
     assert config.policies[0].origin == "repository_config"
+
+
+@pytest.mark.parametrize("version", [True, 7.0, 7.5, "7", 0, 8])
+def test_direct_repository_config_rejects_unsupported_schema_versions(version):
+    with pytest.raises(ValueError, match="Unsupported configuration schema version"):
+        RepositoryConfig(schema_version=version)
+
+
+def test_direct_repository_config_accepts_v7_provider_kinds():
+    contract = ContextContract(
+        "work",
+        "implementation",
+        "Provider source kind",
+        (ContextContractRule("code", ContextRuleMode.REQUIRED, kinds=(SourceKind.SOURCE_CODE,)),),
+    )
+    assert RepositoryConfig(schema_version=7, context_contracts=(contract,)).schema_version == 7
 
 
 @pytest.mark.parametrize(

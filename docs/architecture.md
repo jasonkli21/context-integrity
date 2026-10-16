@@ -261,14 +261,17 @@ These implementations must sit behind the same evidence boundary rather than spr
                ▼            ▼            ▼
               CLI           CI         Agent/tool
 
-Future code evidence path:
+Delivered Phase 7 compiler candidate path:
 
 Codebase Intelligence Engine
         │
         ▼
   EvidenceProvider
         │
-        └──────────────► Claim / Evidence Layer
+        └──────────────► Context Compiler
+
+Future richer relation/impact evidence may inform the Claim / Evidence Layer
+when a later phase defines a consumer and its policy.
 ```
 
 ---

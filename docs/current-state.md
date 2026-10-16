@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-16
 **Current phase:** Phase 7 — Codebase Intelligence EvidenceProvider Integration
 **Active plan:** `docs/plans/phase-7-implementation-plan.md`
-**Status:** Implemented and offline-verified; independent review required.
+**Status:** Implemented and offline-verified; Phase 7 independent review findings addressed.
 
 ## Delivered
 
@@ -32,9 +32,10 @@
 
 ## Verification
 
-`UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed: Ruff lint,
-format and **831 tests**, Python 3.12.13/macOS. Focused evidence/adapter/compiler/contracts/
-configuration/CLI: **371 passed**. v3 inventory/mixed goldens and `git diff --check` passed.
+`UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed after review fixes:
+Ruff lint, format and **850 tests**, Python 3.12.13/macOS. The focused Phase 7
+evidence/adapter/compiler/contracts/configuration/CLI suite passed; v3 inventory/mixed goldens
+and `git diff --check` passed. Fix details: `docs/implementation-reports/phase-7-review-fixes-report.md`.
 Real `ctx 0.1.0` / `file-ranker-v1` smokes passed for non-Git and clean Git/change fixtures,
 selecting documentation plus code with body-free output. Evidence:
 `docs/implementation-reports/phase-7-implementation-report.md`; durable boundary:

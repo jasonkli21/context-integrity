@@ -1,8 +1,8 @@
 """Pure human and stable JSON renderers."""
 
 import json
-from dataclasses import asdict
 
+from context_integrity.evidence import EvidenceProviderState
 from context_integrity.lifecycle import (
     active_authority_exclusion_reason,
     lifecycle_authority_eligible,
@@ -12,6 +12,7 @@ from context_integrity.models import (
     AuthorityPolicy,
     AuthorityResolution,
     AuthorityTier,
+    CandidateRelevance,
     ClaimRecord,
     ClaimsOverview,
     ClassificationResult,
@@ -30,6 +31,50 @@ from context_integrity.models import (
     SourceRecord,
     SourceRevision,
 )
+
+
+def _candidate_relevance_v3(relevance: CandidateRelevance) -> dict:
+    return {
+        "rank": relevance.rank,
+        "score": relevance.score,
+        "score_components": [list(item) for item in relevance.score_components],
+        "reasons": list(relevance.reasons),
+        "matched_entities": [list(item) for item in relevance.matched_entities],
+        "matched_entities_omitted": relevance.matched_entities_omitted,
+        "graph_distance": relevance.graph_distance,
+        "change_distance": relevance.change_distance,
+    }
+
+
+def _provider_state_v3(state: EvidenceProviderState) -> dict:
+    return {
+        "descriptor": {
+            "id": state.descriptor.id,
+            "version": state.descriptor.version,
+            "contract_version": state.descriptor.contract_version,
+            "capabilities": list(state.descriptor.capabilities),
+            "derivation": state.descriptor.derivation,
+        },
+        "snapshot": {
+            "repository_id": state.snapshot.repository_id,
+            "git_head": state.snapshot.git_head,
+            "git_dirty": state.snapshot.git_dirty,
+            "provider_schema_version": state.snapshot.provider_schema_version,
+            "command": state.snapshot.command,
+        },
+        "task": state.task,
+        "ranker_version": state.ranker_version,
+        "acquisition_budget_bytes": state.acquisition_budget_bytes,
+        "coverage": {
+            "signals": [list(item) for item in state.coverage.signals],
+            "incomplete": state.coverage.incomplete,
+        },
+        "change": [list(item) for item in state.change],
+        "fallback_mode": state.fallback_mode,
+        "warnings": [
+            {"code": w.code, "path": w.path, "message": w.message} for w in state.warnings
+        ],
+    }
 
 
 def _repository_v1(repository: RepositoryRef) -> dict:
@@ -855,7 +900,7 @@ def compiled_context_dict(compiled: CompiledContext) -> dict:
         "config_sha256": compiled.config_sha256,
         "status": compiled.status.value,
         "authority_policies": [policy_dict(p) for p in compiled.authority_policies],
-        "providers": [asdict(p) for p in compiled.providers],
+        "providers": [_provider_state_v3(p) for p in compiled.providers],
         "budget": {
             "configured_bytes": budget.configured_bytes,
             "requested_bytes": budget.requested_bytes,
@@ -871,7 +916,9 @@ def compiled_context_dict(compiled: CompiledContext) -> dict:
                 "origin": d.source.origin.value,
                 "provider_id": d.source.provider_id,
                 "provider_version": d.source.provider_version,
-                "relevance": asdict(d.source.relevance) if d.source.relevance else None,
+                "relevance": (
+                    _candidate_relevance_v3(d.source.relevance) if d.source.relevance else None
+                ),
                 "evidence_location": d.source.evidence_location,
                 "derivation": d.source.derivation,
                 "path": d.source.path,

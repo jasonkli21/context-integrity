@@ -27,6 +27,15 @@ Other roles are skipped. A normalized `SourceRecord` is an evidence adapter payl
 `manifest.sources` remains the ordinary context inventory. Clean Git metadata permits
 `tracked_clean`; otherwise candidate Git status is `unknown`.
 
+Every provider must satisfy the same normalized domain invariants: relevance scores, distances,
+omission counts, identifiers and sorted collections are typed and bounded; matched entity byte
+spans fit within candidate size; provenance locations are repository-relative; derivation is a
+stable identifier; and classification must agree with the normalized role/authority/lifecycle.
+Provider classification basis text and source metadata are not accepted. Provider state uses
+the supported capability, change, fallback and warning vocabulary. These checks live at the
+generic batch/model boundary, so replacements do not rely on the Context Engine adapter for
+privacy or determinism.
+
 ## Context Engine transport
 
 The adapter executes these argv lists with no shell, network, installation or database access:
@@ -91,6 +100,9 @@ Final validation uses `validate_contract_sources` with the exact mixed universe.
 Compiled-context JSON advances to v3, adding explicit origins, relevance and provider states;
 all earlier inventory/authority/lifecycle/claims/integrity/contract-validation projections
 remain at their previous versions. Rebuilding derived compiled output is the v2-to-v3 migration.
+The v3 renderer projects provider and relevance fields through explicit whitelists so internal
+dataclass fields cannot silently become public JSON fields. Direct `RepositoryConfig`
+construction enforces the same supported schema-version set as TOML parsing.
 
 ## Coverage and limitations
 

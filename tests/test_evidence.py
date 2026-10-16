@@ -10,21 +10,33 @@ from context_integrity.compiler import compile_context
 from context_integrity.configuration import ConfigurationError, parse_config
 from context_integrity.contracts import validate_contract, validate_contract_sources
 from context_integrity.evidence import (
+    EvidenceContextBatch,
     EvidenceContextRequest,
     EvidenceCoverage,
     EvidenceProviderDescriptor,
     EvidenceProviderError,
+    EvidenceProviderState,
     EvidenceRepositorySnapshot,
 )
 from context_integrity.inventory import scan_repository
 from context_integrity.models import (
     AuthorityClass,
+    CandidateOrigin,
+    CandidateRelevance,
+    ClassificationConfidence,
+    ClassificationResult,
+    CompilerCandidate,
     ContextContract,
     ContextContractRule,
     ContextRuleMode,
+    GitFileStatus,
     LifecycleState,
     RepositoryConfig,
+    ScanWarning,
     SourceKind,
+    SourceRecord,
+    SourceRevision,
+    make_source_id,
 )
 from context_integrity.rendering import render_compiled_context_json
 from test_context_engine import BODY, normalize, response, selected_file
@@ -78,6 +90,34 @@ def test_mixed_validation_budget_privacy_and_golden(tmp_path):
         compile_mixed(manifest, contract, replace(batch, candidates=batch.candidates[::-1]))
     )
     data = provider_projection(result)
+    assert set(data["providers"][0]) == {
+        "descriptor",
+        "snapshot",
+        "task",
+        "ranker_version",
+        "acquisition_budget_bytes",
+        "coverage",
+        "change",
+        "fallback_mode",
+        "warnings",
+    }
+    assert set(data["providers"][0]["descriptor"]) == {
+        "id",
+        "version",
+        "contract_version",
+        "capabilities",
+        "derivation",
+    }
+    assert set(next(d for d in data["decisions"] if d["relevance"])["relevance"]) == {
+        "rank",
+        "score",
+        "score_components",
+        "reasons",
+        "matched_entities",
+        "matched_entities_omitted",
+        "graph_distance",
+        "change_distance",
+    }
     golden = Path(__file__).parent / "fixtures/compiled-context-provider-v3.json"
     assert json.dumps(data, indent=2, sort_keys=True) + "\n" == golden.read_text()
 
@@ -127,35 +167,29 @@ def test_exclusions_lifecycle_authority_beat_rank(tmp_path):
         manifest, repository_config=replace(manifest.repository_config, context_contracts=(new,))
     )
     assert "src/a.py" not in paths(compile_mixed(updated, new, batch))
-    for changes in (
-        {"lifecycle": LifecycleState.HISTORICAL},
-        {"authority_class": AuthorityClass.PLAN},
-    ):
-        first = batch.candidates[0]
-        source = replace(first.source, **changes)
-        candidate = replace(first, source=source, **changes)
-        changed_batch = replace(batch, candidates=(candidate, batch.candidates[1]))
-        rules = tuple(
-            replace(r, authority_policy="implementation_truth") if r.id == "code" else r
-            for r in contract.rules
-        )
-        # Use an actual builtin policy identifier.
-        from context_integrity.authority import effective_policies
+    # Real provider candidates have executable_truth/unknown metadata.  A rule
+    # limited to active lifecycle cannot select them, regardless of rank.
+    rules = tuple(
+        replace(r, lifecycles=(LifecycleState.ACTIVE,)) if r.id == "code" else r
+        for r in contract.rules
+    )
+    new = replace(contract, rules=rules)
+    updated = replace(
+        manifest, repository_config=replace(manifest.repository_config, context_contracts=(new,))
+    )
+    assert paths(compile_mixed(updated, new, batch)) == ("AGENTS.md",)
 
-        policy = next(
-            p
-            for p in effective_policies(None)
-            if p.tiers[0].classes == (AuthorityClass.EXECUTABLE_TRUTH,)
-        )
-        rules = tuple(
-            replace(r, authority_policy=policy.id) if r.id == "code" else r for r in rules
-        )
-        new = replace(contract, rules=rules)
-        updated = replace(
-            manifest,
-            repository_config=replace(manifest.repository_config, context_contracts=(new,)),
-        )
-        assert paths(compile_mixed(updated, new, changed_batch)) == ("AGENTS.md", "src/z.py")
+    # A question-specific authority policy for architectural intent does not
+    # admit provider code's executable_truth class.
+    rules = tuple(
+        replace(r, authority_policy="architectural_intent") if r.id == "code" else r
+        for r in contract.rules
+    )
+    new = replace(contract, rules=rules)
+    updated = replace(
+        manifest, repository_config=replace(manifest.repository_config, context_contracts=(new,))
+    )
+    assert paths(compile_mixed(updated, new, batch)) == ("AGENTS.md",)
 
 
 def test_optional_rank_and_exact_budget(tmp_path):
@@ -208,7 +242,14 @@ def test_provider_feasibility_repair(tmp_path):
 def test_provider_incomplete_contract_complete(tmp_path):
     manifest, contract, batch = setup_mixed(tmp_path)
     coverage = replace(batch.state.coverage, incomplete=True)
-    batch = replace(batch, state=replace(batch.state, coverage=coverage))
+    warnings = (
+        ScanWarning(
+            "provider_incomplete",
+            None,
+            "Provider analysis or candidate acquisition is incomplete; see provider coverage.",
+        ),
+    )
+    batch = replace(batch, state=replace(batch.state, coverage=coverage, warnings=warnings))
     result = compile_mixed(manifest, contract, batch)
     assert result.status == "complete" and result.providers[0].coverage.incomplete
 
@@ -297,30 +338,114 @@ def test_coverage_snapshot_invariants():
 def test_replaceable_generic_provider(tmp_path):
     from context_integrity.evidence import EvidenceProvider
 
-    manifest, contract, batch = setup_mixed(tmp_path)
+    manifest, contract, _batch = setup_mixed(tmp_path)
 
     class Replacement:
         def context_candidates(self, request):
             assert request.repository == manifest.repository
             descriptor = EvidenceProviderDescriptor("replacement", "1")
-            return replace(
-                batch,
-                state=replace(batch.state, descriptor=descriptor),
-                candidates=tuple(
-                    replace(
-                        c,
-                        provider_id=descriptor.id,
-                        provider_version=descriptor.version,
-                        derivation=descriptor.derivation,
-                    )
-                    for c in batch.candidates
+            path = "src/generic.py"
+            source = SourceRecord(
+                make_source_id(request.repository.id, path),
+                path,
+                SourceKind.SOURCE_CODE,
+                AuthorityClass.EXECUTABLE_TRUTH,
+                LifecycleState.UNKNOWN,
+                SourceRevision(
+                    "b" * 64,
+                    request.repository.git_head,
+                    GitFileStatus.UNKNOWN,
+                    "provider_content_sha256",
                 ),
+                ClassificationResult(
+                    SourceKind.SOURCE_CODE,
+                    AuthorityClass.EXECUTABLE_TRUTH,
+                    LifecycleState.UNKNOWN,
+                    ClassificationConfidence.EXPLICIT,
+                    ("provider-role-v1",),
+                    (),
+                ),
+                12,
             )
+            candidate = replace(
+                CompilerCandidate.from_source(source),
+                origin=CandidateOrigin.EVIDENCE_PROVIDER,
+                provider_id=descriptor.id,
+                provider_version=descriptor.version,
+                evidence_location=path,
+                derivation=descriptor.derivation,
+                relevance=CandidateRelevance(1, 1, (("total", 1),), ("task_match",)),
+            )
+            state = EvidenceProviderState(
+                descriptor,
+                EvidenceRepositorySnapshot(
+                    request.repository.id,
+                    request.repository.git_head,
+                    request.repository.git_dirty,
+                ),
+                request.task,
+                "replacement-ranker-v1",
+                request.acquisition_budget_bytes,
+                EvidenceCoverage((), False),
+            )
+            return EvidenceContextBatch(state, (candidate,))
 
     provider: EvidenceProvider = Replacement()
     request = EvidenceContextRequest(tmp_path, manifest.repository, "sample")
     result = compile_mixed(manifest, contract, provider.context_candidates(request))
     assert result.status == "complete" and result.providers[0].descriptor.id == "replacement"
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        (1, -1, (), ()),
+        (1, 0, (("total", 1), ("total", 2)), ()),
+        (1, 0, (), ("unsorted", "task_match")),
+        (1, 0, (), (), (("symbol", "x", 3, 2),)),
+        (1, 0, (), (), (), -1),
+        (1, 0, (), (), (), 0, -1, None),
+    ],
+)
+def test_malformed_candidate_relevance_rejected(args):
+    with pytest.raises(ValueError):
+        CandidateRelevance(*args)
+
+
+@pytest.mark.parametrize(
+    "provenance",
+    [
+        {"evidence_location": "/private/source.py"},
+        {"derivation": "private source body"},
+    ],
+)
+def test_provider_candidate_rejects_unsafe_provenance(tmp_path, provenance):
+    _, _, batch = setup_mixed(tmp_path, files=[selected_file()])
+    with pytest.raises(ValueError):
+        replace(batch.candidates[0], **provenance)
+
+
+def test_generic_batch_rejects_inconsistent_source_classification(tmp_path):
+    _, _, batch = setup_mixed(tmp_path, files=[selected_file()])
+    candidate = batch.candidates[0]
+    classification = replace(candidate.source.classification, authority_class=AuthorityClass.PLAN)
+    source = replace(candidate.source, classification=classification)
+    with pytest.raises(EvidenceProviderError, match="invalid_candidate"):
+        replace(batch, candidates=(replace(candidate, source=source),))
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"fallback_mode": "provider-private-detail"},
+        {"change": (("private", "source text"),)},
+        {"warnings": (ScanWarning("provider_incomplete", None, "arbitrary private warning"),)},
+    ],
+)
+def test_provider_state_rejects_unstable_or_private_metadata(tmp_path, changes):
+    _, _, batch = setup_mixed(tmp_path, files=[selected_file()])
+    with pytest.raises(ValueError):
+        replace(batch.state, **changes)
 
 
 @pytest.mark.parametrize("field", ['kinds = ["unknown_kind"]', 'context_engine_bin = "/tmp/ctx"'])
@@ -341,17 +466,17 @@ paths = ["src/sample.py"]
 
 
 def test_ineligible_optional_provider_slots_cannot_demote_docs(tmp_path):
+    required = ContextContractRule("instructions", ContextRuleMode.REQUIRED, paths=("AGENTS.md",))
     rule = ContextContractRule(
-        "any", ContextRuleMode.OPTIONAL, paths=("A.py", "AGENTS.md", "z.py"), max_count=1
+        "any",
+        ContextRuleMode.OPTIONAL,
+        paths=("A.py", "AGENTS.md", "z.py"),
+        lifecycles=(LifecycleState.ACTIVE,),
+        max_count=1,
     )
     manifest, contract, batch = setup_mixed(
-        tmp_path, rules=(rule,), files=[selected_file("A.py", 2), selected_file("z.py", 1)]
+        tmp_path,
+        rules=(required, rule),
+        files=[selected_file("A.py", 2), selected_file("z.py", 1)],
     )
-    first = batch.candidates[0]
-    first = replace(
-        first,
-        lifecycle=LifecycleState.HISTORICAL,
-        source=replace(first.source, lifecycle=LifecycleState.HISTORICAL),
-    )
-    batch = replace(batch, candidates=(first, batch.candidates[1]))
     assert paths(compile_mixed(manifest, contract, batch)) == ("AGENTS.md",)
