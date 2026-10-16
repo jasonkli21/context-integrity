@@ -1,0 +1,89 @@
+{
+  "claims": [
+    {
+      "claim_type": "future_work",
+      "dependencies": [],
+      "id": "a_no_dependencies",
+      "predicate": "uses",
+      "provenance": {
+        "extraction_method": "repository_config_explicit",
+        "extractor_version": "claims-v1",
+        "locator": "claim:a_no_dependencies",
+        "path": ".context-integrity.toml",
+        "revision": {
+          "content_sha256": "7be854d0806178789713b1df071cc7d2baf0408722f26676bdc1b0d6db871805",
+          "git_head": null,
+          "git_status": "unknown",
+          "observed_revision_basis": "working_tree_content"
+        },
+        "source_id": "src_.context-integrity.toml"
+      },
+      "provenance_complete": true,
+      "scope": null,
+      "subject": "storage",
+      "validity": "unverified",
+      "value": "explicit assertion"
+    },
+    {
+      "claim_type": "custom_category",
+      "dependencies": [
+        {
+          "path": "docs/architecture.md",
+          "resolved": true,
+          "revision": {
+            "content_sha256": "4f531a01dd11807c3725576b7ffb13f4496470e267a516cb283d7c2b695e120c",
+            "git_head": null,
+            "git_status": "unknown",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "source_id": "src_docs/architecture.md"
+        },
+        {
+          "path": "missing.md",
+          "resolved": false,
+          "revision": null,
+          "source_id": null
+        }
+      ],
+      "id": "owns_policy",
+      "predicate": "owns",
+      "provenance": {
+        "extraction_method": "repository_config_explicit",
+        "extractor_version": "claims-v1",
+        "locator": "claim:owns_policy",
+        "path": ".context-integrity.toml",
+        "revision": {
+          "content_sha256": "7be854d0806178789713b1df071cc7d2baf0408722f26676bdc1b0d6db871805",
+          "git_head": null,
+          "git_status": "unknown",
+          "observed_revision_basis": "working_tree_content"
+        },
+        "source_id": "src_.context-integrity.toml"
+      },
+      "provenance_complete": false,
+      "scope": "repository",
+      "subject": "context_integrity",
+      "validity": "unverified",
+      "value": "normative interpretation"
+    }
+  ],
+  "config_sha256": "7be854d0806178789713b1df071cc7d2baf0408722f26676bdc1b0d6db871805",
+  "repository": {
+    "git": {
+      "available": false,
+      "dirty": null,
+      "head": null
+    },
+    "id": "repo_fixture",
+    "identity_basis": "fixture",
+    "name": "claims-fixture"
+  },
+  "schema_version": 1,
+  "warnings": [
+    {
+      "code": "claim_dependency_missing",
+      "message": "Claim owns_policy: dependency is absent from inventory.",
+      "path": "missing.md"
+    }
+  ]
+}

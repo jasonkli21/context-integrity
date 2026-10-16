@@ -46,7 +46,7 @@ def test_config_absent_and_valid(tmp_path):
         b"[",
         b"\xff",
         b"",
-        b"schema_version = 3",
+        b"schema_version = 4",
         b"schema_version = true",
         b"schema_version = '1'",
         b"schema_version = 1\ninclude = 'other.toml'",
@@ -129,13 +129,13 @@ def test_config_unreadable_fail_closed(tmp_path, monkeypatch):
         scan_repository(tmp_path)
 
 
-@pytest.mark.parametrize("schema_version", [1, 2])
+@pytest.mark.parametrize("schema_version", [1, 2, 3])
 @pytest.mark.parametrize("change", ["replace", "remove", "symlink", "appear", "after_read"])
 def test_config_revision_consistency(tmp_path, monkeypatch, change, schema_version):
     from context_integrity import inventory
 
     valid = VALID.replace(b"schema_version = 1", f"schema_version = {schema_version}".encode())
-    if schema_version == 2:
+    if schema_version >= 2:
         valid += b"""
 [[source_metadata]]
 path="a.md"
@@ -147,6 +147,15 @@ reason="Active"
 source="b.md"
 superseded_by="a.md"
 reason="Replacement"
+"""
+    if schema_version == 3:
+        valid += b"""
+[[claims]]
+id="stable"
+claim_type="custom"
+subject="x"
+predicate="is"
+value="y"
 """
     config = tmp_path / CONFIG_PATH
     if change != "appear":

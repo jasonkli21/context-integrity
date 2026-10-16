@@ -10,11 +10,11 @@ Context Integrity is being built around the idea that:
 
 ## Status
 
-**Phase 2 lifecycle/supersession implemented and verified; independent Phase 2 review pending.**
+**Phase 3 explicit claims and provenance implemented and verified; independent review pending.**
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
 
-Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Claims, contradiction detection, architectural drift, context compilation, and LLM-assisted analysis remain deferred.
+Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Explicit claims now retain declaration and dependency revisions, with independent unverified validity. Contradiction detection, architectural drift, context compilation, and LLM-assisted analysis remain deferred.
 
 See [`docs/current-state.md`](docs/current-state.md) for the exact current state.
 
@@ -350,9 +350,68 @@ a newline at EOF. Inventory and authority JSON v1 gain no graph fields or new ke
 
 Lifecycle is explicit source metadata only: no dates, Git timestamps, filename numbering,
 body text, or model inference establish state or supersession. Expiration is never automatic.
-No mutation commands, claims, database, or external integration are included.
+Lifecycle commands do not mutate configuration or evaluate claims. No database or external integration is included.
 See the [Phase 2 implementation report](docs/implementation-reports/phase-2-implementation-report.md)
 for verification and the acceptance mapping.
+
+## Using claims and provenance
+
+```bash
+uv run context-integrity claims list .
+uv run context-integrity claims list . --format json --output /tmp/claims.json
+uv run context-integrity claims show context_integrity_owns_normative_interpretation .
+```
+
+Choose configuration schema v3 to declare explicit structured claims alongside all v2
+policy, metadata, lifecycle, and supersession features. Schemas v1/v2 reject `claims`.
+
+```toml
+schema_version = 3
+
+[[claims]]
+id = "context_integrity_owns_normative_interpretation"
+claim_type = "architectural_intent"
+subject = "context_integrity"
+predicate = "owns"
+value = "normative interpretation of context"
+scope = "repository"
+depends_on = ["docs/architecture.md", "docs/prd.md"]
+```
+
+`id`, `claim_type`, `subject`, `predicate`, and `value` are required nonblank strings.
+IDs and types match `[a-z][a-z0-9_-]*`; IDs must be unique. Types may be independent of
+existing authority policies. `scope` is an optional nonblank string; `depends_on` defaults
+to an empty array. Dependency paths use normalized repository-relative POSIX syntax.
+Unsafe paths, duplicate normalized paths, config self-dependencies, and unknown keys
+are rejected. Claim strings are data and are never executed or interpreted as expressions.
+
+Declaration provenance identifies `.context-integrity.toml`, its SourceId and observed
+raw-byte SourceRevision, locator `claim:<id>`, extraction method `repository_config_explicit`,
+and extractor version `claims-v1`. Editing a declaration preserves its configured ID while
+changing the observed revision. Each dependency carries the already inventoried source's
+identity and raw-byte revision, including dirty content hashes and separate Git metadata.
+Dependencies are inputs to the assertion; they do not prove it or imply that their bodies
+were parsed to extract it.
+
+Missing, ignored, deleted, unsafe-to-read, or non-inventoried paths remain unresolved.
+Ordinary code is outside the inventory and is not added by a claim reference. Claims stay
+visible with `provenance_complete = false` and `claim_dependency_missing` warnings. An
+observed source with an unavailable content revision retains its identity/revision metadata,
+remains unresolved, and emits `claim_dependency_revision_unavailable`. **Every claim remains
+`unverified`**, regardless of provenance completeness or dependency lifecycle/authority.
+
+Both commands support `--format text|json` and `--output PATH`. List text shows ID, type,
+validity, and completeness; show adds the statement, declaration, and dependency revisions.
+Unknown claim exits 2, output write failure exits 4, and configuration errors exit 6.
+Show JSON uses the same schema with one claim and retains all observation warnings.
+
+Claims JSON has its own schema v1 with explicit fields for statements, validity,
+provenance completeness, declaration provenance, dependencies (`resolved`, nullable
+`source_id`/`revision`), and warnings. Claims sort by ID and dependencies by path; JSON
+ends with a newline and omits timestamps, absolute roots, and dependency bodies.
+Inventory, authority, and lifecycle JSON v1 contracts are unchanged. No claim verification,
+authority resolution, prose extraction, or contradiction/drift evaluation runs.
+See the [Phase 3 implementation report](docs/implementation-reports/phase-3-implementation-report.md).
 
 ## Development workflow
 

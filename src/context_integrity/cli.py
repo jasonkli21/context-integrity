@@ -11,6 +11,7 @@ import typer
 from context_integrity import __version__
 from context_integrity.acquisition import normalize_path
 from context_integrity.authority import effective_policies, resolve_authority
+from context_integrity.claims import claims_overview
 from context_integrity.configuration import ConfigurationError
 from context_integrity.inventory import inventory_repository
 from context_integrity.lifecycle import lifecycle_overview
@@ -18,6 +19,8 @@ from context_integrity.models import AuthorityPolicy, InventoryManifest
 from context_integrity.rendering import (
     render_authority_json,
     render_authority_text,
+    render_claims_json,
+    render_claims_text,
     render_explanation,
     render_json,
     render_lifecycle_json,
@@ -246,6 +249,66 @@ def lifecycle_show(
     """Inspect one source's lifecycle and revision without resolving an authority policy."""
     _, manifest = load_inventory(path)
     _lifecycle_output(manifest, format, output, source_path)
+
+
+claims_app = typer.Typer(help="Inspect explicit claims and provenance.", no_args_is_help=True)
+app.add_typer(claims_app, name="claims")
+
+
+def _claims_output(
+    manifest: InventoryManifest,
+    format: OutputFormat,
+    output: Path | None,
+    claim_id: str | None = None,
+) -> None:
+    try:
+        overview = claims_overview(manifest)
+    except ConfigurationError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(6) from exc
+    if claim_id is not None:
+        claims = tuple(c for c in overview.claims if c.id == claim_id)
+        if not claims:
+            typer.echo("Unknown claim ID.", err=True)
+            raise typer.Exit(2)
+        # Same schema and observation warnings, with only the requested claim.
+        overview = replace(overview, claims=claims)
+    rendered = (
+        render_claims_json(overview)
+        if format == OutputFormat.JSON
+        else render_claims_text(overview, detail=claim_id is not None)
+    )
+    if output:
+        try:
+            output.write_text(rendered, encoding="utf-8")
+        except (OSError, ValueError) as exc:
+            typer.echo("Output file could not be written.", err=True)
+            raise typer.Exit(4) from exc
+    else:
+        typer.echo(rendered, nl=False)
+
+
+@claims_app.command("list")
+def claims_list(
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """List explicit claims, independent validity, and provenance completeness."""
+    _, manifest = load_inventory(path)
+    _claims_output(manifest, format, output)
+
+
+@claims_app.command("show")
+def claims_show(
+    claim_id: Annotated[str, typer.Argument()],
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Show one claim's declaration and dependency revisions without verifying its assertion."""
+    _, manifest = load_inventory(path)
+    _claims_output(manifest, format, output, claim_id)
 
 
 if __name__ == "__main__":

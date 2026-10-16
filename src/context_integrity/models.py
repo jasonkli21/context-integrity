@@ -9,6 +9,7 @@ from hashlib import sha256
 from typing import NewType
 
 SourceId = NewType("SourceId", str)
+ClaimId = NewType("ClaimId", str)
 
 
 class SourceKind(StrEnum):
@@ -197,6 +198,7 @@ class RepositoryConfig:
     content_sha256: str | None = None
     schema_version: int = 1
     supersession: tuple[SupersessionSpec, ...] = ()
+    claims: tuple[ClaimSpec, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -269,3 +271,59 @@ class LifecycleOverview:
     sources: tuple[LifecycleEntry, ...]
     supersession: tuple[ResolvedSupersession, ...]
     warnings: tuple[ScanWarning, ...]
+
+
+class ClaimValidity(StrEnum):
+    UNVERIFIED = "unverified"
+
+
+@dataclass(frozen=True)
+class ClaimSpec:
+    id: ClaimId
+    claim_type: str
+    subject: str
+    predicate: str
+    value: str
+    scope: str | None = None
+    depends_on: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ClaimProvenance:
+    source_id: SourceId
+    path: str
+    revision: SourceRevision
+    locator: str
+    extraction_method: str = "repository_config_explicit"
+    extractor_version: str = "claims-v1"
+
+
+@dataclass(frozen=True)
+class ClaimDependency:
+    path: str
+    source_id: SourceId | None
+    revision: SourceRevision | None
+    resolved: bool
+
+
+@dataclass(frozen=True)
+class ClaimRecord:
+    id: ClaimId
+    claim_type: str
+    subject: str
+    predicate: str
+    value: str
+    scope: str | None
+    validity: ClaimValidity
+    provenance: ClaimProvenance
+    dependencies: tuple[ClaimDependency, ...]
+    provenance_complete: bool
+
+
+@dataclass(frozen=True)
+class ClaimsOverview:
+    repository: RepositoryRef
+    config_sha256: str | None
+    claims: tuple[ClaimRecord, ...]
+    warnings: tuple[ScanWarning, ...]
+    schema_version: int = 1

@@ -11,6 +11,8 @@ from context_integrity.models import (
     AuthorityPolicy,
     AuthorityResolution,
     AuthorityTier,
+    ClaimRecord,
+    ClaimsOverview,
     ClassificationResult,
     InventoryManifest,
     InventorySummary,
@@ -478,6 +480,133 @@ def render_lifecycle_text(overview: LifecycleOverview, detail: bool = False) -> 
         lines.append("")
     lines.extend(
         f"Warning: {w.code} [{display(w.path) if w.path else 'repository'}]: {display(w.message)}"
+        for w in overview.warnings
+    )
+    return "\n".join(lines) + "\n"
+
+
+def _claim_v1(claim: ClaimRecord) -> dict:
+    provenance = claim.provenance
+    return {
+        "id": claim.id,
+        "claim_type": claim.claim_type,
+        "subject": claim.subject,
+        "predicate": claim.predicate,
+        "value": claim.value,
+        "scope": claim.scope,
+        "validity": claim.validity.value,
+        "provenance_complete": claim.provenance_complete,
+        "provenance": {
+            "source_id": provenance.source_id,
+            "path": provenance.path,
+            "revision": _revision_v1(provenance.revision),
+            "locator": provenance.locator,
+            "extraction_method": provenance.extraction_method,
+            "extractor_version": provenance.extractor_version,
+        },
+        "dependencies": [
+            {
+                "path": d.path,
+                "source_id": d.source_id,
+                "revision": _revision_v1(d.revision) if d.revision else None,
+                "resolved": d.resolved,
+            }
+            for d in sorted(claim.dependencies, key=lambda d: d.path)
+        ],
+    }
+
+
+def claims_dict(overview: ClaimsOverview) -> dict:
+    """Independent explicit claims JSON v1; no source bodies or internal config fields."""
+    if overview.schema_version != 1:
+        raise ValueError("Unsupported claims schema version.")
+    return {
+        "schema_version": 1,
+        "repository": _repository_v1(overview.repository),
+        "config_sha256": overview.config_sha256,
+        "claims": [_claim_v1(c) for c in sorted(overview.claims, key=lambda c: c.id)],
+        "warnings": [
+            _warning_v1(w)
+            for w in sorted(overview.warnings, key=lambda w: (w.path or "", w.code, w.message))
+        ],
+    }
+
+
+def render_claims_json(overview: ClaimsOverview) -> str:
+    return json.dumps(claims_dict(overview), indent=2, sort_keys=True, ensure_ascii=True) + "\n"
+
+
+def _claim_revision_text(revision: SourceRevision) -> list[str]:
+    return [
+        f"    sha256: {display(revision.content_sha256 or 'unavailable')}",
+        f"    git HEAD: {display(revision.git_head or 'unavailable')}",
+        f"    git status: {display(revision.git_status.value)}",
+        f"    observed basis: {display(revision.observed_revision_basis)}",
+    ]
+
+
+def render_claims_text(overview: ClaimsOverview, detail: bool = False) -> str:
+    lines = [
+        "Context Integrity — Claims",
+        "",
+        f"Repository: {display(overview.repository.name)}",
+        "",
+    ]
+    if not detail:
+        lines.append("ID  TYPE  VALIDITY  PROVENANCE")
+    for claim in sorted(overview.claims, key=lambda c: c.id):
+        if not detail:
+            lines.append(
+                f"{display(claim.id)}  {display(claim.claim_type)}  "
+                f"{display(claim.validity.value)}  "
+                + ("complete" if claim.provenance_complete else "incomplete")
+            )
+            continue
+        lines.extend(
+            [
+                f"Claim: {display(claim.id)}",
+                f"Type: {display(claim.claim_type)}",
+                f"Subject: {display(claim.subject)}",
+                f"Predicate: {display(claim.predicate)}",
+                f"Value: {display(claim.value)}",
+                f"Scope: {display(claim.scope) if claim.scope is not None else 'unspecified'}",
+                f"Validity: {display(claim.validity.value)}",
+                f"Provenance complete: {str(claim.provenance_complete).lower()}",
+                "",
+                "Declared by:",
+                f"  path: {display(claim.provenance.path)}",
+                f"  source id: {display(claim.provenance.source_id)}",
+                f"  locator: {display(claim.provenance.locator)}",
+                f"  extraction: {display(claim.provenance.extraction_method)}",
+                f"  extractor version: {display(claim.provenance.extractor_version)}",
+            ]
+        )
+        lines.extend(_claim_revision_text(claim.provenance.revision))
+        lines.extend(["", "Depends on:"])
+        if not claim.dependencies:
+            lines.append("  none")
+        for dependency in sorted(claim.dependencies, key=lambda d: d.path):
+            lines.extend(
+                [
+                    f"  {display(dependency.path)}",
+                    f"    resolved: {str(dependency.resolved).lower()}",
+                    "    source id: "
+                    + (display(dependency.source_id) if dependency.source_id else "unavailable"),
+                ]
+            )
+            if dependency.revision:
+                lines.extend(_claim_revision_text(dependency.revision))
+        lines.append("")
+    lines.extend(
+        [
+            "",
+            "Claim validity is not derived from source lifecycle or authority resolution.",
+            f"Warnings: {len(overview.warnings)}",
+        ]
+    )
+    lines.extend(
+        f"Warning: {display(w.code)} [{display(w.path) if w.path else 'repository'}]: "
+        f"{display(w.message)}"
         for w in overview.warnings
     )
     return "\n".join(lines) + "\n"

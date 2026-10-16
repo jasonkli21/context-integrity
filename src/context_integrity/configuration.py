@@ -1,6 +1,7 @@
 """Strict versioned repository configuration parsing and descriptor-safe loading."""
 
 import os
+import re
 import tomllib
 from hashlib import sha256
 
@@ -10,6 +11,8 @@ from context_integrity.models import (
     AuthorityClass,
     AuthorityPolicy,
     AuthorityTier,
+    ClaimId,
+    ClaimSpec,
     LifecycleState,
     RepositoryConfig,
     SourceMetadata,
@@ -64,16 +67,17 @@ def _path(value: object) -> str:
 
 
 def parse_config(data: bytes) -> RepositoryConfig:
-    """Parse v1 authority-only or v2 lifecycle config; unknown keys fail closed."""
+    """Parse v1 authority, v2 lifecycle, or v3 claims; unknown keys fail closed."""
     try:
         raw_root = tomllib.loads(data.decode("utf-8"))
         version = raw_root.get("schema_version")
-        if type(version) is not int or version not in {1, 2}:
+        if type(version) is not int or version not in {1, 2, 3}:
             raise ValueError("Unsupported configuration schema version.")
         root = _table(
             raw_root,
             {"schema_version", "authority", "source_metadata"}
-            | ({"supersession"} if version == 2 else set()),
+            | ({"supersession"} if version >= 2 else set())
+            | ({"claims"} if version == 3 else set()),
         )
         digest = sha256(data).hexdigest()
         authority = _table(root.get("authority", {}), {"policies"})
@@ -101,7 +105,7 @@ def parse_config(data: bytes) -> RepositoryConfig:
             entry = _table(
                 raw,
                 {"path", "authority_class", "authority_eligible", "reason"}
-                | ({"lifecycle"} if version == 2 else set()),
+                | ({"lifecycle"} if version >= 2 else set()),
             )
             path = _path(entry.get("path"))
             lifecycle = LifecycleState(_text(entry["lifecycle"])) if "lifecycle" in entry else None
@@ -140,8 +144,32 @@ def parse_config(data: bytes) -> RepositoryConfig:
                 raise ValueError("Configuration cannot be a supersession endpoint.")
             supersession.append(SupersessionSpec(source, target, _text(entry.get("reason"))))
         validate_supersession(tuple(supersession), tuple(metadata))
+        claims = []
+        for raw in _array(root.get("claims", [])):
+            entry = _table(
+                raw, {"id", "claim_type", "subject", "predicate", "value", "scope", "depends_on"}
+            )
+            claim_id, claim_type = _text(entry.get("id")), _text(entry.get("claim_type"))
+            if any(not re.fullmatch(r"[a-z][a-z0-9_-]*", v) for v in (claim_id, claim_type)):
+                raise ValueError("Invalid claim ID or type.")
+            dependencies = tuple(_path(p) for p in _array(entry.get("depends_on", [])))
+            if CONFIG_PATH in dependencies or len(set(dependencies)) != len(dependencies):
+                raise ValueError("Self dependency or duplicate claim dependency.")
+            claims.append(
+                ClaimSpec(
+                    ClaimId(claim_id),
+                    claim_type,
+                    _text(entry.get("subject")),
+                    _text(entry.get("predicate")),
+                    _text(entry.get("value")),
+                    _text(entry["scope"]) if "scope" in entry else None,
+                    tuple(sorted(dependencies)),
+                )
+            )
+        if len({c.id for c in claims}) != len(claims):
+            raise ValueError("Duplicate claim ID.")
         return RepositoryConfig(
-            tuple(policies), tuple(metadata), digest, version, tuple(supersession)
+            tuple(policies), tuple(metadata), digest, version, tuple(supersession), tuple(claims)
         )
     except (ValueError, TypeError, KeyError, RecursionError) as exc:
         # Parser exceptions can contain arbitrary repository text; keep errors path/body-free.
