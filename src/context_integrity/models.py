@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
+from pathlib import PurePosixPath
 from typing import NewType
 
 SourceId = NewType("SourceId", str)
@@ -202,6 +203,11 @@ class RepositoryConfig:
     instruction_policy: InstructionPolicySpec | None = None
     drift_dependencies: tuple[DriftDependencySpec, ...] = ()
 
+    def __post_init__(self) -> None:
+        ids = [dependency.id for dependency in self.drift_dependencies]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Duplicate drift dependency ID.")
+
 
 @dataclass(frozen=True)
 class AuthorityCandidate:
@@ -367,6 +373,16 @@ class InstructionPolicySpec:
     canonical: str
     compatibility: tuple[str, ...]
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.compatibility, tuple):
+            raise ValueError("Compatibility instruction paths must be a tuple.")
+        _validate_integrity_path(self.canonical)
+        for path in self.compatibility:
+            _validate_integrity_path(path)
+        paths = (self.canonical, *self.compatibility)
+        if ".context-integrity.toml" in paths or len(set(paths)) != len(paths):
+            raise ValueError("Instruction paths must be distinct and cannot reference config.")
+
 
 @dataclass(frozen=True)
 class DriftDependencySpec:
@@ -374,6 +390,40 @@ class DriftDependencySpec:
     dependent: str
     upstream: tuple[str, ...]
     reason: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.id, str) or not re.fullmatch(r"[a-z][a-z0-9_-]*", self.id):
+            raise ValueError("Invalid drift dependency ID.")
+        if not isinstance(self.upstream, tuple):
+            raise ValueError("Drift upstream paths must be a tuple.")
+        _validate_integrity_path(self.dependent)
+        for path in self.upstream:
+            _validate_integrity_path(path)
+        if (
+            not self.upstream
+            or len(set(self.upstream)) != len(self.upstream)
+            or self.dependent in self.upstream
+            or self.dependent == ".context-integrity.toml"
+        ):
+            raise ValueError("Invalid drift dependency paths.")
+        if not isinstance(self.reason, str) or not self.reason.strip():
+            raise ValueError("Drift dependency reason must be nonblank.")
+
+
+def _validate_integrity_path(path: str) -> None:
+    """Require an already-normalized safe repository-relative POSIX path."""
+    if (
+        not isinstance(path, str)
+        or not path
+        or "\0" in path
+        or "\\" in path
+        or ":" in path
+        or path.endswith("/")
+    ):
+        raise ValueError("Invalid repository-relative path.")
+    pure = PurePosixPath(path)
+    if pure.is_absolute() or ".." in pure.parts or not pure.parts or pure.as_posix() != path:
+        raise ValueError("Path must be normalized and repository-relative.")
 
 
 class FindingSeverity(StrEnum):

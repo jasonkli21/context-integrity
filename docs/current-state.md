@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-15
 **Current phase:** Phase 4 — Documentation / Instruction Drift
 **Active plan:** `docs/plans/phase-4-implementation-plan.md`
-**Status:** Implemented and offline-verified; independent Phase 4 review pending.
+**Status:** Implemented and offline-verified; review findings F-001–F-003 fixed and verified.
 
 ## Delivered
 
@@ -22,22 +22,22 @@
 
 ## Verification
 
-`UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed:
-Ruff lint/format and **510 tests**, Python 3.12.13/macOS, from a **426-test** baseline at
-`cce525db1eede17dc0158eee30b7a75a0a2d2397`. Focused Phase 4 gate: **83 passed**.
-Existing inventory/authority/lifecycle/claims golden fixtures remain byte-identical.
-Real-checkout text/JSON checks report zero findings; disposable local explicit-diff smoke
-passed. Acceptance evidence: `docs/implementation-reports/phase-4-implementation-report.md`.
+After the review fixes, `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check`
+passed: Ruff lint/format and **532 tests**, Python 3.12.13/macOS. Focused suites passed:
+integrity **105**, configuration/classification **117**. Text and JSON dogfood checks each
+reported zero findings and zero warnings. Acceptance evidence:
+`docs/implementation-reports/phase-4-implementation-report.md`.
 
 ## Known limitations / findings
 
-Phase 4 has not received independent review. Findings prove bounded review conditions,
-not semantic correctness or contradiction. Text describes the current checkout, even
-when changed paths come from an explicit commit range. Scans remain sequential rather
+The independent review findings F-001–F-003 were addressed and the fixes passed the offline
+gate; a final independent verification remains pending. Findings prove bounded review
+conditions, not semantic correctness or contradiction. Text describes the current checkout,
+even when changed paths come from an explicit commit range. Scans remain sequential rather
 than atomic. No automatic rewriting, validity changes, AST/structural code analysis,
-Codebase Intelligence integration, LLM, database, or CI enforcement was added.
-Prior phase review navigation remains at `docs/reviews/README.md`.
+Codebase Intelligence integration, LLM, database, or CI enforcement was added. Prior phase
+review navigation remains at `docs/reviews/README.md`.
 
 ## Next expected step
 
-Independent review, then Phase 5 — Context Contracts.
+Final independent verification, then Phase 5 — Context Contracts.

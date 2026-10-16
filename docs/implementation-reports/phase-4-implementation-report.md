@@ -98,3 +98,41 @@ assertion. Runtime dependencies are unchanged.
 No Codebase Intelligence integration, AST/symbol/import/call graph, LLM, database, network
 integration, semantic contradiction detection, automatic rewriting, claim-validity mutation,
 or CI governance was added. Independent architectural review remains a separate session.
+
+## Independent review fixes
+
+The independent review identified findings F-001 through F-003. The follow-up changes:
+
+- Move instruction-policy and drift-dependency path/identifier/reason validation to the
+  frozen domain models, including repository-config duplicate dependency ID validation.
+- Reuse `lifecycle_authority_eligible` for Phase 4 current-source eligibility. Draft reports
+  no longer prove delivery, draft current-state candidates do not compete with active ones,
+  and configured inactive instruction sources emit `instruction_source_unusable`.
+- Recognize leading delivered status tokens wrapped in `**`, `__`, or backticks. Ambiguous
+  decorated delivered tokens are reported as incomplete metadata and still require delivery
+  evidence. Negative and planned statuses remain non-delivered.
+- Add focused direct-construction, lifecycle, and status regression cases in
+  `tests/test_integrity.py`; clarify the shared current-evidence lifecycle gate in
+  `docs/architecture.md`.
+
+## Review-fix verification
+
+Verification of the review-fix commit was run offline on Python 3.12.13/macOS:
+
+```bash
+UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 uv run pytest tests/test_integrity.py -q
+UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 uv run pytest tests/test_configuration.py tests/test_classification.py -q
+UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check
+UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 uv run context-integrity check .
+UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 uv run context-integrity check . --format json
+```
+
+- Integrity tests: **105 passed**.
+- Configuration/classification tests: **117 passed**.
+- Full gate: Ruff lint and format passed; **532 tests passed**.
+- Text and JSON dogfood checks each returned exit 0, zero findings, and zero warnings.
+- The first full-gate attempt identified two Ruff formatting differences in the changed Python
+  files; Ruff formatted them, and the subsequent full gate passed.
+
+`docs/current-state.md` now records the verified implementation and retains final independent
+verification as the next step.

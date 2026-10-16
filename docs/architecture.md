@@ -684,6 +684,9 @@ Responsibilities, beginning Phase 2:
 - expiration;
 - lifecycle validation.
 
+Only `UNKNOWN` and `ACTIVE` lifecycle states are eligible for current authority or policy
+evidence. `DRAFT` and terminal lifecycle states cannot establish current evidence.
+
 ## 7.6 `claims`
 
 Responsibilities, beginning Phase 3:

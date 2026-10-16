@@ -13,7 +13,12 @@ from context_integrity.configuration import ConfigurationError, parse_config
 from context_integrity.evidence import changed_paths
 from context_integrity.integrity import integrity_overview, references_canonical
 from context_integrity.inventory import inventory_repository
-from context_integrity.models import ChangeScope
+from context_integrity.models import (
+    ChangeScope,
+    DriftDependencySpec,
+    InstructionPolicySpec,
+    RepositoryConfig,
+)
 from context_integrity.rendering import render_integrity_json, render_integrity_text
 from context_integrity.repository import RepositoryError, discover_repository
 
@@ -138,6 +143,10 @@ def test_current_state_valid_and_claims_unchanged(tmp_path):
     "status,expected",
     [
         ("Implemented, offline verified", True),
+        ("**Implemented**", True),
+        ("**Implemented**, offline verified", True),
+        ("`Delivered`", True),
+        ("__Verified__", True),
         ("Delivered", True),
         ("Complete", True),
         ("Completed", True),
@@ -232,6 +241,95 @@ reason = "Historical"
 """,
     )
     assert codes(evaluate(tmp_path)) == {"current_state_delivery_evidence_missing"}
+
+
+def test_draft_report_does_not_prove_delivery(tmp_path):
+    state(tmp_path)
+    write(tmp_path, "docs/plans/phase-4-implementation-plan.md", "Plan")
+    report(tmp_path, 4)
+    write(
+        tmp_path,
+        ".context-integrity.toml",
+        """schema_version = 4
+[[source_metadata]]
+path = "docs/implementation-reports/phase-4-implementation-report.md"
+lifecycle = "draft"
+reason = "Not accepted yet"
+""",
+    )
+    assert codes(evaluate(tmp_path)) == {"current_state_delivery_evidence_missing"}
+
+
+def test_ambiguous_delivered_status_requires_evidence_and_reports_metadata(tmp_path):
+    state(tmp_path, status="***Implemented***")
+    write(tmp_path, "docs/plans/phase-4-implementation-plan.md", "Plan")
+    assert codes(evaluate(tmp_path)) == {
+        "current_state_delivery_evidence_missing",
+        "current_state_metadata_incomplete",
+    }
+
+
+@pytest.mark.parametrize("instruction_path", ["AGENTS.md", "CLAUDE.md"])
+@pytest.mark.parametrize("lifecycle", ["historical", "superseded"])
+def test_inactive_instruction_sources_do_not_satisfy_policy(tmp_path, instruction_path, lifecycle):
+    write(tmp_path, "AGENTS.md", "Canonical")
+    write(tmp_path, "CLAUDE.md", "See AGENTS.md")
+    write(
+        tmp_path,
+        ".context-integrity.toml",
+        f"""schema_version = 4
+[[source_metadata]]
+path = "{instruction_path}"
+lifecycle = "{lifecycle}"
+reason = "No longer current"
+""",
+    )
+    assert "instruction_source_unusable" in codes(evaluate(tmp_path))
+
+
+def test_active_current_state_wins_over_draft_candidate(tmp_path):
+    state(tmp_path)
+    write(tmp_path, "docs/plans/phase-4-implementation-plan.md", "Plan")
+    report(tmp_path, 4)
+    write(tmp_path, "archive/current-state.md", "Draft snapshot")
+    write(
+        tmp_path,
+        ".context-integrity.toml",
+        """schema_version = 4
+[[source_metadata]]
+path = "archive/current-state.md"
+lifecycle = "draft"
+reason = "Work in progress"
+""",
+    )
+    assert not evaluate(tmp_path).findings
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: InstructionPolicySpec("AGENTS.md", ("AGENTS.md",)),
+        lambda: InstructionPolicySpec("../AGENTS.md", ()),
+        lambda: InstructionPolicySpec(".context-integrity.toml", ()),
+        lambda: InstructionPolicySpec("AGENTS.md", ("CLAUDE.md", "CLAUDE.md")),
+        lambda: DriftDependencySpec("Bad ID", "docs/a.md", ("src/a.py",), "x"),
+        lambda: DriftDependencySpec("a", "docs/a.md", (), "x"),
+        lambda: DriftDependencySpec("a", "docs/a.md", ("docs/a.md",), "x"),
+        lambda: DriftDependencySpec("a", "docs/a.md", ("src/a.py", "src/a.py"), "x"),
+        lambda: DriftDependencySpec("a", "docs/a.md", ("src/a.py",), "  "),
+        lambda: DriftDependencySpec("a", "docs//a.md", ("src/a.py",), "x"),
+    ],
+)
+def test_phase_four_domain_specs_reject_invalid_direct_construction(factory):
+    with pytest.raises((ValueError, TypeError)):
+        factory()
+
+
+def test_repository_config_rejects_duplicate_drift_ids():
+    first = DriftDependencySpec("same", "docs/a.md", ("src/a.py",), "A")
+    second = DriftDependencySpec("same", "docs/b.md", ("src/b.py",), "B")
+    with pytest.raises(ValueError):
+        RepositoryConfig(drift_dependencies=(first, second))
 
 
 DEPENDENCY = """schema_version = 4

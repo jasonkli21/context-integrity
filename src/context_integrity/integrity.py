@@ -7,6 +7,7 @@ from pathlib import PurePosixPath
 from context_integrity.acquisition import normalize_path
 from context_integrity.configuration import verify_config_revision
 from context_integrity.evidence import changed_paths, source_text
+from context_integrity.lifecycle import lifecycle_authority_eligible
 from context_integrity.models import (
     ChangeScope,
     ChangeSet,
@@ -16,7 +17,6 @@ from context_integrity.models import (
     IntegrityFinding,
     IntegrityOverview,
     InventoryManifest,
-    LifecycleState,
     RepositoryConfig,
     ScanWarning,
     SourceKind,
@@ -28,18 +28,31 @@ INSTRUCTION_RULE = "instruction.canonical_reference.v1"
 NAVIGATION_RULE = "current_state.navigation.v1"
 DELIVERY_RULE = "current_state.delivery_evidence.v1"
 DEPENDENCY_RULE = "document_dependency.change_review.v1"
-TERMINAL = frozenset(
-    {
-        LifecycleState.SUPERSEDED,
-        LifecycleState.HISTORICAL,
-        LifecycleState.EXPIRED,
-        LifecycleState.INVALID,
-    }
-)
 
 
 def usable(source: SourceRecord) -> bool:
-    return source.lifecycle not in TERMINAL and source.revision.content_sha256 is not None
+    return (
+        lifecycle_authority_eligible(source.lifecycle)
+        and source.revision.content_sha256 is not None
+    )
+
+
+def _delivered_status(status: str) -> tuple[bool, bool]:
+    """Return (requires delivery evidence, ambiguously decorated delivered token)."""
+    value = status.strip()
+    wrapped = re.match(r"^(\*\*|__|`)(.+?)\1(.*)$", value)
+    if wrapped:
+        value = f"{wrapped[2].strip()}{wrapped[3]}"
+    if re.match(r"(?:implemented|delivered|complete|completed|verified)\b", value, re.I):
+        return True, False
+
+    # Unknown Markdown decoration must not turn a likely delivered state into a pass.
+    undecorated = value.lstrip("*_`").lstrip()
+    if value != undecorated and re.match(
+        r"(?:implemented|delivered|complete|completed|verified)\b", undecorated, re.I
+    ):
+        return True, True
+    return False, False
 
 
 def evidence(
@@ -121,6 +134,15 @@ def instruction_findings(
                     (item,),
                 )
             )
+        elif not usable(source):
+            results.append(
+                finding(
+                    INSTRUCTION_RULE,
+                    "instruction_source_unusable",
+                    "Instruction source is not eligible as current policy evidence.",
+                    (item,),
+                )
+            )
         elif path != policy.canonical:
             text = source_text(context, source)
             if text is not None and not references_canonical(text, policy.canonical):
@@ -164,12 +186,13 @@ def current_state_findings(
         re.search(r"\bPhase\s+(\d{1,9})\b", next_section[1], re.I) if next_section else None
     )
     results = []
-    if not all((phase, plan, status, next_phase)):
+    delivered, ambiguous_status = _delivered_status(status[1]) if status else (False, False)
+    if not all((phase, plan, status, next_phase)) or ambiguous_status:
         results.append(
             finding(
                 NAVIGATION_RULE,
                 "current_state_metadata_incomplete",
-                "Current-state navigation metadata is incomplete.",
+                "Current-state navigation metadata is incomplete or ambiguous.",
                 (item,),
             )
         )
@@ -238,13 +261,7 @@ def current_state_findings(
             if source.kind == SourceKind.VERIFICATION_RECORD and usable(source) and match:
                 reports.append((int(match[1]), source))
         number = int(phase[1])
-        if (
-            status
-            and re.match(
-                r"(?:implemented|delivered|complete|completed|verified)\b", status[1], re.I
-            )
-            and not any(n == number for n, _ in reports)
-        ):
+        if delivered and not any(n == number for n, _ in reports):
             results.append(
                 finding(
                     DELIVERY_RULE,
