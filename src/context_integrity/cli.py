@@ -14,7 +14,9 @@ from context_integrity.authority import effective_policies, resolve_authority
 from context_integrity.claims import claims_overview
 from context_integrity.compiler import compile_context
 from context_integrity.configuration import ConfigurationError
+from context_integrity.context_engine import ContextEngineProvider
 from context_integrity.contracts import effective_contracts, resolve_contract, validate_contract
+from context_integrity.evidence import EvidenceContextRequest, EvidenceProviderError
 from context_integrity.integrity import integrity_overview
 from context_integrity.inventory import inventory_repository
 from context_integrity.lifecycle import lifecycle_overview
@@ -437,12 +439,40 @@ def compile_command(
     budget_bytes: Annotated[int | None, typer.Option(min=1)] = None,
     format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
     output: Annotated[Path | None, typer.Option()] = None,
+    evidence_provider: Annotated[str | None, typer.Option()] = None,
+    context_engine_bin: Annotated[str | None, typer.Option()] = None,
+    evidence_budget_bytes: Annotated[int | None, typer.Option(min=1, max=16777216)] = None,
+    evidence_change: Annotated[str | None, typer.Option()] = None,
 ) -> None:
     """Compile deterministic bounded context; incomplete results retain exit zero."""
-    _, manifest = load_inventory(path)
+    if evidence_provider not in {None, "context-engine"}:
+        raise typer.BadParameter("Unknown evidence provider.")
+    if evidence_provider is None and any(
+        v is not None for v in (context_engine_bin, evidence_budget_bytes, evidence_change)
+    ):
+        raise typer.BadParameter("Evidence options require --evidence-provider.")
+    if evidence_provider and (task is None or not task.strip()):
+        raise typer.BadParameter("Provider compilation requires nonblank --task.")
+    context, manifest = load_inventory(path)
     try:
         contract = resolve_contract(manifest.repository_config, contract_id)
-        compiled = compile_context(manifest, contract, task=task, budget_bytes=budget_bytes)
+        evidence = None
+        if evidence_provider:
+            evidence = ContextEngineProvider(context_engine_bin or "ctx").context_candidates(
+                EvidenceContextRequest(
+                    context.root,
+                    manifest.repository,
+                    task,
+                    evidence_budget_bytes if evidence_budget_bytes is not None else 1024 * 1024,
+                    evidence_change,
+                )
+            )
+        compiled = compile_context(
+            manifest, contract, task=task, budget_bytes=budget_bytes, evidence=evidence
+        )
+    except EvidenceProviderError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(7) from exc
     except ConfigurationError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(6) from exc

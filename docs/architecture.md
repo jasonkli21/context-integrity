@@ -329,6 +329,7 @@ Answers:
 ## Layer 6 — Context Compilation
 
 Phase 6 delivers deterministic inventory-source compilation from an explicit contract.
+Phase 7 adds optional revision-scoped provider code candidates to the same selection core.
 
 Answers:
 
@@ -596,6 +597,10 @@ an effective built-in or configured policy. Older schemas reject these fields. V
 matching/count behavior and its JSON v1 projection remain unchanged; compiler policy is
 projected in the separate compiled-context schema.
 
+Phase 7 configuration v7 adds contract kinds `source_code`, `test`, `schema` and `migration`.
+Earlier configuration versions reject these kinds. Runtime provider selection, executable
+paths, acquisition ceilings and change queries stay outside repository configuration.
+
 The broader future contract may add:
 
 ```text
@@ -656,8 +661,10 @@ I/O or resolve contradictions.
 
 The compiler selection boundary uses `CompilerCandidate`, an evidence-shaped item carrying
 identity, location, size, lifecycle/authority inputs, revision and optional derivation/evidence
-location. Phase 6 adapts inventory `SourceRecord` values into candidates. Phase 7 may provide
-other candidate origins without moving authority or lifecycle interpretation into the provider.
+location. Phase 6 adapts inventory `SourceRecord` values into candidates. Phase 7 supplies
+provider candidates with explicit origin, provider/version, rank/reasons and structural evidence.
+Normalized provider `SourceRecord`s remain outside `manifest.sources`. Final compilation
+validation evaluates the exact mixed source universe; standalone validation stays inventory-only.
 
 ---
 
@@ -790,7 +797,9 @@ Responsibilities, delivered in Phase 6:
 - run the shared Phase 5 validator on final selected paths;
 - emit structured decisions and dependency/provenance metadata.
 
-Later: accept code candidates and structural relevance from `EvidenceProvider`.
+Phase 7 adds body-free code candidates and subordinate structural relevance through
+`EvidenceProvider`. The transport adapter belongs in `context_engine.py`; generic request,
+batch, snapshot, descriptor and coverage types belong in `evidence.py`.
 
 ## 7.11 `storage`
 
@@ -833,7 +842,9 @@ EvidenceProvider
 - context_candidates(...)
 ```
 
-The exact method names and transport are intentionally deferred.
+Phase 7 implements only `context_candidates(request) -> batch` as a small Python Protocol.
+Other methods remain conceptual until a consumer requires them. See
+[`evidence-contract.md`](evidence-contract.md) for the implemented evidence contract v1.
 
 ## 8.1 Required Semantics
 
@@ -875,18 +886,24 @@ It still applies:
 - exclusions;
 - integrity checks.
 
-## 8.4 Integration Transport Is Deferred
+## 8.4 Phase 7 Transport and Coherence
 
-Possible later transports:
+The implemented adapter uses bounded local `ctx --version` and schema-v1 `ctx context`
+CLI/JSON calls. No shell, shared database, Rust imports, installation or network is used.
+Each invocation has a 30-second timeout and incremental 64 MiB stdout / 64 KiB stderr
+limits (version stdout: 4 KiB). Errors expose sanitized codes and fail closed.
+Resolved root and known HEAD/dirty metadata must match the requested repository observation.
+Full UTF-8 bodies are byte-validated, SHA-256 hashed and discarded before domain compilation.
+Unsafe paths and duplicate/colliding identities fail; individually lossy paths are omitted
+with explicit coverage. Absolute roots and index-local IDs do not enter stable output.
+Provider role mapping belongs to Context Integrity: source/test/schema/migration become
+executable truth with unknown lifecycle. Other provider roles are skipped.
 
-- local HTTP;
-- Unix socket;
-- file export;
-- Python/Rust binding;
-- MCP;
-- event/change feed.
-
-No transport decision should affect Phase 0–6 architecture.
+Provider completeness and contract completeness are independent. Material analysis,
+acquisition, ranking or change-mapping gaps stay in provider coverage and warnings even
+when the compiled package satisfies its contract. The provider acquisition budget defaults
+to 1 MiB (maximum 16 MiB), separately from final package bytes. Other transports may replace
+this adapter behind the same generic boundary when needed.
 
 ---
 
@@ -1124,10 +1141,11 @@ An LLM can be a specialized evaluator for rules that explicitly permit probabili
 
 # 15. Context Compiler Architecture
 
-Phase 6 delivers the deterministic local part of this pipeline. The explicit contract ID
-selects policy; optional task text is opaque metadata. Candidate acquisition uses only the
-current inventory. No task classification, structural code retrieval, general contradiction
-resolution, source-body bundling, persistence, or integrity gating is delivered.
+Phase 6 delivers deterministic local selection; Phase 7 adds optional Context Engine code
+retrieval through EvidenceProvider. The explicit contract ID selects policy. Task text remains
+opaque without a provider; provider mode uses a nonblank task as its relevance query. No task
+classification, general contradiction resolution, source-body bundling, persistence, or
+integrity gating is delivered.
 
 Compiler lifecycle selection defaults to `unknown | active` unless a rule explicitly
 selects lifecycle states. Phase 5 validation has no such implicit filter. Excluded matches
@@ -1147,13 +1165,14 @@ leaves required deficits, a deterministic exact feasibility search over eligible
 candidates repairs the package when possible, minimizing bytes and then selected paths while
 respecting maxima and budget. If no feasible set exists, the best greedy inspectable package
 is retained. Authority tiers have already filtered each rule and are not compared across
-unrelated policies. Optional rules fill by priority descending and ID ascending, candidates by
-path. Source bytes count once and are checked before selection. CLI budget overrides the
+unrelated policies. For policy-equivalent groups, provider rank/path fills provider slots
+in the lexical candidate sequence while inventory documents retain their positions. Optional
+rules fill by priority descending and ID ascending with the same local relevance ordering. Source bytes count once and are checked before selection. CLI budget overrides the
 contract budget, then defaults to unbounded. The final Phase 5 validator alone determines
-contract completeness. Earlier JSON projections remain unchanged; compiled-context JSON v2
-adds the integrity evaluation state.
+contract completeness. Earlier JSON projections remain unchanged; compiled-context JSON v3
+retains the integrity evaluation state and adds explicit provider/candidate provenance and coverage.
 
-Broader pipeline (code relevance and general contradictions remain future work):
+Broader pipeline (code relevance is delivered; general contradictions remain future work):
 
 ```text
 Task
@@ -1273,9 +1292,9 @@ At minimum:
 
 ```text
 inventory_schema_version
-configuration_schema_version       # implemented through v6
-evidence_contract_version          # later
-compiled_context_schema_version    # implemented v1
+configuration_schema_version       # implemented through v7
+evidence_contract_version          # implemented v1
+compiled_context_schema_version    # implemented v3
 ```
 
 Version fields should represent semantic schema versions, not application build versions.
@@ -1439,7 +1458,7 @@ The CLI should not contain:
 - classification logic;
 - authority rules;
 - persistence logic;
-- future provider protocol logic.
+- provider protocol/normalization logic.
 
 This allows future CI/API integrations to use the same application layer.
 
@@ -1662,7 +1681,7 @@ Do not resolve these before implementation provides evidence:
 - explicit repository configuration syntax;
 - claim DSL;
 - policy DSL;
-- evidence transport to Rust engine;
+- additional evidence transports beyond the Phase 7 local CLI adapter;
 - MCP/API surface;
 - exact cross-repository workspace format;
 - embedding/vector use;
@@ -1729,7 +1748,8 @@ Each phase should extend the existing domain model rather than introduce a secon
 
 The two projects should proceed independently.
 
-The alignment contract at this stage is conceptual:
+Phase 7 implements the context-candidate subset in `evidence-contract.md`.
+The broader alignment contract is:
 
 ```text
 Context Integrity expects future evidence to have:
@@ -1747,13 +1767,13 @@ The Rust project should not import Context Integrity policy types.
 
 Context Integrity should not import Rust parser internals.
 
-When both systems have stable models, create a shared design document:
+The implemented integration contract is documented here:
 
 ```text
 evidence-contract.md
 ```
 
-That document should be based on implemented abstractions, not speculative types.
+That document describes implemented abstractions; broader relation/impact consumers remain deferred.
 
 ---
 
@@ -1802,10 +1822,6 @@ Do not require future agents to mine old session artifacts for important invaria
 
 # 36. Immediate Next Step
 
-Implement Phase 0 according to:
-
-`docs/plans/phase-0-implementation-plan.md`
-
-Do not build Phase 1 authority resolution during Phase 0 merely because the enums already exist.
-
-The purpose of Phase 0 is to validate the foundational source model on real repositories before the architecture becomes more semantic.
+Use `docs/current-state.md` for current verification and review status. Phase 7 provider
+integration is delivered for independent review. Architectural integrity is Phase 8; it
+requires a separately authorized active plan and must preserve the descriptive/policy split.

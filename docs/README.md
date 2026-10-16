@@ -51,6 +51,11 @@ Use for:
 - canonical vs derived state;
 - constraints that should survive a phase.
 
+### `evidence-contract.md`
+
+Implemented EvidenceProvider v1 boundary, Context Engine CLI transport, snapshot/content
+validation, coverage, mixed compiler semantics and safety limits.
+
 ### `current-state.md`
 
 Short navigation/status snapshot.

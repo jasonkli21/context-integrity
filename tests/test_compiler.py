@@ -390,11 +390,11 @@ def test_provenance_determinism_models_and_golden(git_repo):
             replace(manifest, sources=manifest.sources[::-1]), contract, task="opaque task"
         )
     )
-    assert json.loads(rendered)["schema_version"] == 2
+    assert json.loads(rendered)["schema_version"] == 3
     assert json.loads(rendered)["integrity_state"]["evaluation_status"] == "not_evaluated"
-    assert rendered == (Path(__file__).parent / "fixtures/compiled-context-v2.json").read_text()
+    assert rendered == (Path(__file__).parent / "fixtures/compiled-context-v3.json").read_text()
     data = json.loads(rendered)
-    assert data["schema_version"] == 2
+    assert data["schema_version"] == 3
     assert result.config_sha256 == contract.config_revision
     assert result.dependencies[0].source_revision == result.selected_sources[0].revision
     assert str(git_repo) not in rendered and "Instructions" not in rendered

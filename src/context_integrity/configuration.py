@@ -75,11 +75,11 @@ def _path(value: object) -> str:
 
 
 def parse_config(data: bytes) -> RepositoryConfig:
-    """Parse strict schemas v1-v6; unknown keys fail closed."""
+    """Parse strict schemas v1-v7; unknown keys fail closed."""
     try:
         raw_root = tomllib.loads(data.decode("utf-8"))
         version = raw_root.get("schema_version")
-        if type(version) is not int or version not in {1, 2, 3, 4, 5, 6}:
+        if type(version) is not int or version not in {1, 2, 3, 4, 5, 6, 7}:
             raise ValueError("Unsupported configuration schema version.")
         root = _table(
             raw_root,

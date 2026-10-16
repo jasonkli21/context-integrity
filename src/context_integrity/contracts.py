@@ -47,6 +47,10 @@ def matches_rule(source: SourceRecord, rule: ContextContractRule) -> bool:
 
 
 def resolve_package(manifest: InventoryManifest, paths: tuple[str, ...]) -> ContextPackage:
+    return _resolve_package_sources(manifest.sources, paths)
+
+
+def _resolve_package_sources(available_sources, paths):
     normalized = []
     for path in paths:
         # Reject drive, backslash, trailing slash ambiguity before POSIX normalization.
@@ -56,7 +60,9 @@ def resolve_package(manifest: InventoryManifest, paths: tuple[str, ...]) -> Cont
         _validate_integrity_path(value)
         normalized.append(value)
     counts = Counter(normalized)
-    sources = {s.path: s for s in manifest.sources}
+    sources = {s.path: s for s in available_sources}
+    if len(sources) != len(available_sources):
+        raise ValueError("Available source paths must be unique.")
     return ContextPackage(
         tuple(sorted(normalized)),
         tuple(sources[p] for p in sorted(counts) if p in sources),
@@ -98,9 +104,19 @@ def require_bound_contract(manifest: InventoryManifest, contract: ContextContrac
 def validate_contract(
     manifest: InventoryManifest, contract: ContextContract, paths: tuple[str, ...] = ()
 ) -> ContractValidationOverview:
+    return validate_contract_sources(manifest, contract, manifest.sources, paths)
+
+
+def validate_contract_sources(
+    manifest: InventoryManifest,
+    contract: ContextContract,
+    available_sources: tuple[SourceRecord, ...],
+    paths: tuple[str, ...] = (),
+) -> ContractValidationOverview:
+    """Evaluate the bound contract against an explicit source universe."""
     require_bound_contract(manifest, contract)
     config = manifest.repository_config
-    package = resolve_package(manifest, paths)
+    package = _resolve_package_sources(available_sources, paths)
     findings = [
         _finding(
             contract.id,

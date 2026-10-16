@@ -1,6 +1,7 @@
 """Pure human and stable JSON renderers."""
 
 import json
+from dataclasses import asdict
 
 from context_integrity.lifecycle import (
     active_authority_exclusion_reason,
@@ -836,8 +837,8 @@ def render_contract_validation_text(overview: ContractValidationOverview) -> str
 
 
 def compiled_context_dict(compiled: CompiledContext) -> dict:
-    """Separate compiled-context JSON v2; prior projections remain untouched."""
-    if compiled.schema_version != 2:
+    """Separate compiled-context JSON v3; prior projections remain untouched."""
+    if compiled.schema_version != 3:
         raise ValueError("Unsupported compiled context schema version.")
     contract = _contract_v1(compiled.contract)
     contract["budget_bytes"] = compiled.contract.budget_bytes
@@ -847,13 +848,14 @@ def compiled_context_dict(compiled: CompiledContext) -> dict:
         rule.update(priority=policy.priority, authority_policy=policy.authority_policy)
     budget = compiled.budget
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "repository": _repository_v1(compiled.repository),
         "task": {"text": compiled.task, "task_class": compiled.contract.task_class},
         "contract": contract,
         "config_sha256": compiled.config_sha256,
         "status": compiled.status.value,
         "authority_policies": [policy_dict(p) for p in compiled.authority_policies],
+        "providers": [asdict(p) for p in compiled.providers],
         "budget": {
             "configured_bytes": budget.configured_bytes,
             "requested_bytes": budget.requested_bytes,
@@ -866,6 +868,10 @@ def compiled_context_dict(compiled: CompiledContext) -> dict:
         "decisions": [
             {
                 "source_id": d.source.id,
+                "origin": d.source.origin.value,
+                "provider_id": d.source.provider_id,
+                "provider_version": d.source.provider_version,
+                "relevance": asdict(d.source.relevance) if d.source.relevance else None,
                 "evidence_location": d.source.evidence_location,
                 "derivation": d.source.derivation,
                 "path": d.source.path,
@@ -948,7 +954,27 @@ def render_compiled_context_text(compiled: CompiledContext) -> str:
     ]
     if compiled.task is not None:
         lines.append(f"Task: {display(compiled.task)}")
+    for provider in compiled.providers:
+        lines.append(
+            f"Provider: {display(provider.descriptor.id)} {display(provider.descriptor.version)} "
+            f"ranker={display(provider.ranker_version)} incomplete={provider.coverage.incomplete}"
+        )
+        lines.append(
+            f"  Snapshot: HEAD={display(provider.snapshot.git_head or 'unavailable')} "
+            f"dirty={provider.snapshot.git_dirty}"
+        )
+        for name, value in provider.coverage.signals:
+            if value:
+                lines.append(f"  Coverage: {display(name)}={value}")
+    for warning in compiled.warnings:
+        if warning.code.startswith("provider_"):
+            lines.append(f"Warning: {display(warning.code)}: {display(warning.message)}")
     for decision in compiled.decisions:
+        if decision.source.provider_id:
+            lines.append(
+                f"  Evidence: {display(decision.source.provider_id)} "
+                f"rank={decision.source.relevance.rank}"
+            )
         lines.append(f"  {display(decision.source.path)}: {decision.decision.value}")
         for relation in decision.rule_decisions:
             lines.append(f"    {display(relation.rule_id)}: {relation.reason.value}")

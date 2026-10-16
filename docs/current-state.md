@@ -1,54 +1,61 @@
 # Current State
 
 **Last updated:** 2026-10-16
-**Current phase:** Phase 6 — Task Context Compiler
-**Active plan:** `docs/plans/phase-6-implementation-plan.md`
-**Status:** Implemented, review findings F-001–F-004 fixed, and offline-verified.
+**Current phase:** Phase 7 — Codebase Intelligence EvidenceProvider Integration
+**Active plan:** `docs/plans/phase-7-implementation-plan.md`
+**Status:** Implemented and offline-verified; independent review required.
 
 ## Delivered
 
-- Phase 0–5 inventory, authority, lifecycle/supersession, explicit claims, deterministic
-  integrity checks and explicit-package contracts remain intact. Earlier JSON v1
-  projections/goldens are unchanged; claim validity remains `unverified`.
-- Strict config v6 retains v1–v5 and adds contract byte budgets, rule priorities and
-  rule-scoped authority policy references. Old schemas reject compiler-only keys.
-- `compile CONTRACT_ID [PATH]` selects only observed inventory sources under the exact
-  config-bound contract. It applies lifecycle policy, exclusions and subset-aware authority
-  before deterministic required-first coverage and optional fill. Overlapping rules cannot
-  bypass each other's selection restrictions. Unique sources count once; maxima and budget
-  are checked before selection, with no lower-authority budget fallback.
-- Text and separate compiled-context JSON v2 retain structured selection/omission reasons,
-  revisions, policy provenance, dependencies, byte budget and final Phase 5 validation.
-  Complete/incomplete both retain exit 0; task text is opaque metadata. Stable JSON contains
-  no source bodies, absolute root or runtime timestamps.
-- Required greedy selection now invokes deterministic feasibility repair before retaining an
-  incomplete result. Explicit lifecycle selectors define the authority candidate universe,
-  while explicit authority ineligibility remains enforced. Compiler candidates carry optional
-  provider provenance, and compiled-context JSON v2 records integrity evaluation state and
-  supplied deterministic finding references.
+- Phase 0–6 inventory, authority, lifecycle/supersession, explicit claims, deterministic
+  integrity checks, bound contracts and compiler selection semantics remain intact.
+  Earlier JSON v1 surfaces are unchanged; claim validity remains `unverified`.
+- Generic EvidenceProvider contract v1 and a local Context Engine CLI/schema-v1 JSON
+  adapter supply ranked, snapshot-scoped, body-free code/test/schema/migration candidates.
+  Root and known HEAD/dirty mismatches fail closed; full content is byte-validated and
+  SHA-256 hashed before body discard. Processes have finite time/output bounds and
+  sanitized typed errors. Unsafe/duplicate/colliding paths fail; lossy paths are omitted
+  with explicit coverage. No shared database, parser duplication or network is introduced.
+- Strict config v7 retains v1–v6 and adds four provider-backed contract kinds. Runtime
+  executable/provider settings stay outside repository config. Provider mode requires
+  explicit selection and a nonblank task; acquisition bytes and final contract bytes are
+  separate. Provider failure exits 7 without silently falling back to inventory alone.
+- One mixed compiler preserves exclusions, lifecycle, rule-scoped authority, maxima,
+  required-first coverage, exact feasibility repair, optional fill and unique byte counts.
+  Provider rank applies after policy equivalence; inventory documents receive no invented
+  relevance rank. Final validation uses the exact mixed universe, without mutating inventory.
+  Standalone `contracts validate` remains inventory-only.
+- Compiled-context JSON v3 and text expose origins, provider/version/ranker/query,
+  snapshot, coverage, relevance evidence, revisions and dependencies. Stable output omits
+  bodies, absolute roots, timestamps, raw stderr and index-local IDs. Provider completeness
+  stays separate from contract completeness; complete/incomplete contracts both exit 0.
 
 ## Verification
 
-`UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed: Ruff lint/format
-and **721 tests**, Python 3.12.13/macOS. Focused compiler/contracts/authority/configuration:
-**295 passed**. Compiled-context JSON v2 golden and `git diff --check` passed. Acceptance
-evidence: `docs/implementation-reports/phase-6-implementation-report.md` and
-`docs/implementation-reports/phase-6-review-fixes-report.md`.
+`UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed: Ruff lint,
+format and **831 tests**, Python 3.12.13/macOS. Focused evidence/adapter/compiler/contracts/
+configuration/CLI: **371 passed**. v3 inventory/mixed goldens and `git diff --check` passed.
+Real `ctx 0.1.0` / `file-ranker-v1` smokes passed for non-Git and clean Git/change fixtures,
+selecting documentation plus code with body-free output. Evidence:
+`docs/implementation-reports/phase-7-implementation-report.md`; durable boundary:
+`docs/evidence-contract.md`.
 
 ## Known limitations / findings
 
-The compiler still uses conservative intersection of overlapping rule policies. The
-feasibility repair applies to required candidates; optional fill remains deterministic and
-greedy. Compilation proves declared contract completeness, not semantic correctness or
-integrity cleanliness. Missing usable content hashes/sizes prevent selection. Observations
-are sequential rather than atomic. EvidenceProvider integration remains Phase 7 work.
+Observations are sequential, not atomic. Unknown provider snapshot metadata remains
+explicit; acquired candidates carry individual content hashes. Provider shortlists and
+upstream syntax/relation/ranking limitations do not prove exhaustive code truth. Required
+repair retains its existing exact-search complexity; optional fill remains greedy. Overlapping
+rule policy remains conservative. POSIX execution was verified; cross-platform execution
+and independent architectural acceptance are not claimed.
 
-The separately pending Phase 4 final independent verification remains pending; Phase 4/5
-accepted review fixes retain their verified status. There is no semantic task retrieval,
-ordinary code retrieval, source-body bundling, token budgeting, integrity gating, LLM,
-database/cache, Codebase Intelligence integration or CI enforcement.
+The separately pending Phase 4 final independent verification remains pending. No
+architectural-integrity evaluation, graph policy, claim verification, generic contradictions,
+source-body bundling, token budgets, persistence, LLM, cross-repository support or CI
+enforcement is delivered.
 
 ## Next expected step
 
-Complete the separately pending Phase 4 final independent verification. Then Phase 7 —
-Codebase Intelligence EvidenceProvider integration.
+Independent Phase 7 review against the active plan and evidence contract, plus the separately
+pending Phase 4 verification. Phase 8 architectural integrity follows a separately authorized
+plan; structural evidence remains descriptive and Context Integrity owns its policy.

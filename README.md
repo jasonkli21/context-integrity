@@ -10,7 +10,7 @@ Context Integrity is being built around the idea that:
 
 ## Status
 
-**Phase 6 deterministic Task Context Compiler implemented and offline-verified; independent review pending.**
+**Phase 7 EvidenceProvider integration implemented and offline-verified; independent review pending.**
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
 
@@ -48,7 +48,7 @@ Codebase / Context Intelligence Engine
 authoritative, compatible, or required?"
 ```
 
-The Codebase Intelligence project will eventually provide deterministic facts such as symbols, relationships, structural changes, impact, and code-context candidates. Context Integrity will consume those facts through an evidence boundary and apply authority, lifecycle, architectural intent, context contracts, and integrity policy.
+Context Engine now supplies ranked code candidates through a versioned local CLI/JSON evidence boundary. Context Integrity applies authority, lifecycle, exclusions, contracts and budget policy. Architectural evaluation of structural evidence remains future work. See [the evidence contract](docs/evidence-contract.md).
 
 The projects intentionally do **not** share a database or implementation lifecycle today.
 
@@ -247,7 +247,7 @@ false preserves the source in inventory but excludes it from authority resolutio
 warning `authority_metadata_source_missing`. Schema v1 metadata cannot override kind or lifecycle;
 source metadata cannot declare `executable_truth` or `historical`. Use `authority_eligible = false`
 for policy-independent exclusion. `executable_truth` remains a valid policy tier for evidence
-provided through a future executable-evidence boundary. ADR acceptance is not inferred from
+provided through the optional EvidenceProvider boundary. ADR acceptance is not inferred from
 document bodies.
 
 Config defaults to `configuration / unknown / unknown`, with a normal source ID/hash. An
@@ -350,7 +350,8 @@ a newline at EOF. Inventory and authority JSON v1 gain no graph fields or new ke
 
 Lifecycle is explicit source metadata only: no dates, Git timestamps, filename numbering,
 body text, or model inference establish state or supersession. Expiration is never automatic.
-Lifecycle commands do not mutate configuration or evaluate claims. No database or external integration is included.
+Lifecycle commands do not mutate configuration, evaluate claims or acquire provider evidence.
+No database is included.
 See the [Phase 2 implementation report](docs/implementation-reports/phase-2-implementation-report.md)
 for verification and the acceptance mapping.
 
@@ -598,7 +599,7 @@ uv run context-integrity compile implementation-task . --task "Implement a chang
 ```
 
 Compilation requires the exact configured contract and its observed config revision.
-Candidates come only from inventory. An omitted lifecycle selector permits `unknown` and
+Without a provider, candidates come only from inventory. An omitted lifecycle selector permits `unknown` and
 `active`; explicit lifecycle selectors can request historical context. Excluded rules
 always win. A rule's authority policy resolves only its eligible matching candidates,
 and only the highest observed tier is selectable. Equally ranked alternatives remain
@@ -619,9 +620,10 @@ result remains inspectable as incomplete.
 
 Final Phase 5 validation determines `complete` or `incomplete`; both return exit 0.
 Fatal categories remain usage/unknown contract/invalid budget 2, repository 3, output 4,
-and configuration 6. Task text is opaque metadata and does not affect selection.
+configuration 6, and provider failure 7. Without a provider, task text is opaque metadata.
+Provider mode requires a nonblank task and forwards it as the relevance query.
 
-Compiled-context JSON v2 is a separate deliberate projection with structured decisions,
+Compiled-context JSON v3 is a separate deliberate projection with structured decisions,
 rule-scoped authority metadata, config/source revisions, unique dependencies, budget,
 final contract validation, and explicit `integrity_state` (`not_evaluated` unless a
 deterministic integrity overview is supplied). A supplied overview retains finding identity,
@@ -629,8 +631,56 @@ severity, and evidence references. Earlier JSON projections remain unchanged; us
 output to inspect v6 compiler policy fields. Stable output contains no absolute root,
 timestamps, or source bodies. This is a rebuildable selection manifest, observed
 sequentially, with no source-body bundle, semantic retrieval, integrity gating, token
-budgeting, cache, LLM, database, CI enforcement, or Codebase Intelligence integration.
+budgeting, cache, LLM, database, or CI enforcement. Optional code acquisition is described below.
 See the [Phase 6 implementation report](docs/implementation-reports/phase-6-implementation-report.md).
+
+## Mixed documentation and code context (configuration v7)
+
+Schema v7 retains all earlier configuration and permits contract kinds `source_code`,
+`test`, `schema`, and `migration`. Schemas v1–v6 reject these kinds. For a mixed contract,
+set `schema_version = 7`, retain your instruction/document rules, and add:
+
+```toml
+[[context_contracts.rules]]
+id = "code"
+mode = "required"
+kinds = ["source_code"]
+min_count = 1
+max_count = 8
+priority = 80
+
+[[context_contracts.rules]]
+id = "tests"
+mode = "optional"
+kinds = ["test"]
+max_count = 4
+priority = 70
+```
+
+```bash
+uv run context-integrity compile implementation-task . --task "Update compiler selection" \
+  --evidence-provider context-engine --format json --output /tmp/mixed-context.json
+# Advanced runtime options:
+# --context-engine-bin /path/to/ctx
+# --evidence-budget-bytes 1048576
+# --evidence-change BASE..HEAD
+```
+
+A locally installed compatible `ctx` is required only in provider mode; nothing is downloaded.
+The default 1 MiB acquisition ceiling (maximum 16 MiB) is separate from the final contract
+budget. Root/HEAD/dirty mismatches and malformed/unsafe evidence fail closed with exit 7.
+Provider failures never silently compile documentation alone. Complete/incomplete packages
+both retain exit 0. Provider-only options without provider selection are usage errors.
+
+Provider rank only orders otherwise policy-equivalent code candidates. Inventory documents
+receive no invented relevance score. JSON v3 adds provider versions, ranker derivation,
+revision/coverage state, origins and relevance evidence to the existing decisions/dependencies.
+Provider incompleteness remains inspectable independently of contract completeness. Bodies
+are validated, hashed and discarded before compilation. `contracts validate` continues to
+resolve only inventory sources; provider code is visible only to explicit mixed compilation.
+See [the evidence contract](docs/evidence-contract.md) for process limits, role normalization,
+transport replacement, safety and limitations, and the
+[Phase 7 report](docs/implementation-reports/phase-7-implementation-report.md) for verification.
 
 ## Development workflow
 

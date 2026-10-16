@@ -1,0 +1,688 @@
+{
+  "authority_policies": [],
+  "budget": {
+    "configured_bytes": null,
+    "effective_bytes": null,
+    "origin": "unbounded",
+    "remaining_bytes": null,
+    "requested_bytes": null,
+    "used_bytes": 89
+  },
+  "config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract": {
+    "budget_bytes": null,
+    "config_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "description": "Mixed",
+    "id": "work",
+    "rules": [
+      {
+        "authority_classes": [],
+        "authority_policy": null,
+        "id": "code",
+        "kinds": [
+          "source_code"
+        ],
+        "lifecycles": [],
+        "max_count": 1,
+        "min_count": 1,
+        "mode": "required",
+        "paths": [],
+        "priority": 0
+      },
+      {
+        "authority_classes": [],
+        "authority_policy": null,
+        "id": "docs",
+        "kinds": [],
+        "lifecycles": [],
+        "max_count": null,
+        "min_count": 1,
+        "mode": "required",
+        "paths": [
+          "AGENTS.md"
+        ],
+        "priority": 0
+      },
+      {
+        "authority_classes": [],
+        "authority_policy": null,
+        "id": "tests",
+        "kinds": [
+          "test"
+        ],
+        "lifecycles": [],
+        "max_count": 1,
+        "min_count": 0,
+        "mode": "optional",
+        "paths": [],
+        "priority": 0
+      }
+    ],
+    "task_class": "implementation"
+  },
+  "decisions": [
+    {
+      "contributing_rule_ids": [
+        "docs"
+      ],
+      "decision": "selected",
+      "derivation": null,
+      "evidence_location": null,
+      "matched_rule_ids": [
+        "docs"
+      ],
+      "origin": "inventory",
+      "path": "AGENTS.md",
+      "provider_id": null,
+      "provider_version": null,
+      "relevance": null,
+      "revision": {
+        "content_sha256": "139d544b821b13ebea14f1b0fe18577222e415c2966e3a3511c4196055232202",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "rule_decisions": [
+        {
+          "authority_exclusion": null,
+          "authority_policy": null,
+          "equal_tier_paths": [],
+          "highest_tier_index": null,
+          "reason": "selected",
+          "rule_id": "docs",
+          "tier_index": null
+        }
+      ],
+      "size_bytes": 3,
+      "source_id": "fixture:AGENTS.md"
+    },
+    {
+      "contributing_rule_ids": [
+        "code"
+      ],
+      "decision": "selected",
+      "derivation": "context-engine-cli-json-v1:file-ranker-v1",
+      "evidence_location": "src/sample.py",
+      "matched_rule_ids": [
+        "code"
+      ],
+      "origin": "evidence_provider",
+      "path": "src/sample.py",
+      "provider_id": "context-engine",
+      "provider_version": "0.1.0",
+      "relevance": {
+        "change_distance": null,
+        "graph_distance": null,
+        "matched_entities": [
+          [
+            "sample",
+            "function",
+            0,
+            12
+          ]
+        ],
+        "matched_entities_omitted": 0,
+        "rank": 1,
+        "reasons": [
+          "path_component_exact"
+        ],
+        "score": 10,
+        "score_components": [
+          [
+            "centrality",
+            0
+          ],
+          [
+            "change",
+            0
+          ],
+          [
+            "graph",
+            0
+          ],
+          [
+            "lexical_path",
+            10
+          ],
+          [
+            "lexical_symbol",
+            0
+          ],
+          [
+            "role",
+            0
+          ],
+          [
+            "total",
+            10
+          ]
+        ]
+      },
+      "revision": {
+        "content_sha256": "2fbab5c06c561125b3a25a0072f4a0439d2b813cb618bf89ec66e6b8706542e0",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "provider_content_sha256"
+      },
+      "rule_decisions": [
+        {
+          "authority_exclusion": null,
+          "authority_policy": null,
+          "equal_tier_paths": [],
+          "highest_tier_index": null,
+          "reason": "selected",
+          "rule_id": "code",
+          "tier_index": null
+        }
+      ],
+      "size_bytes": 43,
+      "source_id": "fixture:src/sample.py"
+    },
+    {
+      "contributing_rule_ids": [
+        "tests"
+      ],
+      "decision": "selected",
+      "derivation": "context-engine-cli-json-v1:file-ranker-v1",
+      "evidence_location": "tests/spec.py",
+      "matched_rule_ids": [
+        "tests"
+      ],
+      "origin": "evidence_provider",
+      "path": "tests/spec.py",
+      "provider_id": "context-engine",
+      "provider_version": "0.1.0",
+      "relevance": {
+        "change_distance": null,
+        "graph_distance": null,
+        "matched_entities": [
+          [
+            "sample",
+            "function",
+            0,
+            12
+          ]
+        ],
+        "matched_entities_omitted": 0,
+        "rank": 2,
+        "reasons": [
+          "path_component_exact"
+        ],
+        "score": 10,
+        "score_components": [
+          [
+            "centrality",
+            0
+          ],
+          [
+            "change",
+            0
+          ],
+          [
+            "graph",
+            0
+          ],
+          [
+            "lexical_path",
+            10
+          ],
+          [
+            "lexical_symbol",
+            0
+          ],
+          [
+            "role",
+            0
+          ],
+          [
+            "total",
+            10
+          ]
+        ]
+      },
+      "revision": {
+        "content_sha256": "2fbab5c06c561125b3a25a0072f4a0439d2b813cb618bf89ec66e6b8706542e0",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "provider_content_sha256"
+      },
+      "rule_decisions": [
+        {
+          "authority_exclusion": null,
+          "authority_policy": null,
+          "equal_tier_paths": [],
+          "highest_tier_index": null,
+          "reason": "selected",
+          "rule_id": "tests",
+          "tier_index": null
+        }
+      ],
+      "size_bytes": 43,
+      "source_id": "fixture:tests/spec.py"
+    }
+  ],
+  "dependencies": [
+    {
+      "path": "AGENTS.md",
+      "source_id": "fixture:AGENTS.md",
+      "source_revision": {
+        "content_sha256": "139d544b821b13ebea14f1b0fe18577222e415c2966e3a3511c4196055232202",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      }
+    },
+    {
+      "path": "src/sample.py",
+      "source_id": "fixture:src/sample.py",
+      "source_revision": {
+        "content_sha256": "2fbab5c06c561125b3a25a0072f4a0439d2b813cb618bf89ec66e6b8706542e0",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "provider_content_sha256"
+      }
+    },
+    {
+      "path": "tests/spec.py",
+      "source_id": "fixture:tests/spec.py",
+      "source_revision": {
+        "content_sha256": "2fbab5c06c561125b3a25a0072f4a0439d2b813cb618bf89ec66e6b8706542e0",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "provider_content_sha256"
+      }
+    }
+  ],
+  "integrity_state": {
+    "evaluation_status": "not_evaluated",
+    "findings": []
+  },
+  "providers": [
+    {
+      "acquisition_budget_bytes": 4096,
+      "change": [],
+      "coverage": {
+        "incomplete": false,
+        "signals": [
+          [
+            "analysis_incomplete",
+            false
+          ],
+          [
+            "budget_skips",
+            0
+          ],
+          [
+            "content_load_attempts",
+            0
+          ],
+          [
+            "content_load_bytes_reserved",
+            0
+          ],
+          [
+            "content_load_candidates_omitted",
+            0
+          ],
+          [
+            "content_load_failures",
+            0
+          ],
+          [
+            "content_load_safety_limited",
+            false
+          ],
+          [
+            "diagnostics_count",
+            0
+          ],
+          [
+            "excluded_roles",
+            0
+          ],
+          [
+            "fallback_candidates_omitted",
+            0
+          ],
+          [
+            "files_considered",
+            0
+          ],
+          [
+            "files_eligible",
+            0
+          ],
+          [
+            "graph_truncated",
+            false
+          ],
+          [
+            "lexical_non_utf8_path_omissions",
+            0
+          ],
+          [
+            "lossy_candidates_omitted",
+            0
+          ],
+          [
+            "matched_entities_omitted",
+            0
+          ],
+          [
+            "paths_may_be_lossy",
+            false
+          ],
+          [
+            "ranking_roots",
+            0
+          ],
+          [
+            "ranking_roots_omitted",
+            0
+          ],
+          [
+            "reported_skips_truncated",
+            false
+          ],
+          [
+            "scan_warning_count",
+            0
+          ],
+          [
+            "selection_candidates_omitted",
+            0
+          ],
+          [
+            "skips_omitted",
+            0
+          ],
+          [
+            "task_terms",
+            0
+          ],
+          [
+            "task_terms_truncated",
+            false
+          ]
+        ]
+      },
+      "descriptor": {
+        "capabilities": [
+          "context_candidates",
+          "change_context"
+        ],
+        "contract_version": 1,
+        "derivation": "context-engine-cli-json-v1",
+        "id": "context-engine",
+        "version": "0.1.0"
+      },
+      "fallback_mode": null,
+      "ranker_version": "file-ranker-v1",
+      "snapshot": {
+        "command": "context",
+        "git_dirty": null,
+        "git_head": null,
+        "provider_schema_version": 1,
+        "repository_id": "fixture-repository"
+      },
+      "task": "sample",
+      "warnings": []
+    }
+  ],
+  "repository": {
+    "git": {
+      "available": false,
+      "dirty": null,
+      "head": null
+    },
+    "id": "fixture-repository",
+    "identity_basis": "local_fallback",
+    "name": "fixture"
+  },
+  "schema_version": 3,
+  "selected_sources": [
+    {
+      "authority_class": "operating_instruction",
+      "classification": {
+        "authority_class": "operating_instruction",
+        "basis": [
+          {
+            "basis": "exact_filename",
+            "confidence": "strong",
+            "dimension": "kind",
+            "result": "agent_instruction",
+            "rule_id": "kind.agent_instruction.filename"
+          },
+          {
+            "basis": "kind_mapping",
+            "confidence": "strong",
+            "dimension": "authority_class",
+            "result": "operating_instruction",
+            "rule_id": "authority.kind.agent_instruction"
+          },
+          {
+            "basis": "no_historical_signal",
+            "confidence": "unknown",
+            "dimension": "lifecycle",
+            "result": "unknown",
+            "rule_id": "lifecycle.unknown.fallback"
+          }
+        ],
+        "confidence": "strong",
+        "kind": "agent_instruction",
+        "lifecycle": "unknown",
+        "matched_rules": [
+          "kind.agent_instruction.filename",
+          "authority.kind.agent_instruction",
+          "lifecycle.unknown.fallback"
+        ]
+      },
+      "id": "fixture:AGENTS.md",
+      "kind": "agent_instruction",
+      "lifecycle": "unknown",
+      "path": "AGENTS.md",
+      "revision": {
+        "content_sha256": "139d544b821b13ebea14f1b0fe18577222e415c2966e3a3511c4196055232202",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "size_bytes": 3
+    },
+    {
+      "authority_class": "executable_truth",
+      "classification": {
+        "authority_class": "executable_truth",
+        "basis": [],
+        "confidence": "explicit",
+        "kind": "source_code",
+        "lifecycle": "unknown",
+        "matched_rules": [
+          "provider-role-v1"
+        ]
+      },
+      "id": "fixture:src/sample.py",
+      "kind": "source_code",
+      "lifecycle": "unknown",
+      "path": "src/sample.py",
+      "revision": {
+        "content_sha256": "2fbab5c06c561125b3a25a0072f4a0439d2b813cb618bf89ec66e6b8706542e0",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "provider_content_sha256"
+      },
+      "size_bytes": 43
+    },
+    {
+      "authority_class": "executable_truth",
+      "classification": {
+        "authority_class": "executable_truth",
+        "basis": [],
+        "confidence": "explicit",
+        "kind": "test",
+        "lifecycle": "unknown",
+        "matched_rules": [
+          "provider-role-v1"
+        ]
+      },
+      "id": "fixture:tests/spec.py",
+      "kind": "test",
+      "lifecycle": "unknown",
+      "path": "tests/spec.py",
+      "revision": {
+        "content_sha256": "2fbab5c06c561125b3a25a0072f4a0439d2b813cb618bf89ec66e6b8706542e0",
+        "git_head": null,
+        "git_status": "unknown",
+        "observed_revision_basis": "provider_content_sha256"
+      },
+      "size_bytes": 43
+    }
+  ],
+  "status": "complete",
+  "task": {
+    "task_class": "implementation",
+    "text": "sample"
+  },
+  "validation": {
+    "config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "contract": {
+      "config_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "description": "Mixed",
+      "id": "work",
+      "rules": [
+        {
+          "authority_classes": [],
+          "id": "code",
+          "kinds": [
+            "source_code"
+          ],
+          "lifecycles": [],
+          "max_count": 1,
+          "min_count": 1,
+          "mode": "required",
+          "paths": []
+        },
+        {
+          "authority_classes": [],
+          "id": "docs",
+          "kinds": [],
+          "lifecycles": [],
+          "max_count": null,
+          "min_count": 1,
+          "mode": "required",
+          "paths": [
+            "AGENTS.md"
+          ]
+        },
+        {
+          "authority_classes": [],
+          "id": "tests",
+          "kinds": [
+            "test"
+          ],
+          "lifecycles": [],
+          "max_count": 1,
+          "min_count": 0,
+          "mode": "optional",
+          "paths": []
+        }
+      ],
+      "task_class": "implementation"
+    },
+    "findings": [],
+    "package": {
+      "duplicate_paths": [],
+      "requested_paths": [
+        "AGENTS.md",
+        "src/sample.py",
+        "tests/spec.py"
+      ],
+      "resolved_paths": [
+        "AGENTS.md",
+        "src/sample.py",
+        "tests/spec.py"
+      ],
+      "sources": [
+        {
+          "path": "AGENTS.md",
+          "revision": {
+            "content_sha256": "139d544b821b13ebea14f1b0fe18577222e415c2966e3a3511c4196055232202",
+            "git_head": null,
+            "git_status": "unknown",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "source_id": "fixture:AGENTS.md"
+        },
+        {
+          "path": "src/sample.py",
+          "revision": {
+            "content_sha256": "2fbab5c06c561125b3a25a0072f4a0439d2b813cb618bf89ec66e6b8706542e0",
+            "git_head": null,
+            "git_status": "unknown",
+            "observed_revision_basis": "provider_content_sha256"
+          },
+          "source_id": "fixture:src/sample.py"
+        },
+        {
+          "path": "tests/spec.py",
+          "revision": {
+            "content_sha256": "2fbab5c06c561125b3a25a0072f4a0439d2b813cb618bf89ec66e6b8706542e0",
+            "git_head": null,
+            "git_status": "unknown",
+            "observed_revision_basis": "provider_content_sha256"
+          },
+          "source_id": "fixture:tests/spec.py"
+        }
+      ],
+      "unresolved_paths": []
+    },
+    "repository": {
+      "git": {
+        "available": false,
+        "dirty": null,
+        "head": null
+      },
+      "id": "fixture-repository",
+      "identity_basis": "local_fallback",
+      "name": "fixture"
+    },
+    "rules": [
+      {
+        "id": "code",
+        "match_count": 1,
+        "matched_paths": [
+          "src/sample.py"
+        ],
+        "max_count": 1,
+        "min_count": 1,
+        "mode": "required",
+        "satisfied": true
+      },
+      {
+        "id": "docs",
+        "match_count": 1,
+        "matched_paths": [
+          "AGENTS.md"
+        ],
+        "max_count": null,
+        "min_count": 1,
+        "mode": "required",
+        "satisfied": true
+      },
+      {
+        "id": "tests",
+        "match_count": 1,
+        "matched_paths": [
+          "tests/spec.py"
+        ],
+        "max_count": 1,
+        "min_count": 0,
+        "mode": "optional",
+        "satisfied": true
+      }
+    ],
+    "schema_version": 1,
+    "warnings": []
+  },
+  "warnings": []
+}

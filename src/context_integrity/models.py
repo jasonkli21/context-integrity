@@ -7,13 +7,20 @@ from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
 from pathlib import PurePosixPath
-from typing import NewType
+from typing import TYPE_CHECKING, NewType
+
+if TYPE_CHECKING:
+    from context_integrity.evidence import EvidenceProviderState
 
 SourceId = NewType("SourceId", str)
 ClaimId = NewType("ClaimId", str)
 
 
 class SourceKind(StrEnum):
+    SOURCE_CODE = "source_code"
+    TEST = "test"
+    SCHEMA = "schema"
+    MIGRATION = "migration"
     CONFIGURATION = "configuration"
     AGENT_INSTRUCTION = "agent_instruction"
     README = "readme"
@@ -29,6 +36,11 @@ class SourceKind(StrEnum):
     GENERATED_SUMMARY = "generated_summary"
     OTHER_DOCUMENT = "other_document"
     UNKNOWN = "unknown"
+
+
+PROVIDER_SOURCE_KINDS = frozenset(
+    {SourceKind.SOURCE_CODE, SourceKind.TEST, SourceKind.SCHEMA, SourceKind.MIGRATION}
+)
 
 
 class AuthorityClass(StrEnum):
@@ -217,6 +229,13 @@ class RepositoryConfig:
             for c in self.context_contracts
         ):
             raise ValueError("Compiler policy requires configuration schema v6.")
+        if self.schema_version < 7 and any(
+            kind in PROVIDER_SOURCE_KINDS
+            for c in self.context_contracts
+            for r in c.rules
+            for kind in r.kinds
+        ):
+            raise ValueError("Provider source kinds require configuration schema v7.")
         contract_ids = [c.id for c in self.context_contracts]
         if len(set(contract_ids)) != len(contract_ids):
             raise ValueError("Duplicate contract ID.")
@@ -736,6 +755,23 @@ class CompiledDependency:
             raise ValueError("Compiled dependency requires a content SHA256.")
 
 
+class CandidateOrigin(StrEnum):
+    INVENTORY = "inventory"
+    EVIDENCE_PROVIDER = "evidence_provider"
+
+
+@dataclass(frozen=True)
+class CandidateRelevance:
+    rank: int
+    score: int
+    score_components: tuple[tuple[str, int], ...]
+    reasons: tuple[str, ...]
+    matched_entities: tuple[tuple[str, str, int, int], ...] = ()
+    matched_entities_omitted: int = 0
+    graph_distance: int | None = None
+    change_distance: int | None = None
+
+
 @dataclass(frozen=True)
 class CompilerCandidate:
     """Selection-core item; SourceRecord is an optional inventory adapter payload."""
@@ -750,6 +786,10 @@ class CompilerCandidate:
     source: SourceRecord | None = None
     evidence_location: str | None = None
     derivation: str | None = None
+    origin: CandidateOrigin = CandidateOrigin.INVENTORY
+    provider_id: str | None = None
+    provider_version: str | None = None
+    relevance: CandidateRelevance | None = None
 
     @classmethod
     def from_source(cls, source: SourceRecord) -> CompilerCandidate:
@@ -786,7 +826,8 @@ class CompiledContext:
     warnings: tuple[ScanWarning, ...]
     integrity_state: CompiledIntegrityState = CompiledIntegrityState()
     authority_policies: tuple[AuthorityPolicy, ...] = ()
-    schema_version: int = 2
+    schema_version: int = 3
+    providers: tuple[EvidenceProviderState, ...] = ()
 
     def __post_init__(self) -> None:
         if self.task is not None and not isinstance(self.task, str):

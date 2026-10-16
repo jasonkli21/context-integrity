@@ -4,7 +4,12 @@ from dataclasses import replace
 
 from context_integrity.authority import effective_policies, resolve_authority_for_sources
 from context_integrity.configuration import ConfigurationError
-from context_integrity.contracts import matches_rule, require_bound_contract, validate_contract
+from context_integrity.contracts import (
+    matches_rule,
+    require_bound_contract,
+    validate_contract_sources,
+)
+from context_integrity.evidence import EvidenceContextBatch, EvidenceProviderError
 from context_integrity.models import (
     CandidateDecisionKind as Reason,
 )
@@ -36,6 +41,7 @@ def compile_context(
     task: str | None = None,
     budget_bytes: int | None = None,
     integrity_overview: IntegrityOverview | None = None,
+    evidence: EvidenceContextBatch | None = None,
 ) -> CompiledContext:
     """Compile a selection manifest, then validate it with the Phase 5 validator.
 
@@ -55,6 +61,39 @@ def compile_context(
     sources = tuple(
         CompilerCandidate.from_source(s) for s in sorted(manifest.sources, key=lambda s: s.path)
     )
+    if evidence is not None:
+        snapshot = evidence.state.snapshot
+        if (
+            snapshot.repository_id != manifest.repository.id
+            or evidence.state.task != task
+            or (
+                snapshot.git_head is not None
+                and manifest.repository.git_head is not None
+                and snapshot.git_head != manifest.repository.git_head
+            )
+            or (
+                snapshot.git_dirty is not None
+                and manifest.repository.git_dirty is not None
+                and snapshot.git_dirty != manifest.repository.git_dirty
+            )
+        ):
+            raise EvidenceProviderError("snapshot_mismatch")
+        if {s.path for s in sources} & {s.path for s in evidence.candidates}:
+            raise EvidenceProviderError("inventory_collision")
+        sources = tuple(sorted((*sources, *evidence.candidates), key=lambda s: s.path))
+
+    def relevance_order(candidates):
+        # Rank only provider slots in an otherwise lexical sequence. Inventory
+        # documents keep their positions and acquire no invented relevance rank.
+        ordered = sorted(candidates, key=lambda s: s.path)
+        providers = iter(
+            sorted(
+                (s for s in ordered if s.relevance is not None),
+                key=lambda s: (s.relevance.rank, s.path),
+            )
+        )
+        return tuple(next(providers) if s.relevance is not None else s for s in ordered)
+
     policies = {p.id: p for p in effective_policies(manifest.repository_config)}
     if any(r.authority_policy is not None and r.authority_policy not in policies for r in rules):
         raise ConfigurationError("Invalid context contract authority policy.")
@@ -153,12 +192,11 @@ def compile_context(
             priorities = [r.priority for r in helpful]
             # Authority has already narrowed each rule to its highest tier. Tier
             # indices from unrelated policies do not form a global source rank.
-            ranked.append(
-                ((-len(helpful), -max(priorities), -sum(priorities), source.path), source)
-            )
+            ranked.append(((-len(helpful), -max(priorities), -sum(priorities)), source))
         if not ranked:
             break
-        select(min(ranked, key=lambda item: item[0])[1])
+        best_policy = min(key for key, _ in ranked)
+        select(relevance_order(s for key, s in ranked if key == best_policy)[0])
 
     # Greedy is the common path. If it leaves a required deficit, search the
     # eligible required candidate set exactly before reporting incomplete.
@@ -217,7 +255,10 @@ def compile_context(
     for rule in sorted(
         (r for r in rules if r.mode == Mode.OPTIONAL), key=lambda r: (-r.priority, r.id)
     ):
-        for source in matched[rule.id]:
+        optional_candidates = (
+            s for s in matched[rule.id] if s.path not in selected and eligibility[s.path] is None
+        )
+        for source in relevance_order(optional_candidates):
             if (
                 source.path not in selected
                 and eligibility[source.path] is None
@@ -252,7 +293,12 @@ def compile_context(
         )
     chosen_candidates = tuple(s for s in sources if s.path in selected)
     chosen = tuple(s.source for s in chosen_candidates if s.source is not None)
-    validation = validate_contract(manifest, contract, tuple(s.path for s in chosen_candidates))
+    validation = validate_contract_sources(
+        manifest,
+        contract,
+        tuple(s.source for s in sources),
+        tuple(s.path for s in chosen_candidates),
+    )
     return CompiledContext(
         manifest.repository,
         task,
@@ -264,7 +310,13 @@ def compile_context(
         tuple(decisions),
         validation,
         tuple(CompiledDependency(s.id, s.path, s.revision) for s in chosen),
-        validation.warnings,
+        tuple(
+            sorted(
+                (*validation.warnings, *(evidence.state.warnings if evidence else ())),
+                key=lambda w: (w.path or "", w.code, w.message),
+            )
+        ),
+        providers=(evidence.state,) if evidence else (),
         integrity_state=(
             CompiledIntegrityState()
             if integrity_overview is None

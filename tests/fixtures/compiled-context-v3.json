@@ -1,0 +1,278 @@
+{
+  "authority_policies": [
+    {
+      "config_sha256": null,
+      "description": "Preferred sources for agent/developer operations",
+      "id": "operating_instructions",
+      "origin": "builtin",
+      "policy_version": "builtin-v1",
+      "tiers": [
+        {
+          "classes": [
+            "operating_instruction"
+          ],
+          "index": 0
+        },
+        {
+          "classes": [
+            "architecture_product"
+          ],
+          "index": 1
+        },
+        {
+          "classes": [
+            "plan"
+          ],
+          "index": 2
+        }
+      ]
+    }
+  ],
+  "budget": {
+    "configured_bytes": 13,
+    "effective_bytes": 13,
+    "origin": "contract",
+    "remaining_bytes": 0,
+    "requested_bytes": null,
+    "used_bytes": 13
+  },
+  "config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract": {
+    "budget_bytes": 13,
+    "config_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "description": "Fixture",
+    "id": "work",
+    "rules": [
+      {
+        "authority_classes": [],
+        "authority_policy": "operating_instructions",
+        "id": "instructions",
+        "kinds": [],
+        "lifecycles": [],
+        "max_count": null,
+        "min_count": 1,
+        "mode": "required",
+        "paths": [
+          "AGENTS.md"
+        ],
+        "priority": 0
+      }
+    ],
+    "task_class": "implementation"
+  },
+  "decisions": [
+    {
+      "contributing_rule_ids": [
+        "instructions"
+      ],
+      "decision": "selected",
+      "derivation": null,
+      "evidence_location": null,
+      "matched_rule_ids": [
+        "instructions"
+      ],
+      "origin": "inventory",
+      "path": "AGENTS.md",
+      "provider_id": null,
+      "provider_version": null,
+      "relevance": null,
+      "revision": {
+        "content_sha256": "3cdce1db3302a4620afaa8b941420de5b5fe53706434b48102c35bce70e76e75",
+        "git_head": null,
+        "git_status": "untracked",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "rule_decisions": [
+        {
+          "authority_exclusion": null,
+          "authority_policy": "operating_instructions",
+          "equal_tier_paths": [
+            "AGENTS.md"
+          ],
+          "highest_tier_index": 0,
+          "reason": "selected",
+          "rule_id": "instructions",
+          "tier_index": 0
+        }
+      ],
+      "size_bytes": 13,
+      "source_id": "src_464090d845755467a0bab470c3eaa170"
+    },
+    {
+      "contributing_rule_ids": [],
+      "decision": "not_selected",
+      "derivation": null,
+      "evidence_location": null,
+      "matched_rule_ids": [],
+      "origin": "inventory",
+      "path": "docs/architecture.md",
+      "provider_id": null,
+      "provider_version": null,
+      "relevance": null,
+      "revision": {
+        "content_sha256": "e8c5671c923012d0d6f0070b25cfc11ef29a6fc347f0655666a1b7039be5fe50",
+        "git_head": null,
+        "git_status": "untracked",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "rule_decisions": [],
+      "size_bytes": 13,
+      "source_id": "src_5a375ea085185caa766da154f8919e42"
+    }
+  ],
+  "dependencies": [
+    {
+      "path": "AGENTS.md",
+      "source_id": "src_464090d845755467a0bab470c3eaa170",
+      "source_revision": {
+        "content_sha256": "3cdce1db3302a4620afaa8b941420de5b5fe53706434b48102c35bce70e76e75",
+        "git_head": null,
+        "git_status": "untracked",
+        "observed_revision_basis": "working_tree_content"
+      }
+    }
+  ],
+  "integrity_state": {
+    "evaluation_status": "not_evaluated",
+    "findings": []
+  },
+  "providers": [],
+  "repository": {
+    "git": {
+      "available": true,
+      "dirty": true,
+      "head": null
+    },
+    "id": "repo_117fc5264566c8adf434f3eb7d37b8df",
+    "identity_basis": "git_remote",
+    "name": "basic-context"
+  },
+  "schema_version": 3,
+  "selected_sources": [
+    {
+      "authority_class": "operating_instruction",
+      "classification": {
+        "authority_class": "operating_instruction",
+        "basis": [
+          {
+            "basis": "exact_filename",
+            "confidence": "strong",
+            "dimension": "kind",
+            "result": "agent_instruction",
+            "rule_id": "kind.agent_instruction.filename"
+          },
+          {
+            "basis": "kind_mapping",
+            "confidence": "strong",
+            "dimension": "authority_class",
+            "result": "operating_instruction",
+            "rule_id": "authority.kind.agent_instruction"
+          },
+          {
+            "basis": "no_historical_signal",
+            "confidence": "unknown",
+            "dimension": "lifecycle",
+            "result": "unknown",
+            "rule_id": "lifecycle.unknown.fallback"
+          }
+        ],
+        "confidence": "strong",
+        "kind": "agent_instruction",
+        "lifecycle": "unknown",
+        "matched_rules": [
+          "kind.agent_instruction.filename",
+          "authority.kind.agent_instruction",
+          "lifecycle.unknown.fallback"
+        ]
+      },
+      "id": "src_464090d845755467a0bab470c3eaa170",
+      "kind": "agent_instruction",
+      "lifecycle": "unknown",
+      "path": "AGENTS.md",
+      "revision": {
+        "content_sha256": "3cdce1db3302a4620afaa8b941420de5b5fe53706434b48102c35bce70e76e75",
+        "git_head": null,
+        "git_status": "untracked",
+        "observed_revision_basis": "working_tree_content"
+      },
+      "size_bytes": 13
+    }
+  ],
+  "status": "complete",
+  "task": {
+    "task_class": "implementation",
+    "text": "opaque task"
+  },
+  "validation": {
+    "config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "contract": {
+      "config_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "description": "Fixture",
+      "id": "work",
+      "rules": [
+        {
+          "authority_classes": [],
+          "id": "instructions",
+          "kinds": [],
+          "lifecycles": [],
+          "max_count": null,
+          "min_count": 1,
+          "mode": "required",
+          "paths": [
+            "AGENTS.md"
+          ]
+        }
+      ],
+      "task_class": "implementation"
+    },
+    "findings": [],
+    "package": {
+      "duplicate_paths": [],
+      "requested_paths": [
+        "AGENTS.md"
+      ],
+      "resolved_paths": [
+        "AGENTS.md"
+      ],
+      "sources": [
+        {
+          "path": "AGENTS.md",
+          "revision": {
+            "content_sha256": "3cdce1db3302a4620afaa8b941420de5b5fe53706434b48102c35bce70e76e75",
+            "git_head": null,
+            "git_status": "untracked",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "source_id": "src_464090d845755467a0bab470c3eaa170"
+        }
+      ],
+      "unresolved_paths": []
+    },
+    "repository": {
+      "git": {
+        "available": true,
+        "dirty": true,
+        "head": null
+      },
+      "id": "repo_117fc5264566c8adf434f3eb7d37b8df",
+      "identity_basis": "git_remote",
+      "name": "basic-context"
+    },
+    "rules": [
+      {
+        "id": "instructions",
+        "match_count": 1,
+        "matched_paths": [
+          "AGENTS.md"
+        ],
+        "max_count": null,
+        "min_count": 1,
+        "mode": "required",
+        "satisfied": true
+      }
+    ],
+    "schema_version": 1,
+    "warnings": []
+  },
+  "warnings": []
+}
