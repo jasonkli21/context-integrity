@@ -1,4 +1,12 @@
 {
+  "architecture": {
+    "coverage": null,
+    "evaluation_status": "not_evaluated",
+    "invariants": [],
+    "observed_content": [],
+    "provider": null,
+    "snapshot": null
+  },
   "change_set": {
     "base_revision": null,
     "changed_paths": [],
@@ -47,7 +55,7 @@
       "severity": "medium"
     }
   ],
-  "integrity_schema_version": 1,
+  "integrity_schema_version": 2,
   "repository": {
     "git": {
       "available": false,

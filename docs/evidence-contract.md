@@ -5,7 +5,9 @@ authority, lifecycle, contracts, exclusions, and selection. Neither project shar
 or imports the other's implementation. The implemented Python boundary is
 `EvidenceProvider.context_candidates(EvidenceContextRequest) -> EvidenceContextBatch` in
 `src/context_integrity/evidence.py`. Another provider may implement that method without
-changing the compiler. Additional relation/impact methods remain future work.
+changing the compiler. Phase 8 adds the separate `RelationEvidenceProvider.relations` protocol
+in `src/context_integrity/relations.py`; impact methods remain future work. See
+[architectural integrity contract](architecture-integrity-contract.md) for graph evidence and policy.
 
 ## Request and result
 
@@ -13,7 +15,8 @@ Requests carry a runtime-only repository root, the observed `RepositoryRef`, non
 acquisition byte budget, and optional change range. Results carry a provider descriptor
 (identity, executable version, evidence contract version, capabilities and adapter derivation),
 a root-free repository snapshot, query/ranker metadata, coverage, warnings, and body-free
-`CompilerCandidate`s. Version 1 supports `context_candidates` and optional `change_context`.
+`CompilerCandidate`s. Version 1 supports `context_candidates`, optional `change_context`, and the independent
+`relations` capability. Relation-only providers need not implement context acquisition.
 
 The snapshot records repository ID, HEAD/dirty metadata, external schema and command.
 Every candidate identifies its origin, provider/version, deterministic repository/path source
@@ -43,6 +46,7 @@ The adapter executes these argv lists with no shell, network, installation or da
 ```text
 ctx --version
 ctx context ROOT --task TASK --budget BYTES --format json [--change BASE..HEAD]
+ctx graph ROOT --format json
 ```
 
 An executable override is runtime-only. The version response must be `ctx VERSION` with a
@@ -98,8 +102,8 @@ feasibility repair still minimizes bytes then paths; relevance cannot override f
 Final validation uses `validate_contract_sources` with the exact mixed universe. The original
 `validate_contract` stays inventory-only. Both require the exact config-bound contract.
 Compiled-context JSON advances to v3, adding explicit origins, relevance and provider states;
-all earlier inventory/authority/lifecycle/claims/integrity/contract-validation projections
-remain at their previous versions. Rebuilding derived compiled output is the v2-to-v3 migration.
+inventory/authority/lifecycle/claims/contract-validation projections
+remain at their previous versions. Phase 8 intentionally advances integrity output to v2. Rebuilding derived compiled output is the v2-to-v3 migration.
 The v3 renderer projects provider and relevance fields through explicit whitelists so internal
 dataclass fields cannot silently become public JSON fields. Direct `RepositoryConfig`
 construction enforces the same supported schema-version set as TOML parsing.
@@ -116,6 +120,10 @@ Supported-role filtering does not assert that the provider found all potentially
 `CompilationStatus.COMPLETE` means the package satisfies the declared contract over acquired
 candidates. It does not mean the provider analyzed all code or that code is semantically correct.
 An incomplete provider can supply a contract-complete package. Current Context Engine syntax,
-relation-resolution and ranking limitations continue to apply. No parser/indexer, graph policy,
-claim verification, token budgets, LLM, persistence or cross-repository support is introduced.
-Phase 8 may add structural evidence consumers when architectural integrity needs them.
+relation-resolution and ranking limitations continue to apply. No parser/indexer, claim verification, token budgets, LLM, persistence or cross-repository
+support is introduced. Phase 8 consumes graph facts through a separate typed protocol;
+Context Integrity owns invariant selection and judgment. Relation snapshots use command
+`graph`; context provider states still require command `context`. Graph normalization discards
+index-local IDs and source/diagnostic bodies, validates counts and references, and exposes
+conservative coverage. Dirty graph observations have no provider content identity; local
+post-graph hash observations are labeled separately. See the architecture-integrity contract.

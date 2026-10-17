@@ -47,7 +47,7 @@ def test_config_absent_and_valid(tmp_path):
     assert config.policies[0].origin == "repository_config"
 
 
-@pytest.mark.parametrize("version", [True, 7.0, 7.5, "7", 0, 8])
+@pytest.mark.parametrize("version", [True, 7.0, 7.5, "7", 0, 9])
 def test_direct_repository_config_rejects_unsupported_schema_versions(version):
     with pytest.raises(ValueError, match="Unsupported configuration schema version"):
         RepositoryConfig(schema_version=version)
@@ -69,7 +69,7 @@ def test_direct_repository_config_accepts_v7_provider_kinds():
         b"[",
         b"\xff",
         b"",
-        b"schema_version = 8",
+        b"schema_version = 9",
         b"schema_version = true",
         b"schema_version = '1'",
         b"schema_version = 1\ninclude = 'other.toml'",

@@ -684,6 +684,7 @@ def integrity_dict(overview: IntegrityOverview) -> dict:
     changes = overview.change_set
     return {
         "integrity_schema_version": overview.schema_version,
+        "architecture": _architecture(overview.architecture),
         "repository": _repository_v1(overview.repository),
         "config_sha256": overview.config_sha256,
         "change_set": {
@@ -702,6 +703,15 @@ def integrity_dict(overview: IntegrityOverview) -> dict:
                 "message": f.message,
                 "affected_paths": list(f.affected_paths),
                 "dependency_id": f.dependency_id,
+                **(
+                    {
+                        "invariant_id": f.invariant_id,
+                        "claim_id": f.claim_id,
+                        "relations": [_relation(r) for r in f.relations],
+                    }
+                    if f.invariant_id
+                    else {}
+                ),
                 "evidence": [
                     {
                         "role": e.role,
@@ -733,9 +743,66 @@ def render_integrity_text(overview: IntegrityOverview) -> str:
         f"Change scope: {overview.change_set.scope.value}",
         f"Findings: {len(overview.findings)}",
     ]
+    lines.append(f"Architecture: {overview.architecture.evaluation_status}")
+    for result in overview.architecture.invariants:
+        lines.append(
+            f"  {display(result.invariant_id)} (claim {display(result.claim_id)}): "
+            f"{result.status.value}"
+        )
+        explanations = {
+            "violated": "Observed prohibited structural relation.",
+            "no_violation_observed": (
+                "No matching prohibited relation observed; absence is no compliance proof."
+            ),
+            "inconclusive": "No violation observed, but structural evidence is incomplete.",
+            "not_evaluated": "No relation evidence provider selected; invariant was not checked.",
+        }
+        lines.append("    " + explanations[result.status.value])
+        if result.policy:
+            lines.append(
+                f"    Rule: {result.policy.rule}; "
+                f"relations: {', '.join(result.policy.relation_kinds)}"
+            )
+            for side, selector in (
+                ("source", result.policy.source),
+                ("target", result.policy.target),
+            ):
+                for family, values in _architecture_selector(selector).items():
+                    if values:
+                        lines.append(
+                            f"    {side} {family}: " + ", ".join(display(v) for v in values)
+                        )
+        for caveat in result.caveats:
+            lines.append(f"    {display(caveat)}")
+    if overview.architecture.state:
+        state = overview.architecture.state
+        lines.append(
+            f"  Provider: {display(state.descriptor.id)} {display(state.descriptor.version)}; "
+            f"HEAD: {display(state.snapshot.git_head or 'unknown')}; "
+            f"dirty: {state.snapshot.git_dirty}"
+        )
+    if overview.architecture.state:
+        lines.append(
+            "  Structural evidence incomplete: "
+            f"{overview.architecture.state.coverage.summary.incomplete}"
+        )
     for f in overview.findings:
         lines.append(f"{f.severity.value}: {f.code}: {display(f.message)}")
         lines.extend(f"  {display(p)}" for p in f.affected_paths)
+        for r in f.relations:
+            target = (
+                r.target.entity.qualified_name or r.target.entity.path
+                if r.target.entity
+                else r.target.name
+            )
+            lines.append(
+                f"  {display(r.source.qualified_name or r.source.path)} "
+                f"--{r.kind}--> {display(target)}"
+            )
+            lines.append(
+                f"    {display(r.evidence_path)} bytes {r.range.start.byte}..{r.range.end.byte}; "
+                f"{r.derivation}"
+            )
     for w in overview.warnings:
         lines.append(f"Warning: {display(w.code)}: {display(w.path or '')}: {display(w.message)}")
     return "\n".join(lines) + "\n"
@@ -1034,3 +1101,133 @@ def render_compiled_context_text(compiled: CompiledContext) -> str:
                 )
     lines.append(render_contract_validation_text(compiled.validation).rstrip("\n"))
     return "\n".join(lines) + "\n"
+
+
+def _range(span):
+    if span is None:
+        return None
+    return {
+        "start": {"byte": span.start.byte, "row": span.start.row, "column": span.start.column},
+        "end": {"byte": span.end.byte, "row": span.end.row, "column": span.end.column},
+    }
+
+
+def _entity(entity):
+    if entity is None:
+        return None
+    return {
+        "kind": entity.kind,
+        "path": entity.path,
+        "qualified_name": entity.qualified_name,
+        "name": entity.name,
+        "symbol_kind": entity.symbol_kind,
+        "language": entity.language,
+        "range": _range(entity.range),
+    }
+
+
+def _relation(relation):
+    return {
+        "kind": relation.kind,
+        "source": _entity(relation.source),
+        "target": {"entity": _entity(relation.target.entity), "name": relation.target.name},
+        "resolution": relation.resolution,
+        "evidence_path": relation.evidence_path,
+        "range": _range(relation.range),
+        "language": relation.language,
+        "derivation": relation.derivation,
+    }
+
+
+def _architecture(architecture):
+    state = architecture.state
+    return {
+        "evaluation_status": architecture.evaluation_status,
+        "provider": {
+            "id": state.descriptor.id,
+            "version": state.descriptor.version,
+            "contract_version": state.descriptor.contract_version,
+            "capabilities": list(state.descriptor.capabilities),
+            "derivation": state.descriptor.derivation,
+        }
+        if state
+        else None,
+        "snapshot": {
+            "repository_id": state.snapshot.repository_id,
+            "git_head": state.snapshot.git_head,
+            "git_dirty": state.snapshot.git_dirty,
+            "provider_schema_version": state.snapshot.provider_schema_version,
+            "command": state.snapshot.command,
+        }
+        if state
+        else None,
+        "observed_content": [
+            {"path": p, "content_sha256": h, "derivation": "local_post_graph_content_sha256"}
+            for p, h in state.observed_content
+        ]
+        if state
+        else [],
+        "coverage": {
+            "incomplete": state.coverage.summary.incomplete,
+            "signals": dict(state.coverage.summary.signals),
+            "warning_categories": list(state.coverage.warning_categories),
+            "files": [
+                {
+                    "path": f.path,
+                    "symbol_status": f.symbol_status,
+                    "relation_status": f.relation_status,
+                    "syntax_errors": f.syntax_errors,
+                    "unresolved": f.unresolved,
+                    "unsupported": f.unsupported,
+                }
+                for f in state.coverage.files
+            ],
+        }
+        if state
+        else None,
+        "invariants": [
+            {
+                "invariant_id": r.invariant_id,
+                "claim_id": r.claim_id,
+                "status": r.status.value,
+                "policy": {
+                    "rule": r.policy.rule,
+                    "relation_kinds": sorted(r.policy.relation_kinds),
+                    "source": _architecture_selector(r.policy.source),
+                    "target": _architecture_selector(r.policy.target),
+                }
+                if r.policy
+                else None,
+                "provenance_complete": r.provenance_complete,
+                "finding_ids": list(r.finding_ids),
+                "caveats": list(r.caveats),
+                "claim_provenance": {
+                    "path": r.claim.provenance.path,
+                    "source_id": r.claim.provenance.source_id,
+                    "revision": _revision_v1(r.claim.provenance.revision),
+                    "dependencies": [
+                        {
+                            "path": d.path,
+                            "source_id": d.source_id,
+                            "resolved": d.resolved,
+                            "revision": _revision_v1(d.revision) if d.revision else None,
+                        }
+                        for d in r.claim.dependencies
+                    ],
+                    "validity": r.claim.validity.value,
+                }
+                if r.claim
+                else None,
+            }
+            for r in architecture.invariants
+        ],
+    }
+
+
+def _architecture_selector(selector):
+    return {
+        "paths": sorted(selector.paths),
+        "path_prefixes": sorted(selector.path_prefixes),
+        "symbols": sorted(selector.symbols),
+        "names": sorted(selector.names),
+    }

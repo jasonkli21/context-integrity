@@ -474,7 +474,7 @@ def test_cli_findings_success_output_and_errors(tmp_path):
         app, ["check", str(tmp_path), "--format", "json", "--output", str(output)]
     )
     assert result.exit_code == 0
-    assert json.loads(output.read_text())["integrity_schema_version"] == 1
+    assert json.loads(output.read_text())["integrity_schema_version"] == 2
     assert runner.invoke(app, ["check", str(tmp_path), "--output", str(tmp_path)]).exit_code == 4
     assert runner.invoke(app, ["check", str(tmp_path), "--diff", "x..y"]).exit_code == 3
     write(tmp_path, ".context-integrity.toml", "invalid")
@@ -495,7 +495,7 @@ def test_integrity_json_golden_privacy_and_stable_ids(tmp_path):
     assert rendered.endswith("\n")
     assert str(tmp_path) not in rendered
     assert "Canonical secret" not in rendered and "Compatibility secret" not in rendered
-    assert rendered == (Path(__file__).parent / "fixtures/integrity-v1.json").read_text()
+    assert rendered == (Path(__file__).parent / "fixtures/integrity-v2.json").read_text()
     write(tmp_path, "CLAUDE.md", "different body")
     updated = integrity_overview(context, inventory_repository(context))
     assert updated.findings[0].id == overview.findings[0].id

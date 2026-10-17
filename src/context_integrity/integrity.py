@@ -1,14 +1,19 @@
 """Deterministic review signals over inventory, bounded text, and changed paths."""
 
+import json
 import re
 from hashlib import sha256
 from pathlib import PurePosixPath
 
 from context_integrity.acquisition import normalize_path
+from context_integrity.claims import claims_overview
 from context_integrity.configuration import verify_config_revision
-from context_integrity.evidence import changed_paths, source_text
+from context_integrity.evidence import EvidenceProviderError, changed_paths, source_text
 from context_integrity.lifecycle import lifecycle_authority_eligible
 from context_integrity.models import (
+    ArchitectureOverview,
+    ArchitectureResult,
+    ArchitectureStatus,
     ChangeScope,
     ChangeSet,
     FindingSeverity,
@@ -22,6 +27,7 @@ from context_integrity.models import (
     SourceKind,
     SourceRecord,
 )
+from context_integrity.relations import EvidenceRelationBatch
 from context_integrity.repository import RepositoryContext
 
 INSTRUCTION_RULE = "instruction.canonical_reference.v1"
@@ -327,15 +333,23 @@ def dependency_findings(
 
 
 def integrity_overview(
-    context: RepositoryContext, manifest: InventoryManifest, diff: str | None = None
+    context: RepositoryContext,
+    manifest: InventoryManifest,
+    diff: str | None = None,
+    *,
+    relation_batch: EvidenceRelationBatch | None = None,
 ) -> IntegrityOverview:
     changes = changed_paths(context, diff)
+    architecture, architecture_findings, architecture_warnings = evaluate_architecture(
+        manifest, relation_batch
+    )
     findings = (
+        *architecture_findings,
         *instruction_findings(context, manifest),
         *current_state_findings(context, manifest),
         *dependency_findings(manifest, changes),
     )
-    warnings = set((*manifest.warnings, *context.warnings))
+    warnings = set((*manifest.warnings, *context.warnings, *architecture_warnings))
     if changes.scope == ChangeScope.UNAVAILABLE:
         warnings.add(
             ScanWarning(
@@ -353,4 +367,151 @@ def integrity_overview(
         changes,
         tuple(sorted(findings, key=lambda f: (f.rule_id, f.code, f.affected_paths, f.id))),
         tuple(sorted(warnings, key=lambda w: (w.path or "", w.code, w.message))),
+        architecture=architecture,
+    )
+
+
+ARCHITECTURE_RULE = "architecture.forbid_relation.v1"
+
+
+def selector_matches(selector, entity=None, unresolved_name=None):
+    """OR within a selector side; unresolved targets match only explicit names."""
+    if unresolved_name is not None:
+        return unresolved_name in selector.names
+    if entity is None:
+        return False
+    return (
+        entity.path in selector.paths
+        or any(entity.path.startswith(prefix) for prefix in selector.path_prefixes)
+        or (entity.qualified_name is not None and entity.qualified_name in selector.symbols)
+    )
+
+
+def evaluate_architecture(manifest, batch):
+    """Judge explicit policy using descriptive facts, preserving all other domains."""
+    config = manifest.repository_config or RepositoryConfig()
+    if batch is not None:
+        if not isinstance(batch, EvidenceRelationBatch):
+            raise EvidenceProviderError("invalid_relation_batch")
+        snapshot = batch.state.snapshot
+        repo = manifest.repository
+        if (
+            snapshot.repository_id != repo.id
+            or (
+                snapshot.git_head is not None
+                and repo.git_head is not None
+                and snapshot.git_head != repo.git_head
+            )
+            or (
+                snapshot.git_dirty is not None
+                and repo.git_dirty is not None
+                and snapshot.git_dirty != repo.git_dirty
+            )
+        ):
+            raise EvidenceProviderError("snapshot_mismatch")
+    claims = (
+        {c.id: c for c in claims_overview(manifest).claims}
+        if config.architecture_invariants
+        else {}
+    )
+    findings, results, warnings = [], [], []
+    sources = {s.path: s for s in manifest.sources}
+    for invariant in sorted(config.architecture_invariants, key=lambda i: i.id):
+        claim = claims[invariant.claim_id]
+        caveats = []
+        if not claim.provenance_complete:
+            caveats.append("claim_provenance_incomplete")
+            warnings.append(
+                ScanWarning(
+                    "architecture_claim_provenance_incomplete",
+                    None,
+                    "Architecture policy claim dependencies are incomplete; "
+                    "explicit rules remain active.",
+                )
+            )
+        groups = {}
+        if batch is not None:
+            for relation in batch.relations:
+                if (
+                    relation.kind in invariant.relation_kinds
+                    and selector_matches(invariant.source, relation.source)
+                    and selector_matches(
+                        invariant.target, relation.target.entity, relation.target.name
+                    )
+                ):
+                    groups.setdefault(relation.identity(), []).append(relation)
+            # Conservative global coverage: no source-completeness proof is inferred
+            # from missing files, symbols, unresolved names or upstream scan warnings.
+            if batch.state.coverage.summary.incomplete:
+                caveats.append("structural_evidence_incomplete")
+        else:
+            caveats.append("relation_provider_not_selected")
+        ids = []
+        for key in sorted(groups):
+            identity = json.dumps(
+                (ARCHITECTURE_RULE, invariant.id, invariant.claim_id, key),
+                separators=(",", ":"),
+                ensure_ascii=True,
+            )
+            identifier = "finding_" + sha256(identity.encode()).hexdigest()[:32]
+            ids.append(identifier)
+            relations = tuple(sorted(groups[key], key=lambda r: r.sort_key()))
+            paths = {r.evidence_path for r in relations}
+            paths.update(r.target.entity.path for r in relations if r.target.entity)
+            policy_evidence = (
+                evidence("architecture_policy", ".context-integrity.toml", sources),
+                *(evidence("claim_dependency", d.path, sources) for d in claim.dependencies),
+            )
+            findings.append(
+                IntegrityFinding(
+                    identifier,
+                    ARCHITECTURE_RULE,
+                    "architecture_prohibited_relation",
+                    FindingSeverity.HIGH,
+                    "Observed prohibited architectural relation; "
+                    "see invariant, claim and structural evidence.",
+                    tuple(sorted(paths)),
+                    policy_evidence,
+                    invariant_id=invariant.id,
+                    claim_id=claim.id,
+                    relations=relations,
+                )
+            )
+        status = (
+            ArchitectureStatus.VIOLATED
+            if ids
+            else ArchitectureStatus.NOT_EVALUATED
+            if batch is None
+            else ArchitectureStatus.INCONCLUSIVE
+            if batch.state.coverage.summary.incomplete
+            else ArchitectureStatus.NO_VIOLATION_OBSERVED
+        )
+        results.append(
+            ArchitectureResult(
+                invariant.id,
+                claim.id,
+                status,
+                claim.provenance_complete,
+                tuple(sorted(ids)),
+                tuple(sorted(caveats)),
+                claim,
+                invariant,
+            )
+        )
+    if config.architecture_invariants and batch is None:
+        warnings.append(
+            ScanWarning(
+                "architecture_not_evaluated",
+                None,
+                "Architecture invariants were not evaluated; select a relation evidence provider.",
+            )
+        )
+    return (
+        ArchitectureOverview(
+            "evaluated" if batch else "not_evaluated",
+            batch.state if batch else None,
+            tuple(results),
+        ),
+        tuple(findings),
+        tuple(warnings),
     )

@@ -421,7 +421,7 @@ def test_cli_contract_flow_and_exits(contract_repo, tmp_path):
     )
     assert invalid.exit_code == 2 and "/secret/sentinel" not in invalid.output
     assert runner.invoke(app, ["contracts", "list", str(tmp_path / "missing")]).exit_code == 3
-    (contract_repo / ".context-integrity.toml").write_text("schema_version = 8")
+    (contract_repo / ".context-integrity.toml").write_text("schema_version = 9")
     assert runner.invoke(app, ["contracts", "list", root]).exit_code == 6
 
 

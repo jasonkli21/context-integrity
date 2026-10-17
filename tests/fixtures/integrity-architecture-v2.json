@@ -1,0 +1,206 @@
+{
+  "architecture": {
+    "coverage": {
+      "files": [
+        {
+          "path": "src/application/main.py",
+          "relation_status": "analyzed",
+          "symbol_status": "analyzed",
+          "syntax_errors": 0,
+          "unresolved": 0,
+          "unsupported": 0
+        }
+      ],
+      "incomplete": true,
+      "signals": {},
+      "warning_categories": []
+    },
+    "evaluation_status": "evaluated",
+    "invariants": [
+      {
+        "caveats": [
+          "claim_provenance_incomplete",
+          "structural_evidence_incomplete"
+        ],
+        "claim_id": "boundary",
+        "claim_provenance": {
+          "dependencies": [
+            {
+              "path": "docs/architecture.md",
+              "resolved": false,
+              "revision": null,
+              "source_id": null
+            }
+          ],
+          "path": ".context-integrity.toml",
+          "revision": {
+            "content_sha256": "ce7b2babce445d344ea9482fa715a72b9d1fe6ad79d77edcc9327804151eabbf",
+            "git_head": null,
+            "git_status": "unknown",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "source_id": "src_7e694ec93f57951651b00b1ed1b0a806",
+          "validity": "unverified"
+        },
+        "finding_ids": [
+          "finding_ca5b4b03313f0bff5f17e590ee8542ba"
+        ],
+        "invariant_id": "boundary",
+        "policy": {
+          "relation_kinds": [
+            "imports",
+            "references"
+          ],
+          "rule": "forbid_relation",
+          "source": {
+            "names": [],
+            "path_prefixes": [
+              "src/application/"
+            ],
+            "paths": [],
+            "symbols": []
+          },
+          "target": {
+            "names": [
+              "Storage"
+            ],
+            "path_prefixes": [],
+            "paths": [
+              "src/storage.py"
+            ],
+            "symbols": []
+          }
+        },
+        "provenance_complete": false,
+        "status": "violated"
+      }
+    ],
+    "observed_content": [],
+    "provider": {
+      "capabilities": [
+        "relations"
+      ],
+      "contract_version": 1,
+      "derivation": "provider-v1",
+      "id": "fixture",
+      "version": "1"
+    },
+    "snapshot": {
+      "command": "graph",
+      "git_dirty": null,
+      "git_head": null,
+      "provider_schema_version": 1,
+      "repository_id": "repo_fixture"
+    }
+  },
+  "change_set": {
+    "base_revision": null,
+    "changed_paths": [],
+    "derivation": "local_git",
+    "scope": "unavailable",
+    "target_revision": null
+  },
+  "config_sha256": "ce7b2babce445d344ea9482fa715a72b9d1fe6ad79d77edcc9327804151eabbf",
+  "findings": [
+    {
+      "affected_paths": [
+        "src/application/main.py",
+        "src/storage.py"
+      ],
+      "claim_id": "boundary",
+      "code": "architecture_prohibited_relation",
+      "dependency_id": null,
+      "evidence": [
+        {
+          "derivation": "inventory",
+          "path": ".context-integrity.toml",
+          "role": "architecture_policy",
+          "source_id": "src_7e694ec93f57951651b00b1ed1b0a806",
+          "source_revision": {
+            "content_sha256": "ce7b2babce445d344ea9482fa715a72b9d1fe6ad79d77edcc9327804151eabbf",
+            "git_head": null,
+            "git_status": "unknown",
+            "observed_revision_basis": "working_tree_content"
+          }
+        },
+        {
+          "derivation": "inventory",
+          "path": "docs/architecture.md",
+          "role": "claim_dependency",
+          "source_id": null,
+          "source_revision": null
+        }
+      ],
+      "id": "finding_ca5b4b03313f0bff5f17e590ee8542ba",
+      "invariant_id": "boundary",
+      "message": "Observed prohibited architectural relation; see invariant, claim and structural evidence.",
+      "relations": [
+        {
+          "derivation": "python_import_syntax",
+          "evidence_path": "src/application/main.py",
+          "kind": "imports",
+          "language": "python",
+          "range": {
+            "end": {
+              "byte": 10,
+              "column": 10,
+              "row": 0
+            },
+            "start": {
+              "byte": 0,
+              "column": 0,
+              "row": 0
+            }
+          },
+          "resolution": "exact_same_file_qualified_name",
+          "source": {
+            "kind": "file",
+            "language": null,
+            "name": null,
+            "path": "src/application/main.py",
+            "qualified_name": null,
+            "range": null,
+            "symbol_kind": null
+          },
+          "target": {
+            "entity": {
+              "kind": "file",
+              "language": null,
+              "name": null,
+              "path": "src/storage.py",
+              "qualified_name": null,
+              "range": null,
+              "symbol_kind": null
+            },
+            "name": null
+          }
+        }
+      ],
+      "rule_id": "architecture.forbid_relation.v1",
+      "severity": "high"
+    }
+  ],
+  "integrity_schema_version": 2,
+  "repository": {
+    "git": {
+      "available": false,
+      "dirty": null,
+      "head": null
+    },
+    "id": "repo_fixture",
+    "identity_basis": "local_fallback",
+    "name": "fixture"
+  },
+  "warnings": [
+    {
+      "code": "architecture_claim_provenance_incomplete",
+      "message": "Architecture policy claim dependencies are incomplete; explicit rules remain active.",
+      "path": null
+    },
+    {
+      "code": "change_evidence_unavailable",
+      "message": "Local change evidence unavailable; change-dependent checks skipped.",
+      "path": null
+    }
+  ]
+}

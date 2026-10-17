@@ -133,8 +133,10 @@ class EvidenceProviderDescriptor:
             not in {
                 ("context_candidates",),
                 ("context_candidates", "change_context"),
+                ("relations",),
+                ("context_candidates", "relations"),
+                ("context_candidates", "change_context", "relations"),
             }
-            or "context_candidates" not in self.capabilities
             or not isinstance(self.derivation, str)
             or not re.fullmatch(r"[a-z0-9_-]{1,80}", self.derivation)
         ):
@@ -178,7 +180,7 @@ class EvidenceRepositorySnapshot:
             or not self.repository_id
             or type(self.provider_schema_version) is not int
             or self.provider_schema_version != 1
-            or self.command != "context"
+            or self.command not in {"context", "graph"}
             or (
                 self.git_head is not None
                 and (
@@ -247,7 +249,9 @@ class EvidenceProviderState:
         }
         if (
             not isinstance(self.descriptor, EvidenceProviderDescriptor)
+            or "context_candidates" not in self.descriptor.capabilities
             or not isinstance(self.snapshot, EvidenceRepositorySnapshot)
+            or self.snapshot.command != "context"
             or not isinstance(self.coverage, EvidenceCoverage)
             or not isinstance(self.task, str)
             or not self.task.strip()

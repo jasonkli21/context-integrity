@@ -270,8 +270,9 @@ Codebase Intelligence Engine
         │
         └──────────────► Context Compiler
 
-Future richer relation/impact evidence may inform the Claim / Evidence Layer
-when a later phase defines a consumer and its policy.
+Phase 8 RelationEvidenceProvider -> Claim / Evidence Layer -> Integrity Engine
+consumes structural imports/references for explicit forbid_relation invariants.
+Impact consumers remain future work.
 ```
 
 ---
@@ -845,8 +846,9 @@ EvidenceProvider
 - context_candidates(...)
 ```
 
-Phase 7 implements only `context_candidates(request) -> batch` as a small Python Protocol.
-Other methods remain conceptual until a consumer requires them. See
+Phase 7 implements `context_candidates(request) -> batch` as a small Python Protocol.
+Phase 8 adds a separate `RelationEvidenceProvider.relations(request) -> batch` protocol,
+preserving existing replacement context providers. Other methods remain conceptual. See
 [`evidence-contract.md`](evidence-contract.md) for the implemented evidence contract v1.
 
 ## 8.1 Required Semantics
@@ -1295,7 +1297,7 @@ At minimum:
 
 ```text
 inventory_schema_version
-configuration_schema_version       # implemented through v7
+configuration_schema_version       # implemented through v8
 evidence_contract_version          # implemented v1
 compiled_context_schema_version    # implemented v3
 ```
@@ -1776,7 +1778,7 @@ The implemented integration contract is documented here:
 evidence-contract.md
 ```
 
-That document describes implemented abstractions; broader relation/impact consumers remain deferred.
+That document describes implemented context and relation abstractions; impact consumers remain deferred.
 
 ---
 
@@ -1825,6 +1827,23 @@ Do not require future agents to mine old session artifacts for important invaria
 
 # 36. Immediate Next Step
 
-Use `docs/current-state.md` for current verification and review status. Phase 7 provider
-integration is delivered for independent review. Architectural integrity is Phase 8; it
-requires a separately authorized active plan and must preserve the descriptive/policy split.
+Use `docs/current-state.md` for current verification and review status. Phase 8 architectural
+integrity implements explicit repository-owned policy over descriptive relation evidence.
+Fresh independent Phase 8 review is next; Phase 9 remains separately scoped.
+
+
+## Phase 8 architectural integrity boundary
+
+Strict config v8 adds typed `architecture_invariants`, each linked to an explicit architecture
+claim with `must_not_depend_on`. Literal path/prefix/symbol selectors and unresolved target
+names drive `forbid_relation`. `integrity.py` owns evaluation; the public Context Engine
+schema-v1 graph adapter only validates and normalizes facts. Numeric graph identities are
+removed before domain use. Provider acquisition reuses bounded subprocess controls.
+
+Integrity JSON v2 retains Phase 4 checks and adds explicit policy, claim provenance,
+provider/snapshot/coverage and grouped HIGH relation findings. Claims stay `unverified`.
+Absence yields `no_violation_observed`, `inconclusive` with conservative global coverage gaps,
+or `not_evaluated` without a provider. It never proves compliance. Dirty graph evidence lacks
+provider content identity; separate bounded local hashes are observations, not graph byte
+certification. The compiler and contracts remain separate. Durable semantics and limits:
+[`architecture-integrity-contract.md`](architecture-integrity-contract.md).

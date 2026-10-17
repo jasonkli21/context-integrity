@@ -10,6 +10,8 @@ from context_integrity.authority import effective_policies
 from context_integrity.lifecycle import validate_supersession
 from context_integrity.models import (
     SUPPORTED_CONFIG_SCHEMA_VERSIONS,
+    ArchitectureInvariant,
+    ArchitectureSelector,
     AuthorityClass,
     AuthorityPolicy,
     AuthorityTier,
@@ -76,7 +78,7 @@ def _path(value: object) -> str:
 
 
 def parse_config(data: bytes) -> RepositoryConfig:
-    """Parse strict schemas v1-v7; unknown keys fail closed."""
+    """Parse strict schemas v1-v8; unknown keys fail closed."""
     try:
         raw_root = tomllib.loads(data.decode("utf-8"))
         version = raw_root.get("schema_version")
@@ -88,7 +90,8 @@ def parse_config(data: bytes) -> RepositoryConfig:
             | ({"supersession"} if version >= 2 else set())
             | ({"claims"} if version >= 3 else set())
             | ({"instruction_policy", "drift_dependencies"} if version >= 4 else set())
-            | ({"context_contracts"} if version >= 5 else set()),
+            | ({"context_contracts"} if version >= 5 else set())
+            | ({"architecture_invariants"} if version >= 8 else set()),
         )
         digest = sha256(data).hexdigest()
         authority = _table(root.get("authority", {}), {"policies"})
@@ -268,6 +271,37 @@ def parse_config(data: bytes) -> RepositoryConfig:
             for r in c.rules
         ):
             raise ValueError("Unknown contract authority policy.")
+        invariants = []
+        selector_keys = {
+            "source_paths",
+            "source_path_prefixes",
+            "source_symbols",
+            "target_paths",
+            "target_path_prefixes",
+            "target_symbols",
+            "target_names",
+        }
+        for raw in _array(root.get("architecture_invariants", [])):
+            entry = _table(raw, {"id", "claim_id", "rule", "relation_kinds"} | selector_keys)
+
+            def selector(side, entry=entry):
+                return ArchitectureSelector(
+                    *(
+                        tuple(sorted(_text(v) for v in _array(entry.get(side + "_" + family, []))))
+                        for family in ("paths", "path_prefixes", "symbols", "names")
+                    )
+                )
+
+            invariants.append(
+                ArchitectureInvariant(
+                    _text(entry.get("id")),
+                    _text(entry.get("claim_id")),
+                    _text(entry.get("rule")),
+                    tuple(sorted(_text(v) for v in _array(entry.get("relation_kinds")))),
+                    selector("source"),
+                    selector("target"),
+                )
+            )
         return RepositoryConfig(
             tuple(policies),
             tuple(metadata),
@@ -278,6 +312,7 @@ def parse_config(data: bytes) -> RepositoryConfig:
             instruction_policy,
             tuple(sorted(dependencies, key=lambda d: d.id)),
             tuple(sorted(contracts, key=lambda c: c.id)),
+            tuple(sorted(invariants, key=lambda i: i.id)),
         )
     except (ValueError, TypeError, KeyError, RecursionError) as exc:
         # Parser exceptions can contain arbitrary repository text; keep errors path/body-free.

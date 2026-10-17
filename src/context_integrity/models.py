@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, NewType
 
 if TYPE_CHECKING:
     from context_integrity.evidence import EvidenceProviderState
+    from context_integrity.relations import EvidenceRelation, EvidenceRelationState
 
 SourceId = NewType("SourceId", str)
 ClaimId = NewType("ClaimId", str)
@@ -41,7 +42,7 @@ class SourceKind(StrEnum):
 PROVIDER_SOURCE_KINDS = frozenset(
     {SourceKind.SOURCE_CODE, SourceKind.TEST, SourceKind.SCHEMA, SourceKind.MIGRATION}
 )
-SUPPORTED_CONFIG_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7})
+SUPPORTED_CONFIG_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7, 8})
 
 
 class AuthorityClass(StrEnum):
@@ -216,6 +217,7 @@ class RepositoryConfig:
     instruction_policy: InstructionPolicySpec | None = None
     drift_dependencies: tuple[DriftDependencySpec, ...] = ()
     context_contracts: tuple[ContextContract, ...] = ()
+    architecture_invariants: tuple[ArchitectureInvariant, ...] = ()
 
     def __post_init__(self) -> None:
         if (
@@ -242,6 +244,30 @@ class RepositoryConfig:
             for kind in r.kinds
         ):
             raise ValueError("Provider source kinds require configuration schema v7.")
+        if not isinstance(self.architecture_invariants, tuple) or any(
+            not isinstance(i, ArchitectureInvariant) for i in self.architecture_invariants
+        ):
+            raise ValueError("Architecture invariants must be a typed tuple.")
+        if self.architecture_invariants and self.schema_version < 8:
+            raise ValueError("Architecture invariants require configuration schema v8.")
+        ids = [i.id for i in self.architecture_invariants]
+        if len(set(ids)) != len(ids):
+            raise ValueError("Duplicate architecture invariant ID.")
+        if self.architecture_invariants:
+            if not isinstance(self.claims, tuple) or any(
+                not isinstance(c, ClaimSpec) for c in self.claims
+            ):
+                raise ValueError("Architecture policy requires typed explicit claims.")
+            validate_unique_claim_ids(self.claims)
+        claims = {c.id: c for c in self.claims}
+        for invariant in self.architecture_invariants:
+            claim = claims.get(invariant.claim_id)
+            if (
+                claim is None
+                or claim.claim_type != "architecture_invariant"
+                or (claim.predicate != "must_not_depend_on")
+            ):
+                raise ValueError("Architecture invariant requires a compatible explicit claim.")
         contract_ids = [c.id for c in self.context_contracts]
         if len(set(contract_ids)) != len(contract_ids):
             raise ValueError("Duplicate contract ID.")
@@ -467,6 +493,102 @@ def _validate_integrity_path(path: str) -> None:
         raise ValueError("Path must be normalized and repository-relative.")
 
 
+@dataclass(frozen=True)
+class ArchitectureSelector:
+    paths: tuple[str, ...] = ()
+    path_prefixes: tuple[str, ...] = ()
+    symbols: tuple[str, ...] = ()
+    names: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        for values in (self.paths, self.path_prefixes, self.symbols, self.names):
+            if (
+                not isinstance(values, tuple)
+                or len(values) > 1024
+                or any(
+                    not isinstance(v, str)
+                    or not v
+                    or len(v) > 1024
+                    or any(ord(c) < 32 or 0xD800 <= ord(c) <= 0xDFFF for c in v)
+                    for v in values
+                )
+                or len(set(values)) != len(values)
+            ):
+                raise ValueError("Invalid architecture selector.")
+        if not any((self.paths, self.path_prefixes, self.symbols, self.names)):
+            raise ValueError("An architecture selector must be nonempty.")
+        for value in (*self.symbols, *self.names):
+            if value.startswith("/") or "\\" in value or re.match(r"^[A-Za-z]:/", value):
+                raise ValueError("Architecture identifiers cannot contain absolute path forms.")
+        for path in self.paths:
+            _validate_integrity_path(path)
+            if any(c in path for c in "*?[]\ufffd"):
+                raise ValueError("Architecture paths are literal.")
+        for prefix in self.path_prefixes:
+            if not prefix.endswith("/"):
+                raise ValueError("Directory prefixes must end in slash.")
+            _validate_integrity_path(prefix[:-1])
+            if any(c in prefix for c in "*?[]\ufffd"):
+                raise ValueError("Architecture prefixes are literal.")
+
+
+@dataclass(frozen=True)
+class ArchitectureInvariant:
+    id: str
+    claim_id: str
+    rule: str
+    relation_kinds: tuple[str, ...]
+    source: ArchitectureSelector
+    target: ArchitectureSelector
+
+    def __post_init__(self):
+        for value in (self.id, self.claim_id):
+            if not isinstance(value, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,127}", value):
+                raise ValueError("Invalid architecture invariant identifier.")
+        if (
+            self.rule != "forbid_relation"
+            or not isinstance(self.relation_kinds, tuple)
+            or (
+                not self.relation_kinds
+                or any(k not in {"imports", "references"} for k in self.relation_kinds)
+                or len(set(self.relation_kinds)) != len(self.relation_kinds)
+            )
+        ):
+            raise ValueError("Invalid architecture relation rule.")
+        if not isinstance(self.source, ArchitectureSelector) or not isinstance(
+            self.target, ArchitectureSelector
+        ):
+            raise ValueError("Architecture selectors must be typed.")
+        if self.source.names:
+            raise ValueError("Source names are not supported.")
+
+
+class ArchitectureStatus(StrEnum):
+    VIOLATED = "violated"
+    NO_VIOLATION_OBSERVED = "no_violation_observed"
+    INCONCLUSIVE = "inconclusive"
+    NOT_EVALUATED = "not_evaluated"
+
+
+@dataclass(frozen=True)
+class ArchitectureResult:
+    invariant_id: str
+    claim_id: str
+    status: ArchitectureStatus
+    provenance_complete: bool
+    finding_ids: tuple[str, ...] = ()
+    caveats: tuple[str, ...] = ()
+    claim: ClaimRecord | None = None
+    policy: ArchitectureInvariant | None = None
+
+
+@dataclass(frozen=True)
+class ArchitectureOverview:
+    evaluation_status: str = "not_evaluated"
+    state: EvidenceRelationState | None = None
+    invariants: tuple[ArchitectureResult, ...] = ()
+
+
 class FindingSeverity(StrEnum):
     HIGH = "high"
     MEDIUM = "medium"
@@ -507,6 +629,9 @@ class IntegrityFinding:
     affected_paths: tuple[str, ...]
     evidence: tuple[IntegrityEvidence, ...]
     dependency_id: str | None = None
+    invariant_id: str | None = None
+    claim_id: str | None = None
+    relations: tuple[EvidenceRelation, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -516,7 +641,8 @@ class IntegrityOverview:
     change_set: ChangeSet
     findings: tuple[IntegrityFinding, ...]
     warnings: tuple[ScanWarning, ...]
-    schema_version: int = 1
+    schema_version: int = 2
+    architecture: ArchitectureOverview = ArchitectureOverview()
 
 
 class IntegrityEvaluationStatus(StrEnum):

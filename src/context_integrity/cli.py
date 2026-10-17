@@ -21,6 +21,7 @@ from context_integrity.integrity import integrity_overview
 from context_integrity.inventory import inventory_repository
 from context_integrity.lifecycle import lifecycle_overview
 from context_integrity.models import AuthorityPolicy, InventoryManifest
+from context_integrity.relations import EvidenceRelationRequest
 from context_integrity.rendering import (
     render_authority_json,
     render_authority_text,
@@ -330,11 +331,25 @@ def check(
     diff: Annotated[str | None, typer.Option(help="Local two-commit range BASE..TARGET.")] = None,
     format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
     output: Annotated[Path | None, typer.Option()] = None,
+    evidence_provider: Annotated[str | None, typer.Option()] = None,
+    context_engine_bin: Annotated[str | None, typer.Option()] = None,
 ) -> None:
     """Evaluate deterministic integrity review signals; findings do not fail the command."""
+    if evidence_provider not in {None, "context-engine"}:
+        raise typer.BadParameter("Unknown evidence provider.")
+    if context_engine_bin is not None and evidence_provider is None:
+        raise typer.BadParameter("Evidence options require --evidence-provider.")
     context, manifest = load_inventory(path)
     try:
-        overview = integrity_overview(context, manifest, diff)
+        relations = None
+        if evidence_provider:
+            relations = ContextEngineProvider(context_engine_bin or "ctx").relations(
+                EvidenceRelationRequest(context.root, manifest.repository)
+            )
+        overview = integrity_overview(context, manifest, diff, relation_batch=relations)
+    except EvidenceProviderError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(7) from exc
     except ConfigurationError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(6) from exc

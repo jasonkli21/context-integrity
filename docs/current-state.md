@@ -1,62 +1,61 @@
 # Current State
 
 **Last updated:** 2026-10-16
-**Current phase:** Phase 7 — Codebase Intelligence EvidenceProvider Integration
-**Active plan:** `docs/plans/phase-7-implementation-plan.md`
-**Status:** Implemented and offline-verified; Phase 7 independent review findings addressed.
+**Current phase:** Phase 8 — Architectural Integrity
+**Active plan:** `docs/plans/phase-8-implementation-plan.md`
+**Status:** Implemented and offline-verified; fresh independent Phase 8 review required.
 
 ## Delivered
 
-- Phase 0–6 inventory, authority, lifecycle/supersession, explicit claims, deterministic
-  integrity checks, bound contracts and compiler selection semantics remain intact.
-  Earlier JSON v1 surfaces are unchanged; claim validity remains `unverified`.
-- Generic EvidenceProvider contract v1 and a local Context Engine CLI/schema-v1 JSON
-  adapter supply ranked, snapshot-scoped, body-free code/test/schema/migration candidates.
-  Root and known HEAD/dirty mismatches fail closed; full content is byte-validated and
-  SHA-256 hashed before body discard. Processes have finite time/output bounds and
-  sanitized typed errors. Unsafe/duplicate/colliding paths fail; lossy paths are omitted
-  with explicit coverage. No shared database, parser duplication or network is introduced.
-- Strict config v7 retains v1–v6 and adds four provider-backed contract kinds. Runtime
-  executable/provider settings stay outside repository config. Provider mode requires
-  explicit selection and a nonblank task; acquisition bytes and final contract bytes are
-  separate. Provider failure exits 7 without silently falling back to inventory alone.
-- One mixed compiler preserves exclusions, lifecycle, rule-scoped authority, maxima,
-  required-first coverage, exact feasibility repair, optional fill and unique byte counts.
-  Provider rank applies after policy equivalence; inventory documents receive no invented
-  relevance rank. Final validation uses the exact mixed universe, without mutating inventory.
-  Standalone `contracts validate` remains inventory-only.
-- Compiled-context JSON v3 and text expose origins, provider/version/ranker/query,
-  snapshot, coverage, relevance evidence, revisions and dependencies. Stable output omits
-  bodies, absolute roots, timestamps, raw stderr and index-local IDs. Provider completeness
-  stays separate from contract completeness; complete/incomplete contracts both exit 0.
+- Phases 0–7 inventory, authority, lifecycle/supersession, explicit claims, deterministic
+  drift checks, contracts and mixed context compilation remain intact. Claim validity
+  remains `unverified`; compiler/contract behavior and their output versions are unchanged.
+- Strict config v8 adds typed `architecture_invariants` linked to explicit architecture
+  claims with predicate `must_not_depend_on`. Literal path/prefix/symbol selectors and
+  unresolved target names drive `forbid_relation` for imports/references. Older schemas
+  reject the new key; direct construction validates version, selectors and claim linkage.
+- Separate replaceable `RelationEvidenceProvider` preserves Phase 7 context providers.
+  Context Engine public schema-v1 `ctx graph` supplies descriptive facts, normalized
+  without numeric graph identities. Envelope/root/known HEAD/dirty checks, safe paths,
+  typed ranges, referenced IDs and graph/file counts fail closed. Bounded subprocess
+  controls, sanitized failures, explicit coverage and body-free output remain mandatory.
+- `check` evaluates repository-owned policy and retains Phase 4 findings. Observed
+  prohibited edges produce grouped deterministic HIGH findings with claim/policy,
+  stable entities, occurrence ranges, provider/version/derivation, snapshot and coverage.
+  Results distinguish `violated`, `no_violation_observed`, `inconclusive` and `not_evaluated`.
+  Missing provenance dependencies remain visible without disabling explicit rules.
+- Integrity JSON v2 deliberately replaces v1, including legacy-only checks; other JSON
+  surfaces keep their versions. Explicit projectors omit bodies, absolute roots, raw
+  stderr, numeric graph IDs and timestamps. CLI provider/executable settings remain
+  runtime-only. Findings exit 0; provider failures exit 7. No task is needed for graph evidence.
 
 ## Verification
 
-`UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed after review fixes:
-Ruff lint, format and **850 tests**, Python 3.12.13/macOS. The focused Phase 7
-evidence/adapter/compiler/contracts/configuration/CLI suite passed; v3 inventory/mixed goldens
-and `git diff --check` passed. Fix details: `docs/implementation-reports/phase-7-review-fixes-report.md`.
-Real `ctx 0.1.0` / `file-ranker-v1` smokes passed for non-Git and clean Git/change fixtures,
-selecting documentation plus code with body-free output. Evidence:
-`docs/implementation-reports/phase-7-implementation-report.md`; durable boundary:
-`docs/evidence-contract.md`.
+`UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed:
+Ruff lint, formatting (**80 files**) and **958 tests**, Python 3.12.13/macOS.
+The focused architecture/graph suite passed **108 tests**. `git diff --check` passed.
+Existing local `ctx 0.1.0` clean/dirty Git fixture smokes each reported two prohibited
+relations with exit 0, explicit incomplete coverage, and no root/body leakage.
+Implementation evidence: `docs/implementation-reports/phase-8-implementation-report.md`.
+Durable semantics: `docs/architecture-integrity-contract.md` and `docs/evidence-contract.md`.
 
 ## Known limitations / findings
 
-Observations are sequential, not atomic. Unknown provider snapshot metadata remains
-explicit; acquired candidates carry individual content hashes. Provider shortlists and
-upstream syntax/relation/ranking limitations do not prove exhaustive code truth. Required
-repair retains its existing exact-search complexity; optional fill remains greedy. Overlapping
-rule policy remains conservative. POSIX execution was verified; cross-platform execution
-and independent architectural acceptance are not claimed.
+No observed violation is no compliance proof. Coverage is globally conservative: even
+apparently unrelated gaps can make an unviolated invariant inconclusive. Imports may
+remain unresolved; reference resolution is largely same-file syntax evidence, without
+compiler/type/dispatch semantics. Dirty/unknown graph snapshots lack provider content
+fingerprints and remain incomplete. Separate bounded local post-graph hashes identify
+local observations, not certified provider bytes; observations are sequential, not atomic.
+Definition range movement can change symbol edge identity. POSIX/macOS was locally
+verified; cross-platform execution and independent architectural acceptance are not claimed.
 
-The separately pending Phase 4 final independent verification remains pending. No
-architectural-integrity evaluation, graph policy, claim verification, generic contradictions,
-source-body bundling, token budgets, persistence, LLM, cross-repository support or CI
-enforcement is delivered.
+Phase 4 final independent verification and Phase 7 fresh independent review remain pending.
+No claim verification, generic contradiction engine, Phase 9 revalidation, source-body
+bundling, persistence, LLM, cross-repository policy or CI enforcement is delivered.
 
 ## Next expected step
 
-Independent Phase 7 review against the active plan and evidence contract, plus the separately
-pending Phase 4 verification. Phase 8 architectural integrity follows a separately authorized
-plan; structural evidence remains descriptive and Context Integrity owns its policy.
+Fresh independent Phase 8 review against the active plan, architecture, evidence contract,
+architecture-integrity contract, code/tests and material downstream seams. Phase 9 derived
+context revalidation remains separately scoped. Earlier pending reviews remain explicit.

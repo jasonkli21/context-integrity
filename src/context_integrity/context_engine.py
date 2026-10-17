@@ -1,6 +1,7 @@
 """Bounded local Context Engine schema-v1 transport; no policy or source-body storage."""
 
 import json
+import math
 import os
 import re
 import selectors
@@ -36,6 +37,7 @@ from context_integrity.models import (
     SourceRevision,
     make_source_id,
 )
+from context_integrity.relations import EvidenceRelationBatch, EvidenceRelationRequest
 
 MAX_STDOUT = 64 * 1024 * 1024
 MAX_STDERR = 64 * 1024
@@ -448,10 +450,57 @@ class ContextEngineProvider:
         stdout_limit: int = MAX_STDOUT,
         stderr_limit: int = MAX_STDERR,
     ):
-        if timeout <= 0 or stdout_limit <= 0 or stderr_limit <= 0:
+        if (
+            type(timeout) not in {int, float}
+            or not math.isfinite(timeout)
+            or timeout <= 0
+            or type(stdout_limit) is not int
+            or stdout_limit <= 0
+            or type(stderr_limit) is not int
+            or stderr_limit <= 0
+        ):
             raise ValueError("Provider process limits must be positive.")
         self.executable = executable
         self.timeout, self.stdout_limit, self.stderr_limit = timeout, stdout_limit, stderr_limit
+
+    def relations(self, request: EvidenceRelationRequest) -> EvidenceRelationBatch:
+        from context_integrity.graph_adapter import normalize_graph
+
+        version = _run(
+            [self.executable, "--version"],
+            self.timeout,
+            min(self.stdout_limit, 4096),
+            self.stderr_limit,
+        )
+        match = re.fullmatch(rb"ctx ([A-Za-z0-9_.+-]{1,80})\s*", version)
+        if match is None:
+            raise EvidenceProviderError("invalid_version")
+        descriptor = EvidenceProviderDescriptor(
+            "context-engine",
+            match[1].decode("ascii"),
+            capabilities=("relations",),
+            derivation="context-engine-cli-json-v1",
+        )
+        payload = _run(
+            [self.executable, "graph", str(request.repository_root.resolve()), "--format", "json"],
+            self.timeout,
+            self.stdout_limit,
+            self.stderr_limit,
+        )
+        batch = normalize_graph(payload, request, descriptor)
+        from context_integrity.acquisition import MAX_SOURCE_BYTES, read_source
+        from context_integrity.repository import RepositoryContext
+
+        context = RepositoryContext(request.repository_root, request.repository, {}, False, [])
+        remaining = 64 * 1024 * 1024
+        observed = []
+        for file in batch.state.coverage.files:
+            digest = None
+            if remaining >= MAX_SOURCE_BYTES:
+                remaining -= MAX_SOURCE_BYTES
+                _, digest, _ = read_source(context, file.path)
+            observed.append((file.path, digest))
+        return replace(batch, state=replace(batch.state, observed_content=tuple(observed)))
 
     def context_candidates(self, request: EvidenceContextRequest) -> EvidenceContextBatch:
         version = _run(

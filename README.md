@@ -408,9 +408,9 @@ usable `phase-N-implementation-report...` verification record; a plan or generic
 cannot substitute. Later numeric phase reports signal possible navigation lag. Report
 existence is evidence rather than proof of implementation correctness.
 
-Integrity JSON v1 is a separate projection (`integrity_schema_version: 1`) containing
+Integrity JSON v2 is a separate projection (`integrity_schema_version: 2`) containing
 repository identity, config hash, change scope and commit revisions, findings, affected
-paths, owned evidence, and warnings. It omits source bodies, timestamps, and absolute
+paths, owned evidence, warnings, and Phase 8 architecture state. It omits source bodies, timestamps, and absolute
 roots. Finding IDs are stable across content revisions when the rule, code, dependency
 ID, and affected paths stay the same. Findings never mutate authority, lifecycle,
 supersession, or claims; claim validity remains `unverified`.
@@ -724,3 +724,26 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md). Changes should preserve phase boundari
 ## License
 
 A license has not yet been selected. Select one before treating the repository as an open-source distribution.
+
+
+## Architectural integrity (configuration v8)
+
+Phase 8 adds explicit repository-owned `architecture_invariants`, linked to architecture
+claims with predicate `must_not_depend_on`. A `forbid_relation` rule selects source and target
+paths, literal directory prefixes, qualified symbols or unresolved target names, and reports
+observed prohibited imports/references as HIGH findings.
+
+```bash
+uv run context-integrity check . --evidence-provider context-engine --format json
+# Optional existing executable override:
+uv run context-integrity check . --evidence-provider context-engine --context-engine-bin /path/to/ctx
+```
+
+No task is required. `check` now emits integrity JSON v2, preserving Phase 4 checks and adding
+policy, claim linkage, provider provenance, coverage and structural evidence. Results explicitly
+say `violated`, `no_violation_observed`, `inconclusive` or `not_evaluated`. No observed edge is
+no compliance proof. Without a provider, configured invariants visibly remain unevaluated.
+Findings exit 0; provider failures exit 7. Claim validity remains `unverified`.
+
+See [architecture-integrity contract and config example](docs/architecture-integrity-contract.md)
+and [Phase 8 implementation evidence](docs/implementation-reports/phase-8-implementation-report.md).
