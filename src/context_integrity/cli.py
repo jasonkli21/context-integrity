@@ -9,13 +9,26 @@ from typing import Annotated
 import typer
 
 from context_integrity import __version__
-from context_integrity.acquisition import normalize_path
+from context_integrity.acquisition import is_context_candidate, normalize_path
 from context_integrity.authority import effective_policies, resolve_authority
 from context_integrity.claims import claims_overview
 from context_integrity.compiler import compile_context
 from context_integrity.configuration import ConfigurationError
 from context_integrity.context_engine import ContextEngineProvider
 from context_integrity.contracts import effective_contracts, resolve_contract, validate_contract
+from context_integrity.derived import (
+    capture_receipt,
+    check_receipt,
+    compiler_receipt,
+    render_result,
+)
+from context_integrity.derived_models import (
+    Derivation,
+    ReceiptError,
+    render_receipt,
+    render_receipt_text,
+)
+from context_integrity.derived_output import DerivedOutputError, output_path, write_outputs
 from context_integrity.evidence import EvidenceContextRequest, EvidenceProviderError
 from context_integrity.integrity import IntegrityEvaluationError, integrity_overview
 from context_integrity.inventory import inventory_repository
@@ -56,10 +69,16 @@ class OutputFormat(StrEnum):
     JSON = "json"
 
 
-def load_inventory(path: Path) -> tuple[RepositoryContext, InventoryManifest]:
+def load_inventory(
+    path: Path, *, bounded: bool = False
+) -> tuple[RepositoryContext, InventoryManifest]:
     try:
         context = discover_repository(path)
-        return context, inventory_repository(context)
+        return context, inventory_repository(
+            context,
+            max_observation_bytes=64 * 1024 * 1024 if bounded else None,
+            max_sources=4096 if bounded else None,
+        )
     except ConfigurationError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(6) from exc
@@ -457,12 +476,15 @@ def compile_command(
     budget_bytes: Annotated[int | None, typer.Option(min=1)] = None,
     format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
     output: Annotated[Path | None, typer.Option()] = None,
+    receipt_output: Annotated[Path | None, typer.Option()] = None,
     evidence_provider: Annotated[str | None, typer.Option()] = None,
     context_engine_bin: Annotated[str | None, typer.Option()] = None,
     evidence_budget_bytes: Annotated[int | None, typer.Option(min=1, max=16777216)] = None,
     evidence_change: Annotated[str | None, typer.Option()] = None,
 ) -> None:
     """Compile deterministic bounded context; incomplete results retain exit zero."""
+    if receipt_output is not None and (format != OutputFormat.JSON or output is None):
+        raise typer.BadParameter("--receipt-output requires --format json --output.")
     if evidence_provider not in {None, "context-engine"}:
         raise typer.BadParameter("Unknown evidence provider.")
     if evidence_provider is None and any(
@@ -471,7 +493,7 @@ def compile_command(
         raise typer.BadParameter("Evidence options require --evidence-provider.")
     if evidence_provider and (task is None or not task.strip()):
         raise typer.BadParameter("Provider compilation requires nonblank --task.")
-    context, manifest = load_inventory(path)
+    context, manifest = load_inventory(path, bounded=receipt_output is not None)
     try:
         contract = resolve_contract(manifest.repository_config, contract_id)
         evidence = None
@@ -501,7 +523,133 @@ def compile_command(
         if format == OutputFormat.JSON
         else render_compiled_context_text(compiled)
     )
-    _write_contract_output(rendered, output)
+    if receipt_output is not None:
+        try:
+            artifact_path = output_path(context.root, output)
+            receipt_path = output_path(context.root, receipt_output)
+            # New inventory candidates could change the very selection being pinned.
+            if is_context_candidate(artifact_path) or is_context_candidate(receipt_path):
+                raise DerivedOutputError(
+                    "Compiler receipt outputs must use non-inventory paths (for example .json)."
+                )
+            receipt = compiler_receipt(
+                context, manifest, compiled, artifact_path, rendered.encode()
+            )
+            forbidden = (
+                {s.path for s in manifest.sources}
+                | {p.path for p in receipt.dependencies}
+                | {".context-integrity.toml"}
+            )
+            write_outputs(
+                context.root,
+                (
+                    (artifact_path, rendered.encode()),
+                    (receipt_path, render_receipt(receipt).encode()),
+                ),
+                forbidden=forbidden,
+            )
+        except ReceiptError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(6) from exc
+        except DerivedOutputError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(4) from exc
+    else:
+        _write_contract_output(rendered, output)
+
+
+derived_app = typer.Typer(
+    help="Capture and recheck declared derived-context provenance.", no_args_is_help=True
+)
+app.add_typer(derived_app, name="derived")
+
+
+@derived_app.command("capture")
+def derived_capture(
+    artifact: Annotated[str, typer.Argument()],
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    artifact_id: Annotated[str, typer.Option("--id")] = "derived-context",
+    kind: Annotated[str, typer.Option()] = "summary",
+    derivation: Annotated[str, typer.Option()] = "manual",
+    producer: Annotated[str, typer.Option()] = "user",
+    producer_version: Annotated[str | None, typer.Option()] = None,
+    depends_on: Annotated[list[str] | None, typer.Option()] = None,
+    upstream_receipt: Annotated[list[str] | None, typer.Option()] = None,
+    receipt_output: Annotated[Path, typer.Option()] = ...,
+) -> None:
+    """Write an explicit receipt of actual artifact/input bytes; never replace a file."""
+    context, manifest = load_inventory(path, bounded=True)
+    try:
+        receipt_path = output_path(context.root, receipt_output)
+        if is_context_candidate(receipt_path):
+            raise DerivedOutputError(
+                "Receipt outputs must use non-inventory paths (for example .json)."
+            )
+        receipt = capture_receipt(
+            context,
+            manifest,
+            artifact,
+            artifact_id=artifact_id,
+            kind=kind,
+            derivation=Derivation(derivation, producer, producer_version),
+            depends_on=tuple(depends_on or ()),
+            upstream_receipts=tuple(upstream_receipt or ()),
+            receipt_path=receipt_path,
+        )
+        write_outputs(
+            context.root,
+            ((receipt_path, render_receipt(receipt).encode()),),
+            forbidden={
+                artifact,
+                ".context-integrity.toml",
+                *(depends_on or ()),
+                *(upstream_receipt or ()),
+            },
+        )
+    except ReceiptError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(6) from exc
+    except DerivedOutputError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(4) from exc
+    typer.echo(render_receipt_text(receipt), nl=False)
+    typer.echo(f"Receipt: {receipt_path}")
+
+
+@derived_app.command("check")
+def derived_check(
+    receipt: Annotated[str, typer.Argument()],
+    path: Annotated[Path, typer.Argument()] = Path("."),
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Recheck pinned inputs; leave artifact and receipt bytes untouched."""
+    try:
+        context = discover_repository(path)
+        result, inputs = check_receipt(context, receipt)
+        rendered = render_result(result, format == OutputFormat.JSON)
+        if output is None:
+            typer.echo(rendered, nl=False)
+        else:
+            report_path = output_path(context.root, output)
+            if is_context_candidate(report_path):
+                raise DerivedOutputError(
+                    "Report outputs must use non-inventory paths (for example .json)."
+                )
+            write_outputs(
+                context.root,
+                ((report_path, rendered.encode()),),
+                forbidden=inputs,
+            )
+    except RepositoryError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(3) from exc
+    except ReceiptError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(6) from exc
+    except DerivedOutputError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(4) from exc
 
 
 if __name__ == "__main__":

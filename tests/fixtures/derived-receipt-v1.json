@@ -1,0 +1,51 @@
+{
+  "artifact": {
+    "content_sha256": "d5e00f231d492b4a89bc4e77b07ac7ae1aa1c1a34dc5c730e84ff286a2655574",
+    "derivation": {
+      "kind": "model",
+      "producer": "agent",
+      "version": null
+    },
+    "id": "a",
+    "kind": "handoff",
+    "path": "docs/a.md"
+  },
+  "compilation": null,
+  "config_sha256": null,
+  "dependencies": [
+    {
+      "content_sha256": "3cdce1db3302a4620afaa8b941420de5b5fe53706434b48102c35bce70e76e75",
+      "derivation": null,
+      "metadata_sha256": "d64a8271efc0e8f637e3726177535c0a17a19c6b580e9cbf8d5c19316ad42cf3",
+      "observation_basis": "inventory",
+      "observed_authority": "operating_instruction",
+      "observed_lifecycle": "unknown",
+      "path": "AGENTS.md",
+      "provider_id": null,
+      "provider_version": null,
+      "source_id": "src_464090d845755467a0bab470c3eaa170"
+    },
+    {
+      "content_sha256": "e8c5671c923012d0d6f0070b25cfc11ef29a6fc347f0655666a1b7039be5fe50",
+      "derivation": null,
+      "metadata_sha256": "1729e26bd2e00b4784256c0afafb71a5de8a19b9aa5e04dcb769463c5c4300b3",
+      "observation_basis": "inventory",
+      "observed_authority": "architecture_product",
+      "observed_lifecycle": "unknown",
+      "path": "docs/architecture.md",
+      "provider_id": null,
+      "provider_version": null,
+      "source_id": "src_5a375ea085185caa766da154f8919e42"
+    }
+  ],
+  "derived_receipt_schema_version": 1,
+  "known_incomplete": false,
+  "provenance_scope": "declared",
+  "provider_context": [],
+  "repository": {
+    "git_dirty": true,
+    "git_head": null,
+    "id": "repo_117fc5264566c8adf434f3eb7d37b8df"
+  },
+  "upstream_receipts": []
+}

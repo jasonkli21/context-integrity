@@ -1,0 +1,18 @@
+{
+  "artifact_id": "a",
+  "artifact_path": "docs/a.md",
+  "derived_result_schema_version": 1,
+  "provenance_scope": "declared",
+  "reasons": [
+    {
+      "artifact_id": "a",
+      "code": "declared_inputs_not_semantic_validation",
+      "effect": "caveat",
+      "observed_sha256": null,
+      "path": "docs/a.md",
+      "pinned_sha256": null
+    }
+  ],
+  "receipts_observed": 1,
+  "status": "unchanged_observed_inputs"
+}

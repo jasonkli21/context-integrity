@@ -61,6 +61,11 @@ validation, coverage, mixed compiler semantics and safety limits.
 Implemented Phase 8 policy and relation-evidence boundary, source-selector applicability,
 coverage semantics, finding statuses, output guarantees and evaluation limits.
 
+### `derived-context-contract.md`
+
+Implemented Phase 9 receipt/result v1, explicit capture/check and compiler receipt workflows,
+transitive revalidation, status/coverage semantics, safe output lifecycle and resource bounds.
+
 ### `current-state.md`
 
 Short navigation/status snapshot.

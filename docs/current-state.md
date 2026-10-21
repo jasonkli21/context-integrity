@@ -1,69 +1,72 @@
 # Current State
 
 **Last updated:** 2026-10-21
-**Current phase:** Phase 8 — Architectural Integrity
-**Active plan:** `docs/plans/phase-8-implementation-plan.md`
-**Status:** Phase 8 review findings F8-001–F8-004 are fixed and offline-verified; fresh independent re-review remains pending.
+**Current phase:** Phase 9 — Derived Context Revalidation
+**Active plan:** `docs/plans/phase-9-implementation-plan.md`
+**Status:** Phase 9 implemented and offline-verified; independent review pending.
+Phase 8 remediation's fresh independent re-review remains pending.
 
 ## Delivered
 
-- Phases 0–7 inventory, authority, lifecycle/supersession, explicit claims, deterministic
-  drift checks, contracts and mixed context compilation remain intact. Claim validity
-  remains `unverified`; compiler/contract behavior and their output versions are unchanged.
-- Strict config v8 adds typed `architecture_invariants` linked to explicit architecture
-  claims with predicate `must_not_depend_on`. Literal path/prefix/symbol selectors and
-  unresolved target names drive `forbid_relation` for imports/references. Older schemas
-  reject the new key; direct construction validates version, selectors and claim linkage.
-- Separate replaceable `RelationEvidenceProvider` preserves Phase 7 context providers.
-  Context Engine public schema-v1 `ctx graph` supplies descriptive facts, normalized
-  without numeric graph identities. Envelope/root/known HEAD/dirty checks, safe paths,
-  typed ranges, entity inventory, relation endpoints and graph/file counts fail closed.
-  Resolved endpoints must be in the declared file coverage. Bounded subprocess controls,
-  sanitized failures, explicit coverage and body-free output remain mandatory.
-- `check` evaluates repository-owned policy and retains Phase 4 findings. Observed
-  prohibited edges produce grouped deterministic HIGH findings with claim/policy,
-  stable entities, occurrence ranges, provider/version/derivation, snapshot and coverage.
-  Unmatched source selectors report a count and caveat and yield `inconclusive`; a matched
-  source with no observed relation can yield `no_violation_observed` only with complete
-  global coverage. Results also distinguish `violated` and `not_evaluated`.
-  Missing provenance dependencies remain visible without disabling explicit rules.
-- Compiled selectors and entity/relation indexes bound policy matching. Config allows at most
-  128 invariants and 16,384 selector values; evaluation is capped at 250,000 counted work
-  entries and fails explicitly without partial results when the budget is exceeded.
-- Integrity JSON v2 deliberately replaces v1, including legacy-only checks; other JSON
-  surfaces keep their versions. Explicit projectors omit bodies, absolute roots, raw
-  stderr, numeric graph IDs and timestamps. CLI provider/executable settings remain
-  runtime-only. Findings exit 0; provider failures exit 7. No task is needed for graph evidence.
+- Phases 0–8 inventory, question-specific authority, lifecycle/supersession, explicit
+  claims, deterministic drift checks, contracts, mixed compilation and architectural
+  integrity remain intact. Claims stay `unverified`. Config v1–v8, compiled JSON v3,
+  integrity JSON v2 and the other existing projections retain their versions/behavior.
+- Standalone strict derived receipt v1 records actual artifact/source SHA256, effective
+  lifecycle/authority metadata, config absence/presence, declared derivation and pinned
+  upstream receipt/artifact identities. Explicit dependencies may include non-inventory
+  code. Constructors/decoder reject malformed/ambiguous fields and duplicate JSON keys.
+- `derived capture` explicitly writes a new sidecar; `derived check` reobserves pinned
+  inputs without refreshing them. Bounded memoized receipt DAGs propagate original source
+  changes and uncertainty through unchanged intermediate artifacts. HEAD movement alone
+  does not invalidate inputs; staged and unstaged edits are identified by content.
+- Additive `compile --receipt-output` requires saved JSON and pins typed inventory/provider
+  selections, effective contract/policies/budget, task digest, inventory selection universe,
+  compiler status/version and validated provider snapshot/coverage fingerprints. Provider
+  evidence is not re-queried: provider context remains inconclusive absent definite changes.
+- Result v1 reports `unchanged_observed_inputs`, `review_required`, or `inconclusive`, with
+  sorted reasons and explicit provenance caveats. Definite changes dominate while retaining
+  uncertainty. Byte equality proves neither semantic correctness nor exhaustive provenance.
+- New outputs are exclusive, repository-local, non-inventory paths with safe no-follow
+  parents. Both compile payloads are prepared before publication; ordinary failures roll
+  back. Cleanup/rollback failure is explicit. No hidden persistence, model/network call,
+  provider installation, auto-refresh, auto-fix or authority promotion is introduced.
 
 ## Verification
 
 `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed:
-Ruff lint, formatting (**83 files**) and **965 tests**, Python 3.12.13/macOS.
-The focused architecture/graph suite passed **115 tests**. `git diff --check` passed.
-Implementation evidence: `docs/implementation-reports/phase-8-implementation-report.md`;
-review-fix evidence: `docs/implementation-reports/phase-8-review-fixes-report.md`.
-Durable semantics: `docs/architecture-integrity-contract.md` and `docs/evidence-contract.md`.
+Ruff lint, formatting (**91 files**) and **1,067 tests**, Python 3.12.13/macOS.
+`UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 uv run pytest -q tests/test_derived.py tests/test_derived_cli.py`
+passed **102 tests**, including a linked Git worktree with staged/unstaged edits and a fake
+public provider-adapter CLI journey. `git diff --check` passed. No tests were skipped.
+
+Durable behavior: `docs/derived-context-contract.md`, `docs/evidence-contract.md`,
+`docs/architecture-integrity-contract.md`. Phase 9 evidence and plan deviations:
+`docs/implementation-reports/phase-9-implementation-report.md`.
+Phase 8 remediation evidence: `docs/implementation-reports/phase-8-review-fixes-report.md`.
 
 ## Known limitations / findings
 
-No observed violation is no compliance proof. Coverage is globally conservative: even
-apparently unrelated gaps can make an unviolated invariant inconclusive. Imports may
-remain unresolved; reference resolution is largely same-file syntax evidence, without
-compiler/type/dispatch semantics. Dirty/unknown graph snapshots lack provider content
-fingerprints and remain incomplete. Separate bounded local post-graph hashes identify
-local observations, not certified provider bytes; observations are sequential, not atomic.
-Definition range movement can change symbol edge identity. POSIX/macOS was locally
-verified; cross-platform execution and independent architectural acceptance are not claimed.
+Receipts are unauthenticated local declarations, not semantic truth or authority. Manual
+provenance closure is never proven. Provider ranking/coverage is not revalidated; inventory
+selection fingerprints are conservative and can flag unselected document changes. Unknown
+current inventory coverage is inconclusive. Observations are sequential, not atomic.
 
-Phase 4 final independent verification and Phase 7 fresh independent review remain pending.
-No claim verification, generic contradiction engine, Phase 9 revalidation, source-body
-bundling, persistence, LLM, cross-repository policy or CI enforcement is delivered.
-The evaluation work budget can reject very large normalized graphs/policies; it never silently
-skips configured checks. Phase 8 independent acceptance of the remediation remains pending.
+Files cap at 5 MiB; receipts at 1 MiB; DAGs cap at 128 receipt observations, 16 levels,
+256 direct sources and 16 parents per receipt. Graph and metadata inventory each have
+independent 64 MiB/4,096 observation ceilings. Receipt paths are printable ASCII; non-Git
+identity retains existing location-dependent fallback. Cross-platform operation is not
+claimed. Pair publication is not crash-atomic; process/power loss can leave orphaned files.
+
+Phase 8 retains conservative global graph coverage, syntax/resolution limitations and
+unknown/dirty snapshot caveats. No observed architecture violation is no compliance proof.
+Phase 4 final independent verification, Phase 7 fresh independent review and Phase 8 fresh
+independent re-review remain pending. Phase 9 independent acceptance has not been established.
+No semantic claim verification, generic contradiction engine, persistence, LLM, cross-repo
+policy, source-body bundling or CI enforcement is delivered.
 
 ## Next expected step
 
-Fresh independent re-review of the Phase 8 remediation against the active plan, architecture,
-evidence contract, architecture-integrity contract, code/tests and material downstream seams.
-Phase 9 derived context revalidation remains separately scoped. Earlier pending reviews remain
-explicit.
+Independent Phase 9 review against the active plan, durable contracts, code/tests and material
+compiler/provider seams. Keep the earlier pending reviews explicit; Phase 10 cross-repository
+work remains separately scoped.

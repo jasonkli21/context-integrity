@@ -3,7 +3,7 @@
 from collections import Counter
 from pathlib import Path
 
-from context_integrity.acquisition import enumerate_candidates, read_source
+from context_integrity.acquisition import MAX_SOURCE_BYTES, enumerate_candidates, read_source
 from context_integrity.classification import apply_authority_metadata, classify_source
 from context_integrity.configuration import CONFIG_PATH, load_config, verify_config_revision
 from context_integrity.lifecycle import apply_lifecycle_metadata, resolve_supersession
@@ -18,10 +18,15 @@ from context_integrity.models import (
     SourceRevision,
     make_source_id,
 )
-from context_integrity.repository import RepositoryContext, discover_repository
+from context_integrity.repository import RepositoryContext, RepositoryError, discover_repository
 
 
-def inventory_repository(context: RepositoryContext) -> InventoryManifest:
+def inventory_repository(
+    context: RepositoryContext,
+    *,
+    max_observation_bytes: int | None = None,
+    max_sources: int | None = None,
+) -> InventoryManifest:
     config = load_config(context)
     metadata = {m.path: m for m in config.source_metadata}
     sources = []
@@ -30,6 +35,9 @@ def inventory_repository(context: RepositoryContext) -> InventoryManifest:
     forced_config = config.content_sha256 is not None and CONFIG_PATH not in paths
     if config.content_sha256 is not None:
         paths.add(CONFIG_PATH)
+    if max_sources is not None and len(paths) > max_sources:
+        raise RepositoryError("Inventory observation budget exceeded.")
+    remaining = max_observation_bytes
     for path in sorted(paths):
         status = (
             context.statuses.get(path, GitFileStatus.TRACKED_CLEAN)
@@ -40,7 +48,18 @@ def inventory_repository(context: RepositoryContext) -> InventoryManifest:
             status = GitFileStatus.UNKNOWN
         if status == GitFileStatus.DELETED:
             continue
-        size, digest, skipped = read_source(context, path)
+        if remaining is not None and remaining <= 0:
+            raise RepositoryError("Inventory observation budget exceeded.")
+        bound = MAX_SOURCE_BYTES if remaining is None else min(MAX_SOURCE_BYTES, remaining)
+        size, digest, skipped = (
+            read_source(context, path)
+            if remaining is None
+            else read_source(context, path, max_bytes=bound)
+        )
+        if remaining is not None:
+            remaining -= min(size, bound) if size is not None else bound
+            if digest is None and bound < MAX_SOURCE_BYTES:
+                raise RepositoryError("Inventory observation budget exceeded.")
         if skipped:
             continue
         entry = metadata.get(path)

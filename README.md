@@ -10,11 +10,12 @@ Context Integrity is being built around the idea that:
 
 ## Status
 
-**Phase 7 EvidenceProvider integration implemented and offline-verified; independent review pending.**
+**Phase 9 derived-context revalidation implemented; independent review pending.**
+Phase 8 remediation is offline-verified; its independent re-review also remains pending.
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
 
-Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Explicit claims retain declaration and dependency revisions, with independent unverified validity. Deterministic integrity checks now surface structural instruction references, current-state navigation and delivery-evidence gaps, and explicit document review dependencies on changed paths. Repository-defined Context Contracts validate explicitly supplied source packages against metadata selectors and source-count constraints. The compiler selects a bounded context manifest from an explicit contract, applying lifecycle and rule-scoped authority policy before deterministic selection. Contradiction detection, architectural drift, and LLM-assisted analysis remain deferred.
+Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Explicit claims retain declaration and dependency revisions, with independent unverified validity. Deterministic integrity checks now surface structural instruction references, current-state navigation and delivery-evidence gaps, and explicit document review dependencies on changed paths. Repository-defined Context Contracts validate explicitly supplied source packages against metadata selectors and source-count constraints. The compiler selects a bounded context manifest from an explicit contract, applying lifecycle and rule-scoped authority policy before deterministic selection. Explicit architectural invariants now evaluate descriptive relation evidence with conservative coverage. Derived receipt v1 detects changes to declared summary/handoff/compiler inputs. Contradiction detection and LLM-assisted analysis remain deferred.
 
 See [`docs/current-state.md`](docs/current-state.md) for the exact current state.
 
@@ -48,7 +49,7 @@ Codebase / Context Intelligence Engine
 authoritative, compatible, or required?"
 ```
 
-Context Engine now supplies ranked code candidates through a versioned local CLI/JSON evidence boundary. Context Integrity applies authority, lifecycle, exclusions, contracts and budget policy. Architectural evaluation of structural evidence remains future work. See [the evidence contract](docs/evidence-contract.md).
+Context Engine now supplies ranked code candidates through a versioned local CLI/JSON evidence boundary. Context Integrity applies authority, lifecycle, exclusions, contracts and budget policy. Explicit architectural evaluation uses the separate relation adapter. See [the evidence contract](docs/evidence-contract.md) and [architecture integrity contract](docs/architecture-integrity-contract.md).
 
 The projects intentionally do **not** share a database or implementation lifecycle today.
 
@@ -82,8 +83,8 @@ The projects intentionally do **not** share a database or implementation lifecyc
 │   ├── architecture.md               # system boundaries and architecture invariants
 │   ├── current-state.md              # concise status snapshot
 │   ├── plans/
-│   │   ├── phase-0-implementation-plan.md … phase-6-implementation-plan.md
-│   │   └── phase-7-implementation-plan.md # current phase plan; see current-state.md
+│   │   ├── phase-0-implementation-plan.md … phase-8-implementation-plan.md
+│   │   └── phase-9-implementation-plan.md # current phase plan; see current-state.md
 │   ├── adr/                          # durable architectural decisions
 │   ├── implementation-reports/       # evidence of what an implementation session changed
 │   ├── reviews/                      # independent review findings
@@ -747,3 +748,20 @@ Findings exit 0; provider failures exit 7. Claim validity remains `unverified`.
 
 See [architecture-integrity contract and config example](docs/architecture-integrity-contract.md)
 and [Phase 8 implementation evidence](docs/implementation-reports/phase-8-implementation-report.md).
+
+## Derived context receipts
+
+Record known inputs explicitly, then recheck without changing the artifact or pins:
+
+```bash
+uv run context-integrity derived capture docs/handoff.md . \
+  --id handoff-a --kind handoff --derivation model --producer agent \
+  --depends-on AGENTS.md --receipt-output docs/handoff.provenance.json
+uv run context-integrity derived check docs/handoff.provenance.json . --format json
+```
+
+Saved JSON compiles optionally accept `--receipt-output docs/context.provenance.json`.
+Receipts report `unchanged_observed_inputs`, `review_required` or `inconclusive`; equality
+does not establish semantic correctness or exhaustive provenance. Provider context remains
+inconclusive without re-query. Outputs are explicit, repository-local and never overwrite
+existing files. See [the derived context contract](docs/derived-context-contract.md).

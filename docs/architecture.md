@@ -1302,6 +1302,8 @@ inventory_schema_version
 configuration_schema_version       # implemented through v8
 evidence_contract_version          # implemented v1
 compiled_context_schema_version    # implemented v3
+derived_receipt_schema_version     # implemented v1
+derived_result_schema_version      # implemented v1
 ```
 
 Version fields should represent semantic schema versions, not application build versions.
@@ -1831,7 +1833,8 @@ Do not require future agents to mine old session artifacts for important invaria
 
 Use `docs/current-state.md` for current verification and review status. Phase 8 architectural
 integrity implements explicit repository-owned policy over descriptive relation evidence.
-Fresh independent Phase 8 review is next; Phase 9 remains separately scoped.
+Phase 9 derived context revalidation is implemented; independent review is next.
+Fresh independent Phase 8 re-review remains separately pending.
 
 
 ## Phase 8 architectural integrity boundary
@@ -1849,3 +1852,23 @@ or `not_evaluated` without a provider. It never proves compliance. Dirty graph e
 provider content identity; separate bounded local hashes are observations, not graph byte
 certification. The compiler and contracts remain separate. Durable semantics and limits:
 [`architecture-integrity-contract.md`](architecture-integrity-contract.md).
+
+## Phase 9 derived context boundary
+
+Standalone receipt v1 records actual artifact/source bytes, effective inventory metadata,
+config absence/presence, declared upstream receipts and typed compiler selection context.
+It does not advance config v8, compiled JSON v3 or integrity JSON v2. `derived_models.py`
+owns strict declarations/projectors; `derived.py` separates bounded observations from pure
+comparison/status aggregation; `derived_output.py` owns explicit exclusive writes/rollback.
+Existing acquisition and inventory accept optional smaller observation budgets; old command
+defaults are unchanged.
+
+Receipt DAGs retain exact receipt/artifact pins and propagate original changed/unknown input
+reasons with bounded memoization. HEAD alone is explanatory, never an invalidation rule.
+Compiler selection context conservatively fingerprints the inventory universe, effective
+contract/policies, budget and task digest. Selected provider candidates retain derivation;
+local byte equality does not revalidate provider coverage/ranking, so provider context yields
+inconclusive absent a definite change. No semantic verification, authority promotion, hidden
+persistence, network/provider replay or automatic pin refresh is introduced. Ordinary output
+failures roll back prepared pairs; independent filesystem names have no crash-atomic commit.
+Exact semantics and limits: [derived context contract](derived-context-contract.md).

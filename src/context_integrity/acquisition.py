@@ -187,24 +187,33 @@ def enumerate_candidates(context: RepositoryContext) -> list[str]:
     return sorted(paths)
 
 
-def read_source(context: RepositoryContext, path: str) -> tuple[int | None, str | None, bool]:
-    return _read_source(context, path)
+def read_source(
+    context: RepositoryContext, path: str, *, max_bytes: int | None = None
+) -> tuple[int | None, str | None, bool]:
+    return _read_source(context, path, max_bytes=max_bytes)
 
 
-def read_source_bytes(context: RepositoryContext, path: str) -> bytes | None:
+def read_source_bytes(
+    context: RepositoryContext, path: str, *, max_bytes: int | None = None
+) -> bytes | None:
     """Capture bounded bytes through the same descriptor-safe boundary as inventory reads."""
     chunks: list[bytes] = []
-    _, digest, skipped = _read_source(context, path, chunks)
+    _, digest, skipped = _read_source(context, path, chunks, max_bytes=max_bytes)
     return b"".join(chunks) if digest is not None and not skipped else None
 
 
 def _read_source(
-    context: RepositoryContext, path: str, chunks: list[bytes] | None = None
+    context: RepositoryContext,
+    path: str,
+    chunks: list[bytes] | None = None,
+    *,
+    max_bytes: int | None = None,
 ) -> tuple[int | None, str | None, bool]:
     """Open each component relative to a directory FD, rejecting symlinks even during races.
 
     Returns size, digest, skipped. Body reads are bounded even if a file grows after stat.
     """
+    max_bytes = MAX_SOURCE_BYTES if max_bytes is None else min(max_bytes, MAX_SOURCE_BYTES)
     path = normalize_path(path)
     descriptors = []
     try:
@@ -233,7 +242,7 @@ def _read_source(
                 ScanWarning("candidate_metadata_failed", path, "Candidate is not a regular file.")
             )
             return metadata.st_size, None, False
-        if metadata.st_size > MAX_SOURCE_BYTES:
+        if metadata.st_size > max_bytes:
             context.warnings.append(
                 ScanWarning("source_too_large", path, "Candidate exceeds the 5 MiB read limit.")
             )
@@ -248,7 +257,7 @@ def _read_source(
                 )
             )
             return None, None, False
-        if opened.st_size > MAX_SOURCE_BYTES:
+        if opened.st_size > max_bytes:
             context.warnings.append(
                 ScanWarning("source_too_large", path, "Candidate exceeds the 5 MiB read limit.")
             )
@@ -256,9 +265,9 @@ def _read_source(
         digest = sha256()
         count = 0
         try:
-            while chunk := os.read(fd, min(65536, MAX_SOURCE_BYTES + 1 - count)):
+            while chunk := os.read(fd, min(65536, max_bytes + 1 - count)):
                 count += len(chunk)
-                if count > MAX_SOURCE_BYTES:
+                if count > max_bytes:
                     context.warnings.append(
                         ScanWarning(
                             "source_too_large", path, "Candidate grew beyond the 5 MiB limit."

@@ -149,4 +149,5 @@ Omitting the provider still runs Phase 4 checks and visibly marks configured inv
 `not_evaluated`. Provider failure exits 7; configuration errors exit 6. Findings exit 0, including
 HIGH violations. Text, JSON and output-file behavior remain supported. CI thresholds, waivers,
 positive dependency proofs, semantic contradiction reasoning, automatic fixes, persistence,
-cross-repository rules and Phase 9 revalidation are deferred.
+cross-repository rules remain deferred. Phase 9 revalidation is delivered separately in
+[the derived context contract](derived-context-contract.md).
