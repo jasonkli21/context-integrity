@@ -272,4 +272,14 @@ def _decode(payload, request, descriptor, unique_object, integer, boolean, revis
         coverage,
     )
     # Duplicate syntax occurrences with identical normalized facts add no information.
-    return EvidenceRelationBatch(state, tuple(sorted(set(relations), key=lambda r: r.sort_key())))
+    inventory = tuple(
+        sorted(
+            {entity for entity in entities.values() if entity is not None},
+            key=lambda entity: entity.identity(),
+        )
+    )
+    return EvidenceRelationBatch(
+        state,
+        tuple(sorted(set(relations), key=lambda r: r.sort_key())),
+        inventory,
+    )

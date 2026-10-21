@@ -43,6 +43,8 @@ PROVIDER_SOURCE_KINDS = frozenset(
     {SourceKind.SOURCE_CODE, SourceKind.TEST, SourceKind.SCHEMA, SourceKind.MIGRATION}
 )
 SUPPORTED_CONFIG_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4, 5, 6, 7, 8})
+MAX_ARCHITECTURE_INVARIANTS = 128
+MAX_ARCHITECTURE_SELECTOR_VALUES = 16_384
 
 
 class AuthorityClass(StrEnum):
@@ -248,6 +250,16 @@ class RepositoryConfig:
             not isinstance(i, ArchitectureInvariant) for i in self.architecture_invariants
         ):
             raise ValueError("Architecture invariants must be a typed tuple.")
+        if len(self.architecture_invariants) > MAX_ARCHITECTURE_INVARIANTS:
+            raise ValueError("Too many architecture invariants.")
+        selector_value_count = sum(
+            len(values)
+            for invariant in self.architecture_invariants
+            for selector in (invariant.source, invariant.target)
+            for values in (selector.paths, selector.path_prefixes, selector.symbols, selector.names)
+        )
+        if selector_value_count > MAX_ARCHITECTURE_SELECTOR_VALUES:
+            raise ValueError("Too many architecture selector values.")
         if self.architecture_invariants and self.schema_version < 8:
             raise ValueError("Architecture invariants require configuration schema v8.")
         ids = [i.id for i in self.architecture_invariants]
@@ -580,6 +592,7 @@ class ArchitectureResult:
     caveats: tuple[str, ...] = ()
     claim: ClaimRecord | None = None
     policy: ArchitectureInvariant | None = None
+    source_entity_count: int | None = None
 
 
 @dataclass(frozen=True)

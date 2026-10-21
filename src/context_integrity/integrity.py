@@ -2,6 +2,7 @@
 
 import json
 import re
+from bisect import bisect_left
 from hashlib import sha256
 from pathlib import PurePosixPath
 
@@ -34,6 +35,17 @@ INSTRUCTION_RULE = "instruction.canonical_reference.v1"
 NAVIGATION_RULE = "current_state.navigation.v1"
 DELIVERY_RULE = "current_state.delivery_evidence.v1"
 DEPENDENCY_RULE = "document_dependency.change_review.v1"
+MAX_ARCHITECTURE_EVALUATION_WORK = 250_000
+
+
+class IntegrityEvaluationError(Exception):
+    """Sanitized failure when explicit architecture evaluation exceeds its work budget."""
+
+    def __init__(self, code: str):
+        if code != "evaluation_budget_exceeded":
+            raise ValueError("Unsupported integrity evaluation error.")
+        self.code = code
+        super().__init__(f"Integrity evaluation failed ({code}).")
 
 
 def usable(source: SourceRecord) -> bool:
@@ -376,15 +388,50 @@ ARCHITECTURE_RULE = "architecture.forbid_relation.v1"
 
 def selector_matches(selector, entity=None, unresolved_name=None):
     """OR within a selector side; unresolved targets match only explicit names."""
+    return _selector_matches(_compile_selector(selector), entity, unresolved_name)
+
+
+def _compile_selector(selector):
+    return (
+        frozenset(selector.paths),
+        tuple(selector.path_prefixes),
+        frozenset(selector.symbols),
+        frozenset(selector.names),
+    )
+
+
+def _selector_matches(compiled, entity=None, unresolved_name=None):
     if unresolved_name is not None:
-        return unresolved_name in selector.names
+        return unresolved_name in compiled[3]
     if entity is None:
         return False
     return (
-        entity.path in selector.paths
-        or any(entity.path.startswith(prefix) for prefix in selector.path_prefixes)
-        or (entity.qualified_name is not None and entity.qualified_name in selector.symbols)
+        entity.path in compiled[0]
+        or entity.path.startswith(compiled[1])
+        or (entity.qualified_name is not None and entity.qualified_name in compiled[2])
     )
+
+
+def _select_source_entities(
+    selector, compiled, entities_by_path, sorted_paths, entities_by_symbol, charge
+):
+    selected = {}
+    for path in selector.paths:
+        for entity in entities_by_path.get(path, ()):
+            charge()
+            selected[entity.identity()] = entity
+    for prefix in compiled[1]:
+        index = bisect_left(sorted_paths, prefix)
+        while index < len(sorted_paths) and sorted_paths[index].startswith(prefix):
+            for entity in entities_by_path[sorted_paths[index]]:
+                charge()
+                selected[entity.identity()] = entity
+            index += 1
+    for symbol in selector.symbols:
+        for entity in entities_by_symbol.get(symbol, ()):
+            charge()
+            selected[entity.identity()] = entity
+    return tuple(selected[key] for key in sorted(selected))
 
 
 def evaluate_architecture(manifest, batch):
@@ -416,6 +463,30 @@ def evaluate_architecture(manifest, batch):
     )
     findings, results, warnings = [], [], []
     sources = {s.path: s for s in manifest.sources}
+    evaluation_work = 0
+
+    def charge_evaluation_work(amount=1):
+        nonlocal evaluation_work
+        evaluation_work += amount
+        if evaluation_work > MAX_ARCHITECTURE_EVALUATION_WORK:
+            raise IntegrityEvaluationError("evaluation_budget_exceeded")
+
+    entities_by_path = {}
+    entities_by_symbol = {}
+    source_relations = {}
+    sorted_paths = ()
+    if batch is not None and config.architecture_invariants:
+        for entity in batch.entities:
+            charge_evaluation_work()
+            entities_by_path.setdefault(entity.path, []).append(entity)
+            if entity.qualified_name is not None:
+                entities_by_symbol.setdefault(entity.qualified_name, []).append(entity)
+        sorted_paths = tuple(sorted(entities_by_path))
+        for relation in batch.relations:
+            charge_evaluation_work()
+            source_relations.setdefault(relation.source.identity(), {}).setdefault(
+                relation.kind, []
+            ).append(relation)
     for invariant in sorted(config.architecture_invariants, key=lambda i: i.id):
         claim = claims[invariant.claim_id]
         caveats = []
@@ -430,16 +501,28 @@ def evaluate_architecture(manifest, batch):
                 )
             )
         groups = {}
+        source_entity_count = None
         if batch is not None:
-            for relation in batch.relations:
-                if (
-                    relation.kind in invariant.relation_kinds
-                    and selector_matches(invariant.source, relation.source)
-                    and selector_matches(
-                        invariant.target, relation.target.entity, relation.target.name
-                    )
-                ):
-                    groups.setdefault(relation.identity(), []).append(relation)
+            source_entities = _select_source_entities(
+                invariant.source,
+                _compile_selector(invariant.source),
+                entities_by_path,
+                sorted_paths,
+                entities_by_symbol,
+                charge_evaluation_work,
+            )
+            source_entity_count = len(source_entities)
+            if source_entity_count == 0:
+                caveats.append("source_selector_unmatched")
+            compiled_target = _compile_selector(invariant.target)
+            for entity in source_entities:
+                for kind in invariant.relation_kinds:
+                    for relation in source_relations.get(entity.identity(), {}).get(kind, ()):
+                        charge_evaluation_work()
+                        if _selector_matches(
+                            compiled_target, relation.target.entity, relation.target.name
+                        ):
+                            groups.setdefault(relation.identity(), []).append(relation)
             # Conservative global coverage: no source-completeness proof is inferred
             # from missing files, symbols, unresolved names or upstream scan warnings.
             if batch.state.coverage.summary.incomplete:
@@ -483,7 +566,7 @@ def evaluate_architecture(manifest, batch):
             else ArchitectureStatus.NOT_EVALUATED
             if batch is None
             else ArchitectureStatus.INCONCLUSIVE
-            if batch.state.coverage.summary.incomplete
+            if source_entity_count == 0 or batch.state.coverage.summary.incomplete
             else ArchitectureStatus.NO_VIOLATION_OBSERVED
         )
         results.append(
@@ -496,6 +579,7 @@ def evaluate_architecture(manifest, batch):
                 tuple(sorted(caveats)),
                 claim,
                 invariant,
+                source_entity_count,
             )
         )
     if config.architecture_invariants and batch is None:

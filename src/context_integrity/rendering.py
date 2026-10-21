@@ -754,10 +754,15 @@ def render_integrity_text(overview: IntegrityOverview) -> str:
             "no_violation_observed": (
                 "No matching prohibited relation observed; absence is no compliance proof."
             ),
-            "inconclusive": "No violation observed, but structural evidence is incomplete.",
+            "inconclusive": (
+                "No violation observed; the source scope was unmatched or structural evidence "
+                "is incomplete."
+            ),
             "not_evaluated": "No relation evidence provider selected; invariant was not checked.",
         }
         lines.append("    " + explanations[result.status.value])
+        if result.source_entity_count is not None:
+            lines.append(f"    Source entities matched: {result.source_entity_count}")
         if result.policy:
             lines.append(
                 f"    Rule: {result.policy.rule}; "
@@ -1199,6 +1204,7 @@ def _architecture(architecture):
                 if r.policy
                 else None,
                 "provenance_complete": r.provenance_complete,
+                "source_entity_count": r.source_entity_count,
                 "finding_ids": list(r.finding_ids),
                 "caveats": list(r.caveats),
                 "claim_provenance": {

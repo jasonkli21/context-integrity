@@ -17,7 +17,7 @@ from context_integrity.configuration import ConfigurationError
 from context_integrity.context_engine import ContextEngineProvider
 from context_integrity.contracts import effective_contracts, resolve_contract, validate_contract
 from context_integrity.evidence import EvidenceContextRequest, EvidenceProviderError
-from context_integrity.integrity import integrity_overview
+from context_integrity.integrity import IntegrityEvaluationError, integrity_overview
 from context_integrity.inventory import inventory_repository
 from context_integrity.lifecycle import lifecycle_overview
 from context_integrity.models import AuthorityPolicy, InventoryManifest
@@ -348,6 +348,9 @@ def check(
             )
         overview = integrity_overview(context, manifest, diff, relation_batch=relations)
     except EvidenceProviderError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(7) from exc
+    except IntegrityEvaluationError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(7) from exc
     except ConfigurationError as exc:

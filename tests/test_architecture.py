@@ -77,21 +77,28 @@ def setup(tmp_path, config=CONFIG):
     return context, manifest
 
 
-def batch(manifest, relations=(), incomplete=False):
+def batch(manifest, relations=(), incomplete=False, source_paths=None):
+    relations = tuple(sorted(set(relations), key=lambda r: r.sort_key()))
+    paths = {r.source.path for r in relations}
+    paths.update(r.target.entity.path for r in relations if r.target.entity is not None)
+    paths.update(source_paths if source_paths is not None else ("src/application/main.py",))
     files = tuple(
         EvidenceRelationFileState(
             p,
             "analyzed",
             "analyzed",
-            unresolved=sum(
-                r.source.path == p and r.target.name is not None for r in set(relations)
-            ),
+            unresolved=sum(r.source.path == p and r.target.name is not None for r in relations),
         )
-        for p in sorted({r.source.path for r in relations} | {"src/application/main.py"})
+        for p in sorted(paths)
     )
     coverage = EvidenceRelationCoverage(
         EvidenceCoverage((), incomplete or any(f.incomplete for f in files)), files
     )
+    entities = {EvidenceEntity("file", path) for path in paths}
+    for item in relations:
+        entities.add(item.source)
+        if item.target.entity is not None:
+            entities.add(item.target.entity)
     return EvidenceRelationBatch(
         EvidenceRelationState(
             DESCRIPTOR,
@@ -103,7 +110,8 @@ def batch(manifest, relations=(), incomplete=False):
             ),
             coverage,
         ),
-        tuple(sorted(set(relations), key=lambda r: r.sort_key())),
+        relations,
+        tuple(sorted(entities, key=lambda entity: entity.identity())),
     )
 
 
@@ -126,6 +134,30 @@ def test_config_valid_and_direct_construction():
         replace(config, architecture_invariants=config.architecture_invariants * 2)
     with pytest.raises(ValueError):
         RepositoryConfig(schema_version=8, architecture_invariants=({},))
+    expanded = tuple(
+        replace(config.architecture_invariants[0], id=f"boundary-{index}") for index in range(129)
+    )
+    with pytest.raises(ValueError, match="Too many architecture invariants"):
+        replace(config, architecture_invariants=expanded)
+    source = ArchitectureSelector(
+        paths=tuple(f"src/source-{index}.py" for index in range(1024)),
+        path_prefixes=tuple(f"src/package-{index}/" for index in range(1024)),
+        symbols=tuple(f"Source{index}.run" for index in range(1024)),
+    )
+    target = ArchitectureSelector(
+        paths=tuple(f"src/target-{index}.py" for index in range(1024)),
+        path_prefixes=tuple(f"src/storage-{index}/" for index in range(1024)),
+        symbols=tuple(f"Target{index}.run" for index in range(1024)),
+        names=tuple(f"Target{index}" for index in range(1024)),
+    )
+    broad = tuple(
+        replace(
+            config.architecture_invariants[0], id=f"broad-{index}", source=source, target=target
+        )
+        for index in range(3)
+    )
+    with pytest.raises(ValueError, match="Too many architecture selector values"):
+        replace(config, architecture_invariants=broad)
 
 
 @pytest.mark.parametrize(
@@ -257,6 +289,44 @@ def test_absence_language_and_incompleteness(tmp_path, incomplete, status):
     assert all(word not in rendered for word in ('"compliant"', '"satisfied"', '"pass"'))
 
 
+def test_unmatched_source_selector_is_inconclusive(tmp_path):
+    context, manifest = setup(tmp_path)
+    result = integrity_overview(
+        context,
+        manifest,
+        relation_batch=batch(manifest, source_paths=("src/application_old/main.py",)),
+    )
+    invariant = result.architecture.invariants[0]
+    assert invariant.status == "inconclusive"
+    assert invariant.source_entity_count == 0
+    assert "source_selector_unmatched" in invariant.caveats
+    rendered = json.loads(render_integrity_json(result))["architecture"]["invariants"][0]
+    assert rendered["source_entity_count"] == 0
+    assert "source_selector_unmatched" in rendered["caveats"]
+
+
+def test_source_present_without_relations_is_observed_scope(tmp_path):
+    context, manifest = setup(tmp_path)
+    result = integrity_overview(context, manifest, relation_batch=batch(manifest))
+    invariant = result.architecture.invariants[0]
+    assert invariant.status == "no_violation_observed"
+    assert invariant.source_entity_count == 1
+    assert "source_selector_unmatched" not in invariant.caveats
+
+
+def test_missing_source_symbol_is_inconclusive(tmp_path):
+    symbol_config = CONFIG.replace(
+        'source_path_prefixes = ["src/application/"]',
+        'source_symbols = ["Application.missing"]',
+    )
+    context, manifest = setup(tmp_path, symbol_config)
+    result = integrity_overview(context, manifest, relation_batch=batch(manifest))
+    invariant = result.architecture.invariants[0]
+    assert invariant.status == "inconclusive"
+    assert invariant.source_entity_count == 0
+    assert "source_selector_unmatched" in invariant.caveats
+
+
 def test_grouping_distinct_edges_and_stability(tmp_path):
     context, manifest = setup(tmp_path)
     first = relation()
@@ -296,6 +366,75 @@ def test_relation_kind_and_source_filtering(tmp_path):
         ),
     )
     assert not result.findings
+
+
+def test_target_prefix_boundary_and_same_name_entities(tmp_path):
+    config = CONFIG.replace(
+        'target_paths = ["src/storage.py"]',
+        'target_path_prefixes = ["src/storage/"]',
+    )
+    context, manifest = setup(tmp_path, config)
+    observed = batch(
+        manifest,
+        (
+            relation(target="src/storage_old/a.py"),
+            relation(target="src/storage/a.py"),
+            relation(target="src/storage/b.py"),
+        ),
+    )
+    result = integrity_overview(context, manifest, relation_batch=observed)
+    assert len(result.findings) == 2
+    assert {f.relations[0].target.entity.path for f in result.findings} == {
+        "src/storage/a.py",
+        "src/storage/b.py",
+    }
+
+
+def test_target_symbol_selector_matches_resolved_symbol(tmp_path):
+    config = CONFIG.replace(
+        'target_paths = ["src/storage.py"]',
+        'target_symbols = ["Storage.read"]',
+    )
+    context, manifest = setup(tmp_path, config)
+    target = EvidenceEntity(
+        "symbol", "src/application/main.py", "Storage.read", "read", "method", "python", SPAN
+    )
+    edge = replace(
+        relation("references"),
+        target=EvidenceRelationTarget(entity=target),
+        resolution="exact_same_file_qualified_name",
+    )
+    result = integrity_overview(context, manifest, relation_batch=batch(manifest, (edge,)))
+    assert result.architecture.invariants[0].status == "violated"
+
+
+def test_generic_batch_rejects_resolved_target_outside_entity_inventory(tmp_path):
+    _, manifest = setup(tmp_path)
+    observed = batch(manifest, (relation(),))
+    malformed = replace(
+        observed.relations[0],
+        target=EvidenceRelationTarget(entity=EvidenceEntity("file", "src/phantom.py")),
+    )
+    with pytest.raises(ValueError, match="Resolved targets require inventoried entities"):
+        replace(observed, relations=(malformed,))
+
+
+def test_evaluation_budget_failure_is_explicit_and_never_partial(tmp_path, monkeypatch):
+    import context_integrity.integrity as integrity_module
+
+    context, manifest = setup(tmp_path)
+    observed = batch(manifest, (relation(), relation(source="src/application/other.py")))
+    invariant = manifest.repository_config.architecture_invariants[0]
+    expanded = tuple(replace(invariant, id=f"boundary-{index}") for index in range(3))
+    manifest = replace(
+        manifest,
+        repository_config=replace(manifest.repository_config, architecture_invariants=expanded),
+    )
+    monkeypatch.setattr(integrity_module, "MAX_ARCHITECTURE_EVALUATION_WORK", 7)
+    with pytest.raises(
+        integrity_module.IntegrityEvaluationError, match="evaluation_budget_exceeded"
+    ):
+        integrity_overview(context, manifest, relation_batch=observed)
 
 
 def test_no_provider_visible_and_existing_checks(tmp_path):

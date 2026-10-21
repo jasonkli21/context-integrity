@@ -56,6 +56,11 @@ Use for:
 Implemented EvidenceProvider v1 boundary, Context Engine CLI transport, snapshot/content
 validation, coverage, mixed compiler semantics and safety limits.
 
+### `architecture-integrity-contract.md`
+
+Implemented Phase 8 policy and relation-evidence boundary, source-selector applicability,
+coverage semantics, finding statuses, output guarantees and evaluation limits.
+
 ### `current-state.md`
 
 Short navigation/status snapshot.

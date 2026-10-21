@@ -325,24 +325,41 @@ class EvidenceRelationState:
 class EvidenceRelationBatch:
     state: EvidenceRelationState
     relations: tuple[EvidenceRelation, ...]
+    entities: tuple[EvidenceEntity, ...]
 
     def __post_init__(self):
         if (
             not isinstance(self.state, EvidenceRelationState)
             or not isinstance(self.relations, tuple)
             or any(not isinstance(r, EvidenceRelation) for r in self.relations)
+            or not isinstance(self.entities, tuple)
+            or any(not isinstance(e, EvidenceEntity) for e in self.entities)
         ):
             raise ValueError("Invalid relation batch.")
         keys = [r.sort_key() for r in self.relations]
         if keys != sorted(set(keys)):
             raise ValueError("Relations must be unique and sorted.")
+        entity_keys = [e.identity() for e in self.entities]
+        if entity_keys != sorted(set(entity_keys)):
+            raise ValueError("Entities must be unique and sorted.")
+        paths = {f.path for f in self.state.coverage.files}
+        file_paths = [e.path for e in self.entities if e.kind == "file"]
+        if file_paths != sorted(paths) or any(e.path not in paths for e in self.entities):
+            raise ValueError("Entity inventory must agree with file coverage.")
+        entity_ids = set(entity_keys)
         unresolved = {}
         for relation in self.relations:
+            if relation.source.identity() not in entity_ids:
+                raise ValueError("Relations require inventoried source entities.")
+            if (
+                relation.target.entity is not None
+                and relation.target.entity.identity() not in entity_ids
+            ):
+                raise ValueError("Resolved targets require inventoried entities.")
             if relation.target.name is not None:
                 unresolved[relation.source.path] = unresolved.get(relation.source.path, 0) + 1
         if any(unresolved.get(f.path, 0) > f.unresolved for f in self.state.coverage.files):
             raise ValueError("Unresolved relations must remain visible in file coverage.")
-        paths = {f.path for f in self.state.coverage.files}
         if any(r.source.path not in paths for r in self.relations):
             raise ValueError("Relations require file coverage.")
 

@@ -1136,7 +1136,9 @@ Findings are deterministic review signals with owned path/source/revision eviden
 do not mutate authority, lifecycle, supersession, or claim validity. A changed dependent
 suppresses only the simple upstream-without-dependent-change signal. Implementation report
 existence supplies delivery evidence, never infallible proof; plans and generic reviews do
-not satisfy this check. Integrity JSON v1 is separate from existing public projections.
+not satisfy this check. Phase 4 originally introduced integrity JSON v1 alongside the other
+public projections; Phase 8 advances the integrity surface to v2 (see the
+[Phase 8 boundary](#phase-8-architectural-integrity-boundary)).
 
 Rules should prefer deterministic evaluation.
 

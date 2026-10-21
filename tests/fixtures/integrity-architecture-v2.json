@@ -9,6 +9,14 @@
           "syntax_errors": 0,
           "unresolved": 0,
           "unsupported": 0
+        },
+        {
+          "path": "src/storage.py",
+          "relation_status": "analyzed",
+          "symbol_status": "analyzed",
+          "syntax_errors": 0,
+          "unresolved": 0,
+          "unsupported": 0
         }
       ],
       "incomplete": true,
@@ -72,6 +80,7 @@
           }
         },
         "provenance_complete": false,
+        "source_entity_count": 1,
         "status": "violated"
       }
     ],

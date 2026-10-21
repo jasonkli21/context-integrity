@@ -59,6 +59,13 @@ observation. Typed results in `relations.py` contain stable file/symbol entities
 or unresolved name targets, import/reference facts, source points/ranges, resolution, language,
 derivation, provider descriptor, root-free snapshot and coverage/file states.
 
+The normalized entity inventory is exhaustive for the provider's declared graph snapshot:
+every covered path has exactly one file entity; symbols belong to one of those paths; every
+relation source and resolved target must appear in that inventory. `coverage.files` therefore
+means all indexed file entities, including files with no relations. Unresolved names are not
+invented as entities. These checks belong to `EvidenceRelationBatch`, so replacement providers
+follow the same endpoint contract as Context Engine.
+
 The Context Engine adapter consumes **schema-v1 `ctx graph ROOT --format json`**, preceded by
 bounded `ctx --version`. It uses the same finite, no-shell, closed-stdin subprocess runner as
 context acquisition (30 seconds per invocation; 64 MiB stdout / 64 KiB stderr; version stdout
@@ -87,15 +94,31 @@ A matching prohibited edge produces a HIGH finding. Results distinguish:
 | Status | Meaning |
 | --- | --- |
 | `violated` | One or more prohibited structural edges were observed. |
-| `no_violation_observed` | No matching edge appeared in evidence without reported material gaps; this is no architecture compliance proof. |
-| `inconclusive` | No matching edge appeared, but structural evidence is incomplete. |
+| `no_violation_observed` | No matching edge appeared, at least one normalized source entity matched the selector, and coverage reports no material gaps; this is no architecture compliance proof. |
+| `inconclusive` | No matching edge appeared, but coverage is incomplete or no normalized source entity matched the selector. |
 | `not_evaluated` | No relation provider was selected; the explicit invariant was not checked. |
+
+Each evaluated invariant reports `source_entity_count`, the number of normalized file/symbol
+entities selected by its source selector. A zero count adds the `source_selector_unmatched`
+caveat and yields `inconclusive`, even when graph coverage otherwise appears complete. This makes
+misspelled, renamed, or absent policy scopes visible without treating a relation as proof that a
+source exists. A source entity can match even when it has no relations; such a result may be
+`no_violation_observed` only when global structural coverage is complete. Missing source symbols
+and unavailable symbol analysis remain subject to the same conservative coverage rule.
 
 Phase 8 deliberately uses **global conservative coverage**: any reported graph/file gap can
 make every otherwise unviolated invariant inconclusive, even if it appears unrelated. It does
 not attempt to prove gaps irrelevant using missing graph facts. Violations remain valid despite
 coverage gaps. Unknown/unsupported languages, skipped files, syntax recovery, unresolved imports
 and conservative same-file reference resolution are structural limitations, not policy judgments.
+
+Evaluation compiles selector membership sets once and indexes source entities by path/qualified
+symbol and relations by source entity/relation kind. Configuration accepts at most 128
+invariants and 16,384 selector values across them. One evaluation is capped at 250,000
+entity/relation index entries, source-entity selector visits and candidate relation/target
+checks. Exceeding that deterministic work budget fails with `evaluation_budget_exceeded` (CLI
+exit 7); it does not omit checks or return partial results. These limits bound policy matching
+after graph acquisition; they do not certify provider runtime or semantic completeness.
 
 Occurrences group by relation kind and stable source/target entity descriptors. Entity kind,
 path, qualified name, symbol kind/language and symbol definition range distinguish entities;
