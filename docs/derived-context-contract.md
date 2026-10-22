@@ -21,6 +21,11 @@ uv run context-integrity derived check docs/handoff.provenance.json . --format j
 outside the documentation inventory. `--producer-version` is optional. Kind defaults to
 `summary`, derivation to `manual`, producer to `user`, ID to `derived-context`; IDs must be
 unique within a receipt graph, so distinct artifacts should use explicit IDs.
+For an input classified as a generated handoff or summary, also name its receipt with
+`--upstream-receipt`. A plain `--depends-on` hashes only that file and cannot revalidate its
+own inputs; check reports `unlinked_derived_dependency` as uncertainty. `current_state` is
+not treated as a handoff or summary for this rule. A declared `compiled_context` capture is
+also inconclusive because it does not carry the typed compiler selection context.
 Upstream receipts must currently yield `unchanged_observed_inputs` at capture time;
 uncertain or stale upstream provenance is refused rather than adopted. Capture with no
 sources/parents is allowed but explicitly incomplete and checks inconclusive.
@@ -74,7 +79,10 @@ A concrete complete example is [the receipt golden](../tests/fixtures/derived-re
 `provenance_scope` is `declared` for manual capture or `compiler_selection` with a compilation
 object and a tool-derived `compiled_context` artifact. `known_incomplete` must be true when
 the compiler status is incomplete or a provider declares incompleteness. It cannot suppress
-the unconditional provider caveat or the empty-provenance check.
+the unconditional provider caveat. An empty declared source/parent list is incomplete; a
+complete `compiler_selection` with zero selected sources is not, because its contract and
+inventory selection universe are still pinned. A declared `compiled_context` capture remains
+inconclusive because it has no typed selection context.
 
 Source observation basis is `inventory`, `explicit_file`, or `provider`. Inventory pins have
 non-null lifecycle/authority and metadata digests; explicit file pins have null metadata and
@@ -106,7 +114,12 @@ one trailing newline. Internal structured fingerprints use that same canonical e
   including snapshot, ranker, acquisition settings and query. Only the digests are persisted;
   the task text and arbitrary diagnostic/source prose are never copied into the receipt.
 - Task digest hashes UTF-8 task bytes, distinguishing null task from the empty string.
-  Effective budget is pinned separately. Compiler implementation version is recorded.
+  Effective budget is pinned separately. `compiler_version` stores the package release label
+  plus a SHA256 fingerprint of the sorted Python source files in the installed package. A
+  source edit without a release bump therefore produces `compiler_implementation_changed`.
+  This conservative package fingerprint may flag unrelated package edits. Older receipt v1
+  compiler pins containing only the release label differ from the fingerprinted identity and
+  require review. If package source cannot be read, checking is inconclusive.
 
 Repository/source identity reuses existing discovery and `make_source_id`: source IDs are
 `src_` plus the first 32 hex characters of SHA256 of `repository_id + NUL + path`.
@@ -149,11 +162,14 @@ Stable reason codes:
 - For each of `artifact`, `source`, `config`, `upstream_receipt`: suffix `_changed` or
   `_missing` requires review; `_unobservable` or `_budget_exceeded` is uncertainty.
   Missing config equals an absent config pin; unreadable/unsafe config never equals absence.
+- `source_too_large` is uncertainty for an input above its per-file limit. `_budget_exceeded`
+  identifies exhaustion of the shared graph observation budget.
 - `source_metadata_changed`, `contract_changed`, `contract_missing`, `policies_changed`,
-  `selection_context_changed`, `compiler_version_changed`: review.
+  `selection_context_changed`, `compiler_implementation_changed`: review.
 - `source_metadata_unobservable`, `compilation_context_unobservable`,
-  `provenance_incomplete`, `provider_not_revalidated`, `upstream_receipt_untrusted`,
-  `upstream_inconclusive`: uncertainty.
+  `provenance_incomplete`, `unlinked_derived_dependency`,
+  `compiler_implementation_unobservable`, `provider_not_revalidated`,
+  `upstream_receipt_untrusted`, `upstream_inconclusive`: uncertainty.
 - `upstream_review_required`: review, with original upstream reasons retained.
 - `declared_inputs_not_semantic_validation`, `selection_not_replayed`: caveats.
 

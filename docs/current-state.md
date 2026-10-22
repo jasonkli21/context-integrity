@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-21
 **Current phase:** Phase 9 — Derived Context Revalidation
 **Active plan:** `docs/plans/phase-9-implementation-plan.md`
-**Status:** Phase 9 implemented and offline-verified; independent review pending.
+**Status:** Phase 9 review findings fixed and offline-verified; fresh independent re-review pending.
 Phase 8 remediation's fresh independent re-review remains pending.
 
 ## Delivered
@@ -27,6 +27,9 @@ Phase 8 remediation's fresh independent re-review remains pending.
 - Result v1 reports `unchanged_observed_inputs`, `review_required`, or `inconclusive`, with
   sorted reasons and explicit provenance caveats. Definite changes dominate while retaining
   uncertainty. Byte equality proves neither semantic correctness nor exhaustive provenance.
+- Known inventory-classified handoffs and generated summaries require an explicit upstream
+  receipt link for revalidation; compiler receipts fingerprint installed package Python source,
+  and empty compiler selections are distinguished from empty manual declarations.
 - New outputs are exclusive, repository-local, non-inventory paths with safe no-follow
   parents. Both compile payloads are prepared before publication; ordinary failures roll
   back. Cleanup/rollback failure is explicit. No hidden persistence, model/network call,
@@ -35,10 +38,11 @@ Phase 8 remediation's fresh independent re-review remains pending.
 ## Verification
 
 `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed:
-Ruff lint, formatting (**91 files**) and **1,067 tests**, Python 3.12.13/macOS.
+Ruff lint, formatting (**93 files**) and **1,071 tests**, Python 3.12.13/macOS.
 `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 uv run pytest -q tests/test_derived.py tests/test_derived_cli.py`
-passed **102 tests**, including a linked Git worktree with staged/unstaged edits and a fake
-public provider-adapter CLI journey. `git diff --check` passed. No tests were skipped.
+passed **106 tests**, including linked Git worktree edits, generated-source receipt linkage,
+compiler implementation identity changes, empty compiler selection and graph budget reasons.
+`git diff --check` passed. No tests were skipped.
 
 Durable behavior: `docs/derived-context-contract.md`, `docs/evidence-contract.md`,
 `docs/architecture-integrity-contract.md`. Phase 9 evidence and plan deviations:
@@ -67,6 +71,6 @@ policy, source-body bundling or CI enforcement is delivered.
 
 ## Next expected step
 
-Independent Phase 9 review against the active plan, durable contracts, code/tests and material
-compiler/provider seams. Keep the earlier pending reviews explicit; Phase 10 cross-repository
-work remains separately scoped.
+Fresh independent Phase 9 re-review against the active plan, durable contracts, code/tests and
+material compiler/provider seams. Keep the earlier pending reviews explicit; Phase 10
+cross-repository work remains separately scoped.

@@ -112,6 +112,8 @@ Prefer canonical state over handoffs.
 A handoff is justified only when work is genuinely interrupted mid-task. It should be short and point to canonical docs rather than restating them.
 
 Once the task is complete, the handoff should not remain the only source of important information.
+When a handoff is generated from other context, record its declared inputs and any upstream
+derived receipts; see [the derived context contract](../derived-context-contract.md).
 
 ## AI-generated changes
 

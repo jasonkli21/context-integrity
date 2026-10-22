@@ -197,9 +197,17 @@ def read_source_bytes(
     context: RepositoryContext, path: str, *, max_bytes: int | None = None
 ) -> bytes | None:
     """Capture bounded bytes through the same descriptor-safe boundary as inventory reads."""
+    return read_source_bytes_with_observation(context, path, max_bytes=max_bytes)[2]
+
+
+def read_source_bytes_with_observation(
+    context: RepositoryContext, path: str, *, max_bytes: int | None = None
+) -> tuple[int | None, str | None, bytes | None]:
+    """Capture bounded bytes and retain size/hash evidence when a read is refused."""
     chunks: list[bytes] = []
-    _, digest, skipped = _read_source(context, path, chunks, max_bytes=max_bytes)
-    return b"".join(chunks) if digest is not None and not skipped else None
+    size, digest, skipped = _read_source(context, path, chunks, max_bytes=max_bytes)
+    data = b"".join(chunks) if digest is not None and not skipped else None
+    return size, digest, data
 
 
 def _read_source(

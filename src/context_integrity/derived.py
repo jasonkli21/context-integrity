@@ -2,9 +2,14 @@
 
 from dataclasses import asdict, dataclass
 from hashlib import sha256
+from pathlib import Path
 
 from context_integrity import __version__
-from context_integrity.acquisition import MAX_SOURCE_BYTES, read_source, read_source_bytes
+from context_integrity.acquisition import (
+    MAX_SOURCE_BYTES,
+    read_source,
+    read_source_bytes_with_observation,
+)
 from context_integrity.authority import effective_policies
 from context_integrity.configuration import CONFIG_PATH, ConfigurationError
 from context_integrity.contracts import resolve_contract
@@ -44,6 +49,19 @@ def fingerprint(value) -> str:
     return sha256(canonical_json(value).encode()).hexdigest()
 
 
+def compiler_implementation_identity(package_dir: Path | None = None) -> str | None:
+    """Hash the installed package's Python source without exposing source contents."""
+    directory = package_dir or Path(__file__).parent
+    files = sorted(directory.glob("*.py"), key=lambda path: path.name)
+    if not files:
+        return None
+    try:
+        sources = [(path.name, sha256(path.read_bytes()).hexdigest()) for path in files]
+    except OSError:
+        return None
+    return f"{__version__}+{fingerprint(sources)}"
+
+
 def metadata_fingerprint(source: SourceRecord, manifest: InventoryManifest) -> str:
     return fingerprint(
         {
@@ -81,7 +99,7 @@ def selection_fingerprint(manifest: InventoryManifest) -> str:
 class Observation:
     path: str
     content_sha256: str | None
-    state: str  # observed, missing, unobservable, budget_exceeded
+    state: str  # observed, missing, unobservable, too_large, budget_exceeded
 
 
 class Reader:
@@ -102,12 +120,13 @@ class Reader:
         if self.work > 4096 or self.bytes >= MAX_GRAPH_BYTES:
             return Observation(path, None, "budget_exceeded"), None
         start = len(self.context.warnings)
-        bound = min(limit, MAX_GRAPH_BYTES - self.bytes)
+        remaining = MAX_GRAPH_BYTES - self.bytes
+        bound = min(limit, remaining)
         data = None
         if limit == MAX_RECEIPT_BYTES:
-            data = read_source_bytes(self.context, path, max_bytes=bound)
-            content_hash = sha256(data).hexdigest() if data is not None else None
-            size = len(data) if data is not None else None
+            size, content_hash, data = read_source_bytes_with_observation(
+                self.context, path, max_bytes=bound
+            )
         else:
             size, content_hash, _ = read_source(self.context, path, max_bytes=bound)
         self.bytes += size if content_hash is not None else bound
@@ -116,7 +135,22 @@ class Reader:
             missing = any(
                 w.message == "Candidate disappeared before it could be opened." for w in warnings
             )
-            observation = Observation(path, None, "missing" if missing else "unobservable")
+            graph_budget_limited = (
+                remaining < limit
+                and size is not None
+                and bound < size <= limit
+                and any(w.code == "source_too_large" for w in warnings)
+            )
+            state = (
+                "missing"
+                if missing
+                else "budget_exceeded"
+                if graph_budget_limited
+                else "too_large"
+                if any(w.code == "source_too_large" for w in warnings)
+                else "unobservable"
+            )
+            observation = Observation(path, None, state)
         else:
             observation = Observation(path, content_hash, "observed")
         self.cache[key] = observation, data
@@ -335,7 +369,7 @@ def compiler_receipt(
         compiled.status.value,
         compiled.integrity_state.evaluation_status.value,
         tuple(sorted({w.code for w in compiled.warnings})),
-        __version__,
+        compiler_implementation_identity() or "unavailable",
     )
     return DerivedReceipt(
         Artifact(
@@ -421,7 +455,13 @@ class Checker:
         reasons = [
             Reason("declared_inputs_not_semantic_validation", artifact.path, artifact.id, "caveat")
         ]
-        if receipt.known_incomplete or (not receipt.dependencies and not receipt.upstream_receipts):
+        if receipt.known_incomplete or (
+            receipt.provenance_scope == "declared"
+            and (
+                receipt.artifact.kind == "compiled_context"
+                or (not receipt.dependencies and not receipt.upstream_receipts)
+            )
+        ):
             reasons.append(
                 Reason("provenance_incomplete", artifact.path, artifact.id, "uncertainty")
             )
@@ -459,6 +499,20 @@ class Checker:
                             "review",
                             source.metadata_sha256,
                             metadata_fingerprint(current, self.manifest),
+                        )
+                    )
+                if (
+                    current is not None
+                    and current.kind.value in ("handoff", "generated_summary")
+                    and source.path
+                    not in {parent.artifact_path for parent in receipt.upstream_receipts}
+                ):
+                    reasons.append(
+                        Reason(
+                            "unlinked_derived_dependency",
+                            source.path,
+                            artifact.id,
+                            "uncertainty",
                         )
                     )
         if receipt.provider_context:
@@ -515,9 +569,24 @@ class Checker:
                             )
                 except ValueError:
                     reasons.append(Reason("contract_missing", artifact.path, artifact.id, "review"))
-            if pin.compiler_version != __version__:
+            implementation = compiler_implementation_identity()
+            if implementation is None:
                 reasons.append(
-                    Reason("compiler_version_changed", artifact.path, artifact.id, "review")
+                    Reason(
+                        "compiler_implementation_unobservable",
+                        artifact.path,
+                        artifact.id,
+                        "uncertainty",
+                    )
+                )
+            elif pin.compiler_version != implementation:
+                reasons.append(
+                    Reason(
+                        "compiler_implementation_changed",
+                        artifact.path,
+                        artifact.id,
+                        "review",
+                    )
                 )
         for parent in sorted(receipt.upstream_receipts, key=lambda p: p.path):
             self.input_paths.add(parent.path)

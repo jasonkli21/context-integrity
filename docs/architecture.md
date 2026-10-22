@@ -1866,7 +1866,9 @@ defaults are unchanged.
 Receipt DAGs retain exact receipt/artifact pins and propagate original changed/unknown input
 reasons with bounded memoization. HEAD alone is explanatory, never an invalidation rule.
 Compiler selection context conservatively fingerprints the inventory universe, effective
-contract/policies, budget and task digest. Selected provider candidates retain derivation;
+contract/policies, budget, task digest and the installed package's Python source fingerprint.
+This implementation fingerprint is conservative and can flag unrelated package edits.
+Selected provider candidates retain derivation;
 local byte equality does not revalidate provider coverage/ranking, so provider context yields
 inconclusive absent a definite change. No semantic verification, authority promotion, hidden
 persistence, network/provider replay or automatic pin refresh is introduced. Ordinary output

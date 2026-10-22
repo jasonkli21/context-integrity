@@ -764,4 +764,6 @@ Saved JSON compiles optionally accept `--receipt-output docs/context.provenance.
 Receipts report `unchanged_observed_inputs`, `review_required` or `inconclusive`; equality
 does not establish semantic correctness or exhaustive provenance. Provider context remains
 inconclusive without re-query. Outputs are explicit, repository-local and never overwrite
-existing files. See [the derived context contract](docs/derived-context-contract.md).
+existing files. When an input is itself a generated handoff or summary, link its receipt with
+`--upstream-receipt` so changes to its inputs propagate. See
+[the derived context contract](docs/derived-context-contract.md).

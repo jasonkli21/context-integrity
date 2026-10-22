@@ -207,7 +207,7 @@ def test_dirty_staged_reverted_unrelated_head(git_repo, git):
         ("delete", "source_missing", "review_required"),
         ("rename", "source_missing", "review_required"),
         ("symlink", "source_unobservable", "inconclusive"),
-        ("oversize", "source_unobservable", "inconclusive"),
+        ("oversize", "source_too_large", "inconclusive"),
         ("artifact", "artifact_changed", "review_required"),
     ],
 )
@@ -254,6 +254,105 @@ def test_explicit_non_inventory_and_no_dependencies(git_repo):
     assert check(git_repo).status == "review_required"
     save(git_repo, capture(git_repo, name="empty", deps=()))
     assert check(git_repo, "docs/empty.receipt.json").status == "inconclusive"
+
+
+def test_known_generated_dependencies_require_their_receipt(git_repo):
+    from context_integrity.derived import capture_receipt
+
+    upstream_path = "docs/source-summary.md"
+    (git_repo / upstream_path).write_text("Generated source summary\n")
+    context = discover_repository(git_repo)
+    manifest = inventory_repository(context)
+    parent = capture_receipt(
+        context,
+        manifest,
+        upstream_path,
+        artifact_id="source-summary",
+        kind="summary",
+        derivation=Derivation("model", "agent"),
+        depends_on=("AGENTS.md",),
+        receipt_path="docs/source-summary.receipt.json",
+    )
+    save(git_repo, parent)
+
+    unlinked = capture(git_repo, name="unlinked", deps=(upstream_path,))
+    save(git_repo, unlinked)
+    result = check(git_repo, "docs/unlinked.receipt.json")
+    assert result.status == "inconclusive"
+    assert "unlinked_derived_dependency" in codes(result)
+
+    linked = capture(
+        git_repo, name="linked", deps=(), parents=("docs/source-summary.receipt.json",)
+    )
+    save(git_repo, linked)
+    result = check(git_repo, "docs/linked.receipt.json")
+    assert result.status == "unchanged_observed_inputs"
+
+    (git_repo / "docs/manual-compiled.json").write_text("{}\n")
+    context = discover_repository(git_repo)
+    manual_compiled = capture_receipt(
+        context,
+        inventory_repository(context),
+        "docs/manual-compiled.json",
+        artifact_id="manual-compiled",
+        kind="compiled_context",
+        derivation=Derivation("manual", "user"),
+        depends_on=("AGENTS.md",),
+        receipt_path="docs/manual-compiled.receipt.json",
+    )
+    save(git_repo, manual_compiled)
+    result = check(git_repo, "docs/manual-compiled.receipt.json")
+    assert result.status == "inconclusive"
+    assert "provenance_incomplete" in codes(result)
+
+    (git_repo / "docs/current-state.md").write_text("Current state\n")
+    (git_repo / "docs/state.md").write_text("State handoff\n")
+    context = discover_repository(git_repo)
+    current_state = capture_receipt(
+        context,
+        inventory_repository(context),
+        "docs/state.md",
+        artifact_id="state",
+        kind="handoff",
+        derivation=Derivation("manual", "user"),
+        depends_on=("docs/current-state.md",),
+        receipt_path="docs/state.receipt.json",
+    )
+    save(git_repo, current_state)
+    assert "unlinked_derived_dependency" not in codes(check(git_repo, "docs/state.receipt.json"))
+
+
+def test_reader_distinguishes_graph_budget_from_file_ceiling(git_repo, monkeypatch):
+    import context_integrity.derived as module
+    from context_integrity.derived import Reason
+
+    monkeypatch.setattr(module, "MAX_GRAPH_BYTES", 10)
+    reader = Reader(discover_repository(git_repo))
+    reader.bytes = 9
+    observation, _ = reader.read("AGENTS.md")
+    assert observation.state == "budget_exceeded"
+    assert {r.code for r in compare_pin("a", "source", "a" * 64, observation)} == {
+        "source_budget_exceeded"
+    }
+
+    receipt_reader = Reader(discover_repository(git_repo))
+    receipt_reader.bytes = 9
+    receipt_observation, _ = receipt_reader.read("AGENTS.md", MAX_RECEIPT_BYTES)
+    assert receipt_observation.state == "budget_exceeded"
+
+    reader = Reader(discover_repository(git_repo))
+    reader.bytes = 10
+    zero_budget, _ = reader.read("AGENTS.md")
+    assert zero_budget.state == "budget_exceeded"
+    reasons = [
+        *compare_pin("a", "source", "a" * 64, zero_budget),
+        Reason("artifact_changed", "docs/a.md", "a", "review"),
+    ]
+    assert aggregate(reasons) == "review_required"
+
+    reader = Reader(discover_repository(git_repo))
+    observation, _ = reader.read("AGENTS.md", limit=4)
+    assert observation.state == "too_large"
 
 
 @pytest.mark.parametrize("mode", ["create", "delete", "change", "invalid"])

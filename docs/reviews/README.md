@@ -34,6 +34,7 @@ Finding IDs are scoped to each review.
 | [Phase 1 independent review](phase-1-independent-review.md) | `9efd5fbc509adffbc11a1100ac2bb31caf8f1b6e` | [Phase 1 report](../implementation-reports/phase-1-implementation-report.md), fix `36d150af6cf67b8bab41c528b4304fa83da51309`; Phase 2 baseline |
 | [Phase 2 review and cumulative Phase 0–2 audit](phase-2-independent-review.md) | `3ae38a6dc1fec72b24a64e3a0ccd8f6c2f7195d5` | [Phase 2 report](../implementation-reports/phase-2-implementation-report.md), cumulative F-001–F-005 corrections; final independent verification pending |
 | [Phase 8 independent review](phase-8-independent-review.md) | `9f782781d10707cb35a0059a88d1683250c1fc16` | [Phase 8 review-fixes report](../implementation-reports/phase-8-review-fixes-report.md) |
+| [Phase 9 independent review](phase-9-independent-review.md) | `eedc972a53bb568291bda7a876189aefe6c1ad3f` | [Phase 9 review-fixes report](../implementation-reports/phase-9-review-fixes-report.md) |
 
 Phase 0/1 records were recovered from their original external artifacts during cumulative
 review remediation, rather than reconstructed from implementation summaries.

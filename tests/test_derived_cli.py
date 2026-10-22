@@ -11,7 +11,11 @@ from typer.testing import CliRunner
 from context_integrity.cli import app
 from context_integrity.compiler import compile_context
 from context_integrity.contracts import resolve_contract
-from context_integrity.derived import check_receipt, compiler_receipt
+from context_integrity.derived import (
+    check_receipt,
+    compiler_implementation_identity,
+    compiler_receipt,
+)
 from context_integrity.derived_models import parse_receipt, render_receipt
 from context_integrity.derived_output import DerivedOutputError, write_outputs
 from context_integrity.evidence import EvidenceContextRequest
@@ -156,7 +160,7 @@ def compile_args(root):
     ]
 
 
-def test_compiler_v3_unchanged_and_receipt_context(git_repo):
+def test_compiler_v3_unchanged_and_receipt_context(git_repo, monkeypatch):
     (git_repo / ".context-integrity.toml").write_text(CONFIG)
     context = discover_repository(git_repo)
     manifest = inventory_repository(context)
@@ -172,16 +176,63 @@ def test_compiler_v3_unchanged_and_receipt_context(git_repo):
     assert receipt.derived_receipt_schema_version == 1
     assert receipt.artifact.content_sha256 == sha256(expected.encode()).hexdigest()
     assert receipt.compilation.task_sha256 == sha256(b"PRIVATE TASK TEXT").hexdigest()
+    assert "+" in receipt.compilation.compiler_version
     assert receipt.compilation.contract_id == "work"
     assert receipt.config_sha256 == sha256(CONFIG.encode()).hexdigest()
     assert {p.path for p in receipt.dependencies} == {"AGENTS.md"}
     assert b"PRIVATE TASK TEXT" not in data
     checked, _ = check_receipt(discover_repository(git_repo), "docs/compiled.receipt.json")
     assert checked.status == "unchanged_observed_inputs"
+    import context_integrity.derived as derived_module
+
+    original_identity = derived_module.compiler_implementation_identity
+    monkeypatch.setattr(
+        derived_module,
+        "compiler_implementation_identity",
+        lambda: original_identity()[:-1] + ("0" if not original_identity().endswith("0") else "1"),
+    )
+    checked, _ = check_receipt(discover_repository(git_repo), "docs/compiled.receipt.json")
+    assert checked.status == "review_required"
+    assert "compiler_implementation_changed" in {r.code for r in checked.reasons}
+    monkeypatch.setattr(derived_module, "compiler_implementation_identity", original_identity)
     (git_repo / "docs/new.md").write_text("newly eligible input")
     checked, _ = check_receipt(discover_repository(git_repo), "docs/compiled.receipt.json")
     assert checked.status == "review_required"
     assert "selection_context_changed" in {r.code for r in checked.reasons}
+
+
+def test_empty_complete_compiler_selection_is_not_provenance_incomplete(git_repo):
+    empty_config = """schema_version = 8
+[[context_contracts]]
+id = "work"
+task_class = "implementation"
+description = "Optional absent source"
+[[context_contracts.rules]]
+id = "optional"
+mode = "optional"
+paths = ["docs/no-match.md"]
+"""
+    (git_repo / ".context-integrity.toml").write_text(empty_config)
+    result = runner.invoke(app, compile_args(git_repo))
+    assert result.exit_code == 0, result.output
+    receipt = parse_receipt((git_repo / "docs/compiled.receipt.json").read_bytes())
+    assert receipt.dependencies == ()
+    assert receipt.compilation.status == "complete"
+    checked, _ = check_receipt(discover_repository(git_repo), "docs/compiled.receipt.json")
+    assert checked.status == "unchanged_observed_inputs"
+    assert "provenance_incomplete" not in {r.code for r in checked.reasons}
+
+
+def test_compiler_implementation_identity_tracks_source_bytes(tmp_path):
+    package = tmp_path / "package"
+    package.mkdir()
+    source = package / "compiler.py"
+    source.write_text("return ['a']\n")
+    first = compiler_implementation_identity(package)
+    assert first is not None
+    assert compiler_implementation_identity(package) == first
+    source.write_text("return ['b']\n")
+    assert compiler_implementation_identity(package) != first
 
 
 @pytest.mark.parametrize("incomplete", [False, True])
