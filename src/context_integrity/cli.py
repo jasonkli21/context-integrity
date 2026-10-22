@@ -654,3 +654,70 @@ def derived_check(
 
 if __name__ == "__main__":
     app()
+
+
+workspace_app = typer.Typer(
+    help="Check explicitly declared local cross-repository alignments.", no_args_is_help=True
+)
+app.add_typer(workspace_app, name="workspace")
+
+
+def _workspace_command(manifest, task, format, output):
+    from context_integrity.workspace import WorkspaceRepositoryError, resolve_workspace
+    from context_integrity.workspace_config import WorkspaceInputError
+    from context_integrity.workspace_output import (
+        check_dict,
+        context_dict,
+        publish_workspace,
+        render_workspace,
+    )
+
+    try:
+        workspace = resolve_workspace(manifest)
+        findings = workspace.check()
+        value = (
+            check_dict(workspace, findings)
+            if task is None
+            else context_dict(workspace, findings, workspace.compile(task), task)
+        )
+        rendered = render_workspace(value, as_json=format == OutputFormat.JSON)
+    except RepositoryError as exc:
+        typer.echo(
+            str(exc) if isinstance(exc, WorkspaceRepositoryError) else "workspace_repository_error",
+            err=True,
+        )
+        raise typer.Exit(3) from exc
+    except (WorkspaceInputError, ConfigurationError, ValueError) as exc:
+        typer.echo(
+            str(exc) if isinstance(exc, WorkspaceInputError) else "workspace_input_error", err=True
+        )
+        raise typer.Exit(6) from exc
+    if output is None:
+        typer.echo(rendered, nl=False)
+    else:
+        try:
+            publish_workspace(workspace, output, rendered)
+        except DerivedOutputError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(4) from exc
+
+
+@workspace_app.command("check")
+def workspace_check(
+    manifest: Annotated[Path, typer.Argument()],
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Observe declared alignments; findings retain exit zero."""
+    _workspace_command(manifest, None, format, output)
+
+
+@workspace_app.command("compile")
+def workspace_compile(
+    manifest: Annotated[Path, typer.Argument()],
+    task: Annotated[str, typer.Option()],
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Compile independent per-repository context indexes with explicit budgets."""
+    _workspace_command(manifest, task, format, output)

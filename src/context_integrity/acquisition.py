@@ -5,7 +5,7 @@ import os
 import stat
 from fnmatch import fnmatchcase
 from hashlib import sha256
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from context_integrity.models import ScanWarning
 from context_integrity.repository import RepositoryContext, RepositoryError, try_git
@@ -92,6 +92,20 @@ CONTEXT_FILENAMES = (
     "*_handoff.*",
     "*-summary.*",
 )
+
+
+def open_directory_no_follow(path: Path) -> int:
+    """Return an owned FD after traversing all absolute ancestors without symlinks."""
+    fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in path.absolute().parts[1:]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            os.close(fd)
+            fd = child
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
 
 
 def normalize_path(path: str) -> str:
@@ -188,24 +202,40 @@ def enumerate_candidates(context: RepositoryContext) -> list[str]:
 
 
 def read_source(
-    context: RepositoryContext, path: str, *, max_bytes: int | None = None
+    context: RepositoryContext,
+    path: str,
+    *,
+    max_bytes: int | None = None,
+    require_stable: bool = False,
 ) -> tuple[int | None, str | None, bool]:
-    return _read_source(context, path, max_bytes=max_bytes)
+    return _read_source(context, path, max_bytes=max_bytes, require_stable=require_stable)
 
 
 def read_source_bytes(
-    context: RepositoryContext, path: str, *, max_bytes: int | None = None
+    context: RepositoryContext,
+    path: str,
+    *,
+    max_bytes: int | None = None,
+    require_stable: bool = False,
 ) -> bytes | None:
     """Capture bounded bytes through the same descriptor-safe boundary as inventory reads."""
-    return read_source_bytes_with_observation(context, path, max_bytes=max_bytes)[2]
+    return read_source_bytes_with_observation(
+        context, path, max_bytes=max_bytes, require_stable=require_stable
+    )[2]
 
 
 def read_source_bytes_with_observation(
-    context: RepositoryContext, path: str, *, max_bytes: int | None = None
+    context: RepositoryContext,
+    path: str,
+    *,
+    max_bytes: int | None = None,
+    require_stable: bool = False,
 ) -> tuple[int | None, str | None, bytes | None]:
     """Capture bounded bytes and retain size/hash evidence when a read is refused."""
     chunks: list[bytes] = []
-    size, digest, skipped = _read_source(context, path, chunks, max_bytes=max_bytes)
+    size, digest, skipped = _read_source(
+        context, path, chunks, max_bytes=max_bytes, require_stable=require_stable
+    )
     data = b"".join(chunks) if digest is not None and not skipped else None
     return size, digest, data
 
@@ -216,6 +246,7 @@ def _read_source(
     chunks: list[bytes] | None = None,
     *,
     max_bytes: int | None = None,
+    require_stable: bool = False,
 ) -> tuple[int | None, str | None, bool]:
     """Open each component relative to a directory FD, rejecting symlinks even during races.
 
@@ -225,7 +256,7 @@ def _read_source(
     path = normalize_path(path)
     descriptors = []
     try:
-        parent_fd = os.open(context.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        parent_fd = open_directory_no_follow(context.root)
         descriptors.append(parent_fd)
         for segment in PurePosixPath(path).parts[:-1]:
             metadata = os.stat(segment, dir_fd=parent_fd, follow_symlinks=False)
@@ -288,6 +319,20 @@ def _read_source(
         except OSError:
             context.warnings.append(ScanWarning("hash_failed", path, "Source hashing failed."))
             return opened.st_size, None, False
+        if require_stable:
+            after = os.fstat(fd)
+            named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+
+            def identity(st):
+                return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+
+            if identity(opened) != identity(after) or identity(after) != identity(named):
+                context.warnings.append(
+                    ScanWarning(
+                        "source_changed_during_read", path, "Source observation was unstable."
+                    )
+                )
+                return None, None, False
         return count, digest.hexdigest(), False
     except OSError as exc:
         if exc.errno in {errno.ENOENT, errno.ENOTDIR}:

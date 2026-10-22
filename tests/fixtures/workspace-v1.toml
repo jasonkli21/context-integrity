@@ -1,0 +1,38 @@
+workspace_schema_version = 1
+[[repositories]]
+alias = "api"
+root = "api"
+repository_id = "repo_af348c2a1c93181d43e464541164c1b2"
+[[repositories]]
+alias = "web"
+root = "web"
+repository_id = "repo_7bbbe0bdfa789eb0e1081c53d73f94fb"
+[[checks]]
+id = "pin"
+kind = "contract_pin"
+producer_repo = "api"
+producer_path = "spec/api.json"
+consumer_repo = "web"
+consumer_path = "contracts/api.lock.json"
+[[checks]]
+id = "mirror"
+kind = "mirror_bytes"
+left_repo = "api"
+left_path = "docs/architecture.md"
+right_repo = "web"
+right_path = "docs/architecture.md"
+[[checks]]
+id = "claims"
+kind = "claim_match"
+left_repo = "api"
+left_claim_id = "region"
+right_repo = "web"
+right_claim_id = "region"
+[[context_targets]]
+repo = "api"
+contract_id = "work"
+budget_bytes = 10000
+[[context_targets]]
+repo = "web"
+contract_id = "work"
+budget_bytes = 10000

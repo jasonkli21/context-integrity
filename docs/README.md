@@ -66,6 +66,11 @@ coverage semantics, finding statuses, output guarantees and evaluation limits.
 Implemented Phase 9 receipt/result v1, explicit capture/check and compiler receipt workflows,
 transitive revalidation, status/coverage semantics, safe output lifecycle and resource bounds.
 
+### `workspace-integrity-contract.md`
+
+Implemented Phase 10 workspace/lock/check/context v1, explicit qualified identities, deterministic
+alignment semantics, independent compilation, no-follow acquisition and exclusive output bounds.
+
 ### `current-state.md`
 
 Short navigation/status snapshot.

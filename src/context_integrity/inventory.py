@@ -1,6 +1,7 @@
 """Inventory application use case; no printing or output writes."""
 
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 
 from context_integrity.acquisition import MAX_SOURCE_BYTES, enumerate_candidates, read_source
@@ -21,12 +22,33 @@ from context_integrity.models import (
 from context_integrity.repository import RepositoryContext, RepositoryError, discover_repository
 
 
+@dataclass
+class InventoryObservationBudget:
+    """Optional invocation-wide accounting, including refused/skipped reads."""
+
+    remaining_bytes: int = 64 * 1024 * 1024
+    remaining_attempts: int = 4096
+
+
 def inventory_repository(
     context: RepositoryContext,
     *,
     max_observation_bytes: int | None = None,
     max_sources: int | None = None,
+    require_stable: bool = False,
+    observation_budget: InventoryObservationBudget | None = None,
 ) -> InventoryManifest:
+    if observation_budget is not None:
+        max_sources = (
+            min(max_sources, observation_budget.remaining_attempts)
+            if max_sources is not None
+            else observation_budget.remaining_attempts
+        )
+        max_observation_bytes = (
+            min(max_observation_bytes, observation_budget.remaining_bytes)
+            if max_observation_bytes is not None
+            else observation_budget.remaining_bytes
+        )
     config = load_config(context)
     metadata = {m.path: m for m in config.source_metadata}
     sources = []
@@ -52,12 +74,19 @@ def inventory_repository(
             raise RepositoryError("Inventory observation budget exceeded.")
         bound = MAX_SOURCE_BYTES if remaining is None else min(MAX_SOURCE_BYTES, remaining)
         size, digest, skipped = (
-            read_source(context, path)
+            read_source(context, path, max_bytes=bound, require_stable=True)
+            if require_stable
+            else read_source(context, path)
             if remaining is None
             else read_source(context, path, max_bytes=bound)
         )
         if remaining is not None:
-            remaining -= min(size, bound) if size is not None else bound
+            used = min(size, bound) if size is not None else bound
+            if observation_budget is not None:
+                used = size if digest is not None else bound
+                observation_budget.remaining_bytes -= used
+                observation_budget.remaining_attempts -= 1
+            remaining -= used
             if digest is None and bound < MAX_SOURCE_BYTES:
                 raise RepositoryError("Inventory observation budget exceeded.")
         if skipped:

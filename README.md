@@ -10,12 +10,12 @@ Context Integrity is being built around the idea that:
 
 ## Status
 
-**Phase 9 derived-context revalidation implemented; independent review pending.**
+**Phase 10 cross-repository integrity implemented; independent review pending.**
 Phase 8 remediation is offline-verified; its independent re-review also remains pending.
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
 
-Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Explicit claims retain declaration and dependency revisions, with independent unverified validity. Deterministic integrity checks now surface structural instruction references, current-state navigation and delivery-evidence gaps, and explicit document review dependencies on changed paths. Repository-defined Context Contracts validate explicitly supplied source packages against metadata selectors and source-count constraints. The compiler selects a bounded context manifest from an explicit contract, applying lifecycle and rule-scoped authority policy before deterministic selection. Explicit architectural invariants now evaluate descriptive relation evidence with conservative coverage. Derived receipt v1 detects changes to declared summary/handoff/compiler inputs. Contradiction detection and LLM-assisted analysis remain deferred.
+Question-specific authority policies now identify the highest observed eligible source tier and missing stronger tiers. Source-role precedence does not establish claim correctness or agreement. Explicit lifecycle metadata and directional supersession now determine source lifecycle and active-authority eligibility. Explicit claims retain declaration and dependency revisions, with independent unverified validity. Deterministic integrity checks now surface structural instruction references, current-state navigation and delivery-evidence gaps, and explicit document review dependencies on changed paths. Repository-defined Context Contracts validate explicitly supplied source packages against metadata selectors and source-count constraints. The compiler selects a bounded context manifest from an explicit contract, applying lifecycle and rule-scoped authority policy before deterministic selection. Explicit architectural invariants now evaluate descriptive relation evidence with conservative coverage. Derived receipt v1 detects changes to declared summary/handoff/compiler inputs. Explicit workspace v1 declarations now check consumer contract pins, exact file mirrors and paired unverified claims, and compile independent repository context indexes. Contradiction detection and LLM-assisted analysis remain deferred.
 
 See [`docs/current-state.md`](docs/current-state.md) for the exact current state.
 
@@ -83,8 +83,8 @@ The projects intentionally do **not** share a database or implementation lifecyc
 │   ├── architecture.md               # system boundaries and architecture invariants
 │   ├── current-state.md              # concise status snapshot
 │   ├── plans/
-│   │   ├── phase-0-implementation-plan.md … phase-8-implementation-plan.md
-│   │   └── phase-9-implementation-plan.md # current phase plan; see current-state.md
+│   │   ├── phase-0-implementation-plan.md … phase-9-implementation-plan.md
+│   │   └── phase-10-implementation-plan.md # current phase plan; see current-state.md
 │   ├── adr/                          # durable architectural decisions
 │   ├── implementation-reports/       # evidence of what an implementation session changed
 │   ├── reviews/                      # independent review findings
@@ -767,3 +767,19 @@ inconclusive without re-query. Outputs are explicit, repository-local and never 
 existing files. When an input is itself a generated handoff or summary, link its receipt with
 `--upstream-receipt` so changes to its inputs propagate. See
 [the derived context contract](docs/derived-context-contract.md).
+
+## Cross-repository workspace
+
+Declare 2–8 local repositories, expected IDs, explicit alignments and per-repository context
+contracts/budgets in a separate manifest. See the [workspace integrity contract](docs/workspace-integrity-contract.md)
+for complete examples, strict grammar, status meanings and limits.
+
+```bash
+uv run context-integrity workspace check workspace.context-integrity.toml --format json
+uv run context-integrity workspace compile workspace.context-integrity.toml \
+  --task "Update API consumer" --format json --output workspace-context.json
+```
+
+Saved outputs must be new files outside all participating repositories. Findings exit zero;
+matching pins/declarations establish observed alignment only. Workspace commands operate
+offline without Context Engine and never rewrite locks or Phase 9 receipts.

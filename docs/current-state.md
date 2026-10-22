@@ -1,76 +1,70 @@
 # Current State
 
 **Last updated:** 2026-10-21
-**Current phase:** Phase 9 — Derived Context Revalidation
-**Active plan:** `docs/plans/phase-9-implementation-plan.md`
-**Status:** Phase 9 review findings fixed and offline-verified; fresh independent re-review pending.
-Phase 8 remediation's fresh independent re-review remains pending.
+**Current phase:** Phase 10 — Cross-Repository Integrity
+**Active plan:** `docs/plans/phase-10-implementation-plan.md`
+**Status:** Implemented and offline-verified; independent Phase 10 review pending.
+Phase 9 and Phase 8 fresh independent re-reviews remain pending.
 
 ## Delivered
 
-- Phases 0–8 inventory, question-specific authority, lifecycle/supersession, explicit
-  claims, deterministic drift checks, contracts, mixed compilation and architectural
-  integrity remain intact. Claims stay `unverified`. Config v1–v8, compiled JSON v3,
-  integrity JSON v2 and the other existing projections retain their versions/behavior.
-- Standalone strict derived receipt v1 records actual artifact/source SHA256, effective
-  lifecycle/authority metadata, config absence/presence, declared derivation and pinned
-  upstream receipt/artifact identities. Explicit dependencies may include non-inventory
-  code. Constructors/decoder reject malformed/ambiguous fields and duplicate JSON keys.
-- `derived capture` explicitly writes a new sidecar; `derived check` reobserves pinned
-  inputs without refreshing them. Bounded memoized receipt DAGs propagate original source
-  changes and uncertainty through unchanged intermediate artifacts. HEAD movement alone
-  does not invalidate inputs; staged and unstaged edits are identified by content.
-- Additive `compile --receipt-output` requires saved JSON and pins typed inventory/provider
-  selections, effective contract/policies/budget, task digest, inventory selection universe,
-  compiler status/version and validated provider snapshot/coverage fingerprints. Provider
-  evidence is not re-queried: provider context remains inconclusive absent definite changes.
-- Result v1 reports `unchanged_observed_inputs`, `review_required`, or `inconclusive`, with
-  sorted reasons and explicit provenance caveats. Definite changes dominate while retaining
-  uncertainty. Byte equality proves neither semantic correctness nor exhaustive provenance.
-- Known inventory-classified handoffs and generated summaries require an explicit upstream
-  receipt link for revalidation; compiler receipts fingerprint installed package Python source,
-  and empty compiler selections are distinguished from empty manual declarations.
-- New outputs are exclusive, repository-local, non-inventory paths with safe no-follow
-  parents. Both compile payloads are prepared before publication; ordinary failures roll
-  back. Cleanup/rollback failure is explicit. No hidden persistence, model/network call,
-  provider installation, auto-refresh, auto-fix or authority promotion is introduced.
+- Phases 0–9 remain intact: inventory, question-specific authority, lifecycle/supersession,
+  explicit unverified claims, deterministic checks, contracts, mixed compilation,
+  architectural integrity and single-repository derived-context revalidation.
+  Config v1–v8, compiled JSON v3, integrity JSON v2 and derived receipt/result v1 are unchanged.
+- Strict explicitly supplied workspace TOML v1 binds 2–8 aliases to observed repository IDs,
+  rejecting unsafe/nested/duplicate roots, wrong identities and same-origin checkout collisions.
+  Qualified source/claim identities prevent collisions between identical repo-relative names.
+- Explicit consumer contract lock JSON v1 pins a producer ID/path/raw-byte SHA256. Independent
+  `contract_pin`, `mirror_bytes` and `claim_match` checks distinguish observed alignment,
+  review/change impact and uncertainty, retaining provenance and coverage limitations.
+- `workspace check` emits separate check JSON v1; `workspace compile --task` independently
+  applies configured contracts/policies and bounded per-target budgets. Context JSON v1
+  preserves decisions/revisions and selection/check distinctions, with task digest only.
+- New workspace commands operate offline without provider installation, models, database or
+  network. Default stdout is read-only; saved output is exclusive, outside all participating
+  roots and protected by descriptor-relative no-follow publication. Locks/receipts are never
+  refreshed. Source reads include stable-file checks; failures and budget gaps cannot align.
 
 ## Verification
 
 `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed:
-Ruff lint, formatting (**93 files**) and **1,071 tests**, Python 3.12.13/macOS.
-`UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 uv run pytest -q tests/test_derived.py tests/test_derived_cli.py`
-passed **106 tests**, including linked Git worktree edits, generated-source receipt linkage,
-compiler implementation identity changes, empty compiler selection and graph budget reasons.
-`git diff --check` passed. No tests were skipped.
+Ruff lint, formatting (**102 files at that gate**) and **1,167 tests**, Python 3.12.13/macOS.
+`UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 uv run pytest -q tests/test_workspace.py tests/test_workspace_cli.py`
+passed **96 tests**. No tests were skipped. Final documentation formatting and staged
+whitespace checks are recorded in the implementation report.
 
-Durable behavior: `docs/derived-context-contract.md`, `docs/evidence-contract.md`,
-`docs/architecture-integrity-contract.md`. Phase 9 evidence and plan deviations:
-`docs/implementation-reports/phase-9-implementation-report.md`.
-Phase 8 remediation evidence: `docs/implementation-reports/phase-8-review-fixes-report.md`.
+Durable semantics and exact examples: `docs/workspace-integrity-contract.md`.
+Phase 10 implementation evidence: `docs/implementation-reports/phase-10-implementation-report.md`.
+Predecessor contracts remain `docs/derived-context-contract.md`, `docs/evidence-contract.md`
+and `docs/architecture-integrity-contract.md`.
 
 ## Known limitations / findings
 
-Receipts are unauthenticated local declarations, not semantic truth or authority. Manual
-provenance closure is never proven. Provider ranking/coverage is not revalidated; inventory
-selection fingerprints are conservative and can flag unselected document changes. Unknown
-current inventory coverage is inconclusive. Observations are sequential, not atomic.
+Equal pins/files/declarations do not prove API compatibility, consumer implementation use,
+semantic truth, exhaustive coverage or product compliance. Claims stay `unverified`;
+current dependency observations have no accepted historical revision pin. Dirty, unobservable
+or generated dependencies and inventory gaps prevent positive claim alignment.
 
-Files cap at 5 MiB; receipts at 1 MiB; DAGs cap at 128 receipt observations, 16 levels,
-256 direct sources and 16 parents per receipt. Graph and metadata inventory each have
-independent 64 MiB/4,096 observation ceilings. Receipt paths are printable ASCII; non-Git
-identity retains existing location-dependent fallback. Cross-platform operation is not
-claimed. Pair publication is not crash-atomic; process/power loss can leave orphaned files.
+Repository observations are sequential, not atomic. No-origin identity is location dependent;
+two same-origin checkouts cannot represent different logical workspace repos. Workspace indexes
+are not durable cross-repo Phase 9 receipts or transitive generated-artifact revalidation.
+Provider graphs and global authority/budget ranking are not merged. Publication is exclusive
+but not a crash transaction; process loss may leave orphaned files.
 
-Phase 8 retains conservative global graph coverage, syntax/resolution limitations and
-unknown/dirty snapshot caveats. No observed architecture violation is no compliance proof.
-Phase 4 final independent verification, Phase 7 fresh independent review and Phase 8 fresh
-independent re-review remain pending. Phase 9 independent acceptance has not been established.
-No semantic claim verification, generic contradiction engine, persistence, LLM, cross-repo
-policy, source-body bundling or CI enforcement is delivered.
+Workspace bounds: manifest 256 KiB, lock 16 KiB, files 5 MiB, task 64 KiB, 128 checks,
+16 context targets, 256 declared qualified endpoints, summed context budget 64 MiB. Explicit
+reads and shared inventories each have separate 64 MiB/4,096-work ceilings. Exact path/output
+restrictions, POSIX/macOS verification scope and predecessor limitations remain in the contracts.
+
+Phase 4 final independent verification, Phase 7 fresh independent review, Phase 8 fresh
+independent re-review and Phase 9 fresh independent re-review remain pending. Phase 10 independent
+acceptance has not been established. No semantic compatibility/claim verification, generic
+contradiction engine, persistence, LLM, cross-repo structural graph, source-body bundling or
+CI enforcement is delivered.
 
 ## Next expected step
 
-Fresh independent Phase 9 re-review against the active plan, durable contracts, code/tests and
-material compiler/provider seams. Keep the earlier pending reviews explicit; Phase 10
-cross-repository work remains separately scoped.
+Independent Phase 10 review against the active plan, architecture, durable contracts,
+code/tests and compiler/acquisition seams. Preserve earlier pending review statuses;
+Phase 11 governance/CI work remains separately scoped.

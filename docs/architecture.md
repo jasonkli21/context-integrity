@@ -1692,7 +1692,7 @@ Do not resolve these before implementation provides evidence:
 - policy DSL;
 - additional evidence transports beyond the Phase 7 local CLI adapter;
 - MCP/API surface;
-- exact cross-repository workspace format;
+- cross-repository structural graph and durable generated-artifact receipt formats;
 - embedding/vector use;
 - LLM provider;
 - learned ranking;
@@ -1833,7 +1833,8 @@ Do not require future agents to mine old session artifacts for important invaria
 
 Use `docs/current-state.md` for current verification and review status. Phase 8 architectural
 integrity implements explicit repository-owned policy over descriptive relation evidence.
-Phase 9 derived context revalidation is implemented; independent review is next.
+Phase 9 derived context revalidation and Phase 10 explicit workspace integrity are implemented;
+independent review remains required. See current-state for verification and review gaps.
 Fresh independent Phase 8 re-review remains separately pending.
 
 
@@ -1874,3 +1875,26 @@ inconclusive absent a definite change. No semantic verification, authority promo
 persistence, network/provider replay or automatic pin refresh is introduced. Ordinary output
 failures roll back prepared pairs; independent filesystem names have no crash-atomic commit.
 Exact semantics and limits: [derived context contract](derived-context-contract.md).
+
+## Phase 10 workspace boundary
+
+`workspace_models.py` keeps qualified repository/source/claim identities and typed rule results
+separate from filesystem acquisition. `workspace_config.py` validates an explicit strict workspace
+TOML v1 and consumer contract lock JSON v1. `workspace.py` binds aliases to discovered identities,
+rejects duplicate/nested roots and same-origin checkout collisions, then evaluates explicit
+contract pins, byte mirrors and paired unverified declarations. Matching bytes/declarations
+never establish semantic compatibility or a cross-repository authority winner.
+
+`workspace_output.py` projects separate check/context JSON v1 with repository-qualified evidence
+and task digest only. Composition reuses each repository's configured contract/compiler and
+explicit budget; selection completeness and check findings remain independent. Provider support
+is disabled at this surface; no cross-repo graph, shared database or global ranking is inferred.
+The consumer-owned lock is a narrow producer-revision acceptance receipt; it neither changes
+Phase 9 receipt v1 nor supplies transitive generated-artifact revalidation.
+
+All root ancestors and source components use no-follow descriptor traversal. Workspace reads
+also check stable file metadata after hashing. Invocation-local qualified caches, separate
+shared explicit/inventory budgets and conservative uncertainty bound observations. Saved output
+is exclusive and outside every participating root. Observations/publication remain sequential,
+without a multi-repo atomic snapshot or crash transaction. Exact grammar, limits, caveats and
+valid fixtures: [workspace integrity contract](workspace-integrity-contract.md).

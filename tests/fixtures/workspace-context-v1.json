@@ -1,0 +1,533 @@
+{
+  "checks_status": "aligned_observed",
+  "coverage": {
+    "checks_declared": 3,
+    "checks_evaluated": 3,
+    "limitations": [
+      "declared_checks_only",
+      "sequential_non_atomic_observations",
+      "no_semantic_validation"
+    ]
+  },
+  "findings": [
+    {
+      "accepted_sha256": null,
+      "claims": [
+        {
+          "claim": {
+            "claim_id": "region",
+            "repo_alias": "api",
+            "repository_id": "repo_af348c2a1c93181d43e464541164c1b2"
+          },
+          "declaration": {
+            "claim_type": "policy",
+            "predicate": "stores_in",
+            "scope": "data",
+            "subject": "product",
+            "value": "us"
+          },
+          "dependencies": [
+            {
+              "resolved": true,
+              "revision": {
+                "content_sha256": "6a88aec4ca197fa6f248b2a93f80452c0745999a523d96beb949caaecf3e487e",
+                "git_head": "1111111111111111111111111111111111111111",
+                "git_status": "tracked_clean",
+                "observed_revision_basis": "working_tree_content"
+              },
+              "source": {
+                "path": "docs/architecture.md",
+                "repo_alias": "api",
+                "repository_id": "repo_af348c2a1c93181d43e464541164c1b2"
+              },
+              "source_id": "src_2910dea12622c3cf667471dff53d9226"
+            }
+          ],
+          "provenance": {
+            "extraction_method": "repository_config_explicit",
+            "extractor_version": "claims-v1",
+            "locator": "claim:region",
+            "provenance_complete": true,
+            "revision": {
+              "content_sha256": "82a641d2ddb0808d6b40c1f52eeb57f8afc50d177413b07a3d86921f75321de2",
+              "git_head": "1111111111111111111111111111111111111111",
+              "git_status": "tracked_clean",
+              "observed_revision_basis": "working_tree_content"
+            },
+            "source": {
+              "path": ".context-integrity.toml",
+              "repo_alias": "api",
+              "repository_id": "repo_af348c2a1c93181d43e464541164c1b2"
+            },
+            "source_id": "src_eafc3238fab235e52eaebe63634c95d6"
+          },
+          "reasons": [],
+          "sources": [
+            {
+              "authority": "unknown",
+              "content_sha256": "82a641d2ddb0808d6b40c1f52eeb57f8afc50d177413b07a3d86921f75321de2",
+              "lifecycle": "unknown",
+              "source": {
+                "path": ".context-integrity.toml",
+                "repo_alias": "api",
+                "repository_id": "repo_af348c2a1c93181d43e464541164c1b2"
+              },
+              "source_id": "src_eafc3238fab235e52eaebe63634c95d6",
+              "state": "observed"
+            },
+            {
+              "authority": "architecture_product",
+              "content_sha256": "6a88aec4ca197fa6f248b2a93f80452c0745999a523d96beb949caaecf3e487e",
+              "lifecycle": "active",
+              "source": {
+                "path": "docs/architecture.md",
+                "repo_alias": "api",
+                "repository_id": "repo_af348c2a1c93181d43e464541164c1b2"
+              },
+              "source_id": "src_2910dea12622c3cf667471dff53d9226",
+              "state": "observed"
+            }
+          ],
+          "validity": "unverified"
+        },
+        {
+          "claim": {
+            "claim_id": "region",
+            "repo_alias": "web",
+            "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb"
+          },
+          "declaration": {
+            "claim_type": "policy",
+            "predicate": "stores_in",
+            "scope": "data",
+            "subject": "product",
+            "value": "us"
+          },
+          "dependencies": [
+            {
+              "resolved": true,
+              "revision": {
+                "content_sha256": "6a88aec4ca197fa6f248b2a93f80452c0745999a523d96beb949caaecf3e487e",
+                "git_head": "1111111111111111111111111111111111111111",
+                "git_status": "tracked_clean",
+                "observed_revision_basis": "working_tree_content"
+              },
+              "source": {
+                "path": "docs/architecture.md",
+                "repo_alias": "web",
+                "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb"
+              },
+              "source_id": "src_90d4597a8559a37e97595ee2130005ac"
+            }
+          ],
+          "provenance": {
+            "extraction_method": "repository_config_explicit",
+            "extractor_version": "claims-v1",
+            "locator": "claim:region",
+            "provenance_complete": true,
+            "revision": {
+              "content_sha256": "82a641d2ddb0808d6b40c1f52eeb57f8afc50d177413b07a3d86921f75321de2",
+              "git_head": "1111111111111111111111111111111111111111",
+              "git_status": "tracked_clean",
+              "observed_revision_basis": "working_tree_content"
+            },
+            "source": {
+              "path": ".context-integrity.toml",
+              "repo_alias": "web",
+              "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb"
+            },
+            "source_id": "src_5773bcf17241d15c196df3b4a12c4b0b"
+          },
+          "reasons": [],
+          "sources": [
+            {
+              "authority": "unknown",
+              "content_sha256": "82a641d2ddb0808d6b40c1f52eeb57f8afc50d177413b07a3d86921f75321de2",
+              "lifecycle": "unknown",
+              "source": {
+                "path": ".context-integrity.toml",
+                "repo_alias": "web",
+                "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb"
+              },
+              "source_id": "src_5773bcf17241d15c196df3b4a12c4b0b",
+              "state": "observed"
+            },
+            {
+              "authority": "architecture_product",
+              "content_sha256": "6a88aec4ca197fa6f248b2a93f80452c0745999a523d96beb949caaecf3e487e",
+              "lifecycle": "active",
+              "source": {
+                "path": "docs/architecture.md",
+                "repo_alias": "web",
+                "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb"
+              },
+              "source_id": "src_90d4597a8559a37e97595ee2130005ac",
+              "state": "observed"
+            }
+          ],
+          "validity": "unverified"
+        }
+      ],
+      "evaluation_status": "evaluated",
+      "id": "claims",
+      "kind": "claim_match",
+      "reasons": [
+        {
+          "code": "claims_unverified"
+        },
+        {
+          "code": "declarations_agree"
+        },
+        {
+          "code": "dependency_history_not_pinned"
+        }
+      ],
+      "rule_id": "workspace.claim_match.v1",
+      "signal": "aligned",
+      "sources": []
+    },
+    {
+      "accepted_sha256": null,
+      "claims": [],
+      "evaluation_status": "evaluated",
+      "id": "mirror",
+      "kind": "mirror_bytes",
+      "reasons": [
+        {
+          "code": "byte_comparison_not_semantic_validation"
+        },
+        {
+          "code": "byte_equality_observed"
+        }
+      ],
+      "rule_id": "workspace.mirror_bytes.v1",
+      "signal": "aligned",
+      "sources": [
+        {
+          "authority": null,
+          "content_sha256": "6a88aec4ca197fa6f248b2a93f80452c0745999a523d96beb949caaecf3e487e",
+          "lifecycle": null,
+          "source": {
+            "path": "docs/architecture.md",
+            "repo_alias": "api",
+            "repository_id": "repo_af348c2a1c93181d43e464541164c1b2"
+          },
+          "source_id": "src_2910dea12622c3cf667471dff53d9226",
+          "state": "observed"
+        },
+        {
+          "authority": null,
+          "content_sha256": "6a88aec4ca197fa6f248b2a93f80452c0745999a523d96beb949caaecf3e487e",
+          "lifecycle": null,
+          "source": {
+            "path": "docs/architecture.md",
+            "repo_alias": "web",
+            "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb"
+          },
+          "source_id": "src_90d4597a8559a37e97595ee2130005ac",
+          "state": "observed"
+        }
+      ]
+    },
+    {
+      "accepted_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+      "claims": [],
+      "evaluation_status": "evaluated",
+      "id": "pin",
+      "kind": "contract_pin",
+      "reasons": [
+        {
+          "code": "accepted_revision_observed"
+        },
+        {
+          "code": "consumer_implementation_not_verified"
+        }
+      ],
+      "rule_id": "workspace.contract_pin.v1",
+      "signal": "aligned",
+      "sources": [
+        {
+          "authority": null,
+          "content_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+          "lifecycle": null,
+          "source": {
+            "path": "spec/api.json",
+            "repo_alias": "api",
+            "repository_id": "repo_af348c2a1c93181d43e464541164c1b2"
+          },
+          "source_id": "src_16a27a72844fb75fc3e21e3bb2a74fa7",
+          "state": "observed"
+        },
+        {
+          "authority": null,
+          "content_sha256": "df8ed18251ea4a44343c51a9d2f631cb424a5a9e7b3018ca5d5e1ec04eff862c",
+          "lifecycle": null,
+          "source": {
+            "path": "contracts/api.lock.json",
+            "repo_alias": "web",
+            "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb"
+          },
+          "source_id": "src_d6fdc0e0a6a422c249973c7bf5ecdd66",
+          "state": "observed"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "providers_disabled",
+    "index_not_durable_receipt",
+    "no_global_ranking"
+  ],
+  "manifest_sha256": "291b4beff2c63f23c6d890595209fe9228dee7760f6e31c5b9379a3dc78f9723",
+  "repositories": [
+    {
+      "alias": "api",
+      "git_dirty": false,
+      "git_head": "1111111111111111111111111111111111111111",
+      "identity_basis": "git_remote",
+      "limitations": [],
+      "repository_id": "repo_af348c2a1c93181d43e464541164c1b2",
+      "warnings": []
+    },
+    {
+      "alias": "web",
+      "git_dirty": false,
+      "git_head": "1111111111111111111111111111111111111111",
+      "identity_basis": "git_remote",
+      "limitations": [],
+      "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb",
+      "warnings": []
+    }
+  ],
+  "review_required": false,
+  "selection_complete": true,
+  "status": "aligned_observed",
+  "targets": [
+    {
+      "authority_policies": [],
+      "budget": {
+        "configured_bytes": null,
+        "effective_bytes": 10000,
+        "used_bytes": 22
+      },
+      "config_sha256": "82a641d2ddb0808d6b40c1f52eeb57f8afc50d177413b07a3d86921f75321de2",
+      "contract_id": "work",
+      "contract_sha256": "93e4372a439201bfbe9ef08dc7965c6e74e549c1802bd49226e5f59ddf91308f",
+      "coverage": "observed_inventory",
+      "decisions": [
+        {
+          "contributing_rule_ids": [],
+          "decision": "not_selected",
+          "derivation": "inventory_classification",
+          "matched_rule_ids": [],
+          "origin": "inventory",
+          "revision": {
+            "content_sha256": "82a641d2ddb0808d6b40c1f52eeb57f8afc50d177413b07a3d86921f75321de2",
+            "git_head": "1111111111111111111111111111111111111111",
+            "git_status": "tracked_clean",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "rule_decisions": [],
+          "source": {
+            "path": ".context-integrity.toml",
+            "repo_alias": "api",
+            "repository_id": "repo_af348c2a1c93181d43e464541164c1b2"
+          },
+          "source_id": "src_eafc3238fab235e52eaebe63634c95d6"
+        },
+        {
+          "contributing_rule_ids": [
+            "architecture"
+          ],
+          "decision": "selected",
+          "derivation": "inventory_classification",
+          "matched_rule_ids": [
+            "architecture"
+          ],
+          "origin": "inventory",
+          "revision": {
+            "content_sha256": "6a88aec4ca197fa6f248b2a93f80452c0745999a523d96beb949caaecf3e487e",
+            "git_head": "1111111111111111111111111111111111111111",
+            "git_status": "tracked_clean",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "rule_decisions": [
+            {
+              "authority_exclusion": null,
+              "authority_policy": null,
+              "equal_tier_sources": [],
+              "highest_tier_index": null,
+              "reason": "selected",
+              "rule_id": "architecture",
+              "tier_index": null
+            }
+          ],
+          "source": {
+            "path": "docs/architecture.md",
+            "repo_alias": "api",
+            "repository_id": "repo_af348c2a1c93181d43e464541164c1b2"
+          },
+          "source_id": "src_2910dea12622c3cf667471dff53d9226"
+        }
+      ],
+      "dependencies": [
+        {
+          "revision": {
+            "content_sha256": "6a88aec4ca197fa6f248b2a93f80452c0745999a523d96beb949caaecf3e487e",
+            "git_head": "1111111111111111111111111111111111111111",
+            "git_status": "tracked_clean",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "source": {
+            "path": "docs/architecture.md",
+            "repo_alias": "api",
+            "repository_id": "repo_af348c2a1c93181d43e464541164c1b2"
+          },
+          "source_id": "src_2910dea12622c3cf667471dff53d9226"
+        }
+      ],
+      "integrity_status": "not_evaluated",
+      "repo_alias": "api",
+      "repository_id": "repo_af348c2a1c93181d43e464541164c1b2",
+      "requested_budget_bytes": 10000,
+      "selected_sources": [
+        {
+          "authority": "architecture_product",
+          "derivation": "inventory_classification",
+          "kind": "architecture",
+          "lifecycle": "active",
+          "revision": {
+            "content_sha256": "6a88aec4ca197fa6f248b2a93f80452c0745999a523d96beb949caaecf3e487e",
+            "git_head": "1111111111111111111111111111111111111111",
+            "git_status": "tracked_clean",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "size_bytes": 22,
+          "source": {
+            "path": "docs/architecture.md",
+            "repo_alias": "api",
+            "repository_id": "repo_af348c2a1c93181d43e464541164c1b2"
+          },
+          "source_id": "src_2910dea12622c3cf667471dff53d9226"
+        }
+      ],
+      "status": "complete",
+      "validation": [],
+      "warnings": []
+    },
+    {
+      "authority_policies": [],
+      "budget": {
+        "configured_bytes": null,
+        "effective_bytes": 10000,
+        "used_bytes": 22
+      },
+      "config_sha256": "82a641d2ddb0808d6b40c1f52eeb57f8afc50d177413b07a3d86921f75321de2",
+      "contract_id": "work",
+      "contract_sha256": "93e4372a439201bfbe9ef08dc7965c6e74e549c1802bd49226e5f59ddf91308f",
+      "coverage": "observed_inventory",
+      "decisions": [
+        {
+          "contributing_rule_ids": [],
+          "decision": "not_selected",
+          "derivation": "inventory_classification",
+          "matched_rule_ids": [],
+          "origin": "inventory",
+          "revision": {
+            "content_sha256": "82a641d2ddb0808d6b40c1f52eeb57f8afc50d177413b07a3d86921f75321de2",
+            "git_head": "1111111111111111111111111111111111111111",
+            "git_status": "tracked_clean",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "rule_decisions": [],
+          "source": {
+            "path": ".context-integrity.toml",
+            "repo_alias": "web",
+            "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb"
+          },
+          "source_id": "src_5773bcf17241d15c196df3b4a12c4b0b"
+        },
+        {
+          "contributing_rule_ids": [
+            "architecture"
+          ],
+          "decision": "selected",
+          "derivation": "inventory_classification",
+          "matched_rule_ids": [
+            "architecture"
+          ],
+          "origin": "inventory",
+          "revision": {
+            "content_sha256": "6a88aec4ca197fa6f248b2a93f80452c0745999a523d96beb949caaecf3e487e",
+            "git_head": "1111111111111111111111111111111111111111",
+            "git_status": "tracked_clean",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "rule_decisions": [
+            {
+              "authority_exclusion": null,
+              "authority_policy": null,
+              "equal_tier_sources": [],
+              "highest_tier_index": null,
+              "reason": "selected",
+              "rule_id": "architecture",
+              "tier_index": null
+            }
+          ],
+          "source": {
+            "path": "docs/architecture.md",
+            "repo_alias": "web",
+            "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb"
+          },
+          "source_id": "src_90d4597a8559a37e97595ee2130005ac"
+        }
+      ],
+      "dependencies": [
+        {
+          "revision": {
+            "content_sha256": "6a88aec4ca197fa6f248b2a93f80452c0745999a523d96beb949caaecf3e487e",
+            "git_head": "1111111111111111111111111111111111111111",
+            "git_status": "tracked_clean",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "source": {
+            "path": "docs/architecture.md",
+            "repo_alias": "web",
+            "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb"
+          },
+          "source_id": "src_90d4597a8559a37e97595ee2130005ac"
+        }
+      ],
+      "integrity_status": "not_evaluated",
+      "repo_alias": "web",
+      "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb",
+      "requested_budget_bytes": 10000,
+      "selected_sources": [
+        {
+          "authority": "architecture_product",
+          "derivation": "inventory_classification",
+          "kind": "architecture",
+          "lifecycle": "active",
+          "revision": {
+            "content_sha256": "6a88aec4ca197fa6f248b2a93f80452c0745999a523d96beb949caaecf3e487e",
+            "git_head": "1111111111111111111111111111111111111111",
+            "git_status": "tracked_clean",
+            "observed_revision_basis": "working_tree_content"
+          },
+          "size_bytes": 22,
+          "source": {
+            "path": "docs/architecture.md",
+            "repo_alias": "web",
+            "repository_id": "repo_7bbbe0bdfa789eb0e1081c53d73f94fb"
+          },
+          "source_id": "src_90d4597a8559a37e97595ee2130005ac"
+        }
+      ],
+      "status": "complete",
+      "validation": [],
+      "warnings": []
+    }
+  ],
+  "task_sha256": "0ebb429fa86d481c2630fac53db1c91cffed5d4d41d1021c179444eb67e7ee0b",
+  "workspace_context_schema_version": 1
+}
