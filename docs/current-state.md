@@ -1,9 +1,9 @@
 # Current State
 
-**Last updated:** 2026-10-21
+**Last updated:** 2026-10-24
 **Current phase:** Phase 10 — Cross-Repository Integrity
 **Active plan:** `docs/plans/phase-10-implementation-plan.md`
-**Status:** Implemented and offline-verified; independent Phase 10 review pending.
+**Status:** Phase 10 delivered; review fixes committed, verification and independent acceptance pending.
 Phase 9 and Phase 8 fresh independent re-reviews remain pending.
 
 ## Delivered
@@ -27,6 +27,9 @@ Phase 9 and Phase 8 fresh independent re-reviews remain pending.
   refreshed. Source reads include stable-file checks; failures and budget gaps cannot align.
 
 ## Verification
+
+The following results document the original Phase 10 delivery at `c24f15d`; they do not verify
+the review-fix commit.
 
 `UV_CACHE_DIR=/tmp/context-integrity-uv-cache UV_OFFLINE=1 make check` passed:
 Ruff lint, formatting (**102 files at that gate**) and **1,167 tests**, Python 3.12.13/macOS.
@@ -59,12 +62,13 @@ restrictions, POSIX/macOS verification scope and predecessor limitations remain 
 
 Phase 4 final independent verification, Phase 7 fresh independent review, Phase 8 fresh
 independent re-review and Phase 9 fresh independent re-review remain pending. Phase 10 independent
-acceptance has not been established. No semantic compatibility/claim verification, generic
-contradiction engine, persistence, LLM, cross-repo structural graph, source-body bundling or
-CI enforcement is delivered.
+acceptance has not been established. Review fixes bound report serialization, isolate warning
+scopes, and expose claim freshness and metadata sensitivity. Automated verification of those fixes
+remains pending. No semantic compatibility/claim verification, generic contradiction engine,
+persistence, LLM, cross-repo structural graph, source-body bundling or CI enforcement is delivered.
 
 ## Next expected step
 
-Independent Phase 10 review against the active plan, architecture, durable contracts,
-code/tests and compiler/acquisition seams. Preserve earlier pending review statuses;
-Phase 11 governance/CI work remains separately scoped.
+Independent verification of the Phase 10 review fixes, followed by Phase 10 acceptance review
+against the active plan, architecture, durable contracts, code and compiler/acquisition seams.
+Preserve earlier pending review statuses; Phase 11 governance/CI work remains separately scoped.

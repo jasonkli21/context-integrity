@@ -167,8 +167,12 @@ Source observations contain `(repo_alias,repository_id,path)`, scoped source ID,
 raw-byte SHA256, and nullable observed lifecycle/authority. Claim observations retain the
 qualified claim ID, explicit declaration fields (including original scope/value), `unverified`
 validity, extraction provenance/revision, qualified provenance/dependency observations and
-local uncertainty codes. These explicit declarations are structured metadata, not source-body
-bundles. Warning/error prose, classification prose and remote URLs are not copied.
+local uncertainty codes. Each `claim_match` finding also reports
+`claim_dependency_freshness: not_established`; declaration equality and historical freshness
+remain separate dimensions. Coverage lists `claim_dependency_freshness_not_established` and
+`claim_literals_may_be_sensitive` when claim checks are present. These explicit declarations are
+structured metadata, not source-body bundles. Warning/error prose, classification prose and
+remote URLs are not copied.
 
 | Rule | Aligned evidence | Review evidence | Inconclusive |
 | --- | --- | --- | --- |
@@ -185,8 +189,10 @@ Matching locks retain `consumer_implementation_not_verified`. Mirrors retain
 Claim comparison uses exact Python string equality, with no case, whitespace, Unicode or
 semantic normalization. IDs only locate declarations. Config source cannot manage its own
 lifecycle: existing eligibility accepts `unknown` or `active`; other lifecycle states on
-provenance/dependencies yield `claim_provenance_not_active`. All inventory warnings conservatively
-prevent positive claim alignment. Unresolved dependency revisions yield
+provenance/dependencies yield `claim_provenance_not_active`. Repository-discovery and
+inventory-acquisition warnings conservatively prevent positive claim alignment. Explicit file
+observation warnings belong to their finding and do not change a later inventory's coverage.
+Unresolved dependency revisions yield
 `claim_evidence_incomplete`. Changed, staged, unstaged, untracked or unknown-status dependencies
 yield `claim_dependency_changed_or_unknown`, even if both claim strings are identical.
 Generated-derivative dependencies yield `claim_dependency_revalidation_unavailable`; workspace
@@ -220,8 +226,10 @@ Context Engine. Source IDs, decisions, dependencies and equal-tier alternatives 
 `workspace_check_schema_version=1` fields are `manifest_sha256`, sorted `repositories`, `status`,
 `coverage`, `findings`. Coverage contains `checks_declared`, `checks_evaluated`, and limitations
 `declared_checks_only`, `sequential_non_atomic_observations`, `no_semantic_validation`, plus
-`no_checks_declared` when appropriate. Repository descriptors contain alias, repository ID,
-identity basis, HEAD/dirty, sorted warning codes and limitations; no local name/root/remote.
+`claim_dependency_freshness_not_established` and `claim_literals_may_be_sensitive` when claim
+checks are present, and `no_checks_declared` when appropriate. Claim findings include the
+structured `claim_dependency_freshness` value. Repository descriptors contain alias, repository
+ID, identity basis, HEAD/dirty, sorted warning codes and limitations; no local name/root/remote.
 
 `workspace_context_schema_version=1` fields are `manifest_sha256`, UTF-8 `task_sha256`,
 `repositories`, `selection_complete`, `checks_status`, boolean `review_required`, `status`,
@@ -239,7 +247,9 @@ incomplete target with `inventory_unavailable`, without inventing a contract or 
 Projectors allowlist every field. Existing compiled JSON v3 is never embedded and retains its
 raw task representation for direct callers. Workspace task text, source bodies, absolute roots,
 timestamps, raw provider data/stderr and credential remotes are absent. Explicit claim metadata
-is retained; callers should treat those fields as untrusted strings. JSON uses sorted keys,
+is retained verbatim; claim values can contain secrets or other sensitive strings. Review reports
+before sharing them or passing them to another agent. The CLI does not redact claim metadata.
+JSON uses sorted keys,
 2-space indentation, ASCII escaping, finite values and one trailing newline. Repositories,
 checks and targets sort by alias, check ID and `(alias,contract_id)` respectively. Changing
 manifest declaration ordering changes its raw digest but not the sorted observations.
@@ -248,6 +258,9 @@ Text adds a brief summary to the same complete escaped JSON evidence, ensuring l
 ## Acquisition, bounds, publication and exits
 
 - Manifest ≤256 KiB; lock ≤16 KiB; explicit source ≤5 MiB; UTF-8 task ≤64 KiB.
+- Fully rendered JSON or text reports are limited to 8 MiB, including the text summary. A bounded
+  preflight rejects oversized reports with `workspace_report_limit_exceeded` (exit 6) before
+  stdout output or file publication; reports are never truncated.
 - Explicit observation budget: 64 MiB and 4,096 distinct attempts. Cache keys include observed
   repository ID, path and read limit. Only lock bodies are retained (≤16 KiB each); source
   bodies are hashed and discarded. Failures conservatively reserve the requested allowance.

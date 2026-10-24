@@ -1,5 +1,6 @@
 """Allowlisted workspace projections and exclusive, root-free publication."""
 
+import json
 from hashlib import sha256
 from pathlib import Path
 
@@ -8,9 +9,23 @@ from context_integrity.derived_models import canonical_json, path_value
 from context_integrity.derived_output import DerivedOutputError, write_outputs
 from context_integrity.models import make_source_id
 from context_integrity.workspace_config import safe_directory
-from context_integrity.workspace_models import QualifiedSourceRef, aggregate
+from context_integrity.workspace_models import QualifiedSourceRef, RuleKind, aggregate
 
 CAVEATS = ["declared_checks_only", "sequential_non_atomic_observations", "no_semantic_validation"]
+MAX_WORKSPACE_OUTPUT_BYTES = 8 * 1024 * 1024
+
+
+class WorkspaceOutputError(ValueError):
+    """Workspace report exceeded its bounded serialized size."""
+
+
+def _check_json_size(value: dict, limit: int) -> None:
+    encoder = json.JSONEncoder(sort_keys=True, indent=2, ensure_ascii=True, allow_nan=False)
+    size = 1  # canonical_json appends one newline
+    for chunk in encoder.iterencode(value):
+        size += len(chunk)  # ensure_ascii=True makes every emitted character ASCII
+        if size > limit:
+            raise WorkspaceOutputError("workspace_report_limit_exceeded")
 
 
 def qualified(ref):
@@ -89,7 +104,7 @@ def claim_observation(value):
 
 
 def finding(value):
-    return {
+    result = {
         "id": value.id,
         "rule_id": f"workspace.{value.kind.value}.v1",
         "kind": value.kind.value,
@@ -100,6 +115,9 @@ def finding(value):
         "claims": [claim_observation(c) for c in value.claims],
         "accepted_sha256": value.accepted_sha256,
     }
+    if value.kind == RuleKind.CLAIM_MATCH:
+        result["claim_dependency_freshness"] = "not_established"
+    return result
 
 
 def repositories(workspace):
@@ -120,6 +138,11 @@ def repositories(workspace):
 
 
 def check_dict(workspace, findings):
+    limitations = CAVEATS.copy()
+    if any(f.kind == RuleKind.CLAIM_MATCH for f in findings):
+        limitations.extend(
+            ["claim_dependency_freshness_not_established", "claim_literals_may_be_sensitive"]
+        )
     return {
         "workspace_check_schema_version": 1,
         "manifest_sha256": workspace.spec.manifest_sha256,
@@ -128,7 +151,7 @@ def check_dict(workspace, findings):
         "coverage": {
             "checks_declared": len(findings),
             "checks_evaluated": sum(f.evaluation_status == "evaluated" for f in findings),
-            "limitations": CAVEATS + ([] if findings else ["no_checks_declared"]),
+            "limitations": limitations + ([] if findings else ["no_checks_declared"]),
         },
         "findings": [finding(f) for f in findings],
     }
@@ -269,10 +292,16 @@ def fingerprint_contract(compiled):
 
 def render_workspace(value: dict, *, as_json: bool) -> str:
     # Text retains the complete structured evidence, with a concise summary heading.
+    prefix = ""
+    limit = MAX_WORKSPACE_OUTPUT_BYTES
+    if not as_json:
+        prefix = f"Workspace: {value['status']}\nDeclared checks: {len(value['findings'])}\n\n"
+        limit -= len(prefix.encode("utf-8"))
+    _check_json_size(value, limit)
     body = canonical_json(value)
     if as_json:
         return body
-    return f"Workspace: {value['status']}\nDeclared checks: {len(value['findings'])}\n\n{body}"
+    return prefix + body
 
 
 def publish_workspace(workspace, output: Path, rendered: str):

@@ -5,7 +5,9 @@
     "limitations": [
       "declared_checks_only",
       "sequential_non_atomic_observations",
-      "no_semantic_validation"
+      "no_semantic_validation",
+      "claim_dependency_freshness_not_established",
+      "claim_literals_may_be_sensitive"
     ]
   },
   "findings": [
@@ -167,6 +169,7 @@
           "validity": "unverified"
         }
       ],
+      "claim_dependency_freshness": "not_established",
       "evaluation_status": "evaluated",
       "id": "claims",
       "kind": "claim_match",

@@ -1613,7 +1613,9 @@ Later:
 
 # 29. Cross-Repository Architecture
 
-Multi-repository support is a long-term requirement but not a Phase 0 scope requirement.
+Multi-repository support is a long-term requirement but was not a Phase 0 scope requirement.
+The Phase 10 explicit workspace v1 supports declared local checks and per-repository context
+indexes; graph federation and semantic cross-repository analysis remain future work.
 
 The architecture should ensure:
 
@@ -1622,7 +1624,7 @@ The architecture should ensure:
 - IDs are not based solely on local absolute paths;
 - source and evidence contracts can carry repository identity.
 
-A future workspace is conceptually:
+The workspace model is conceptually:
 
 ```text
 Workspace

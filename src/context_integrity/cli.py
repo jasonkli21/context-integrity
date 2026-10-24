@@ -666,6 +666,7 @@ def _workspace_command(manifest, task, format, output):
     from context_integrity.workspace import WorkspaceRepositoryError, resolve_workspace
     from context_integrity.workspace_config import WorkspaceInputError
     from context_integrity.workspace_output import (
+        WorkspaceOutputError,
         check_dict,
         context_dict,
         publish_workspace,
@@ -687,6 +688,9 @@ def _workspace_command(manifest, task, format, output):
             err=True,
         )
         raise typer.Exit(3) from exc
+    except WorkspaceOutputError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(6) from exc
     except (WorkspaceInputError, ConfigurationError, ValueError) as exc:
         typer.echo(
             str(exc) if isinstance(exc, WorkspaceInputError) else "workspace_input_error", err=True
@@ -708,7 +712,7 @@ def workspace_check(
     format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
     output: Annotated[Path | None, typer.Option()] = None,
 ) -> None:
-    """Observe declared alignments; findings retain exit zero."""
+    """Observe declared alignments; claim literals may be sensitive report data."""
     _workspace_command(manifest, None, format, output)
 
 
@@ -719,5 +723,5 @@ def workspace_compile(
     format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
     output: Annotated[Path | None, typer.Option()] = None,
 ) -> None:
-    """Compile independent per-repository context indexes with explicit budgets."""
+    """Compile per-repository context; claim literals may be sensitive report data."""
     _workspace_command(manifest, task, format, output)

@@ -1,6 +1,6 @@
 """Local workspace resolution, bounded acquisition and deterministic explicit checks."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from hashlib import sha256
 from pathlib import Path
 
@@ -53,6 +53,7 @@ class Workspace:
         self.spec = spec
         self.repositories = repositories
         self.contexts = {r.alias: r.context for r in repositories}
+        self.discovery_warnings = {r.alias: tuple(r.context.warnings) for r in repositories}
         self.cache: dict[tuple[str, str, int], tuple[SourceObservation, bytes | None]] = {}
         self.inventories: dict[str, InventoryManifest | None] = {}
         self.bytes = self.attempts = 0
@@ -70,8 +71,7 @@ class Workspace:
         self.attempts += 1
         if self.attempts > OBSERVATION_ATTEMPTS or self.bytes >= OBSERVATION_BYTES:
             return SourceObservation(ref, "budget_exceeded", None), None
-        context = self.contexts[alias]
-        start = len(context.warnings)
+        context = replace(self.contexts[alias], warnings=[])
         bound = min(limit, OBSERVATION_BYTES - self.bytes)
         data = None
         if lock:
@@ -81,7 +81,7 @@ class Workspace:
         else:
             size, digest, _ = read_source(context, path, max_bytes=bound, require_stable=True)
         self.bytes += size if digest is not None else bound
-        warnings = context.warnings[start:]
+        warnings = context.warnings
         state = "observed"
         if digest is None:
             state = (
@@ -102,7 +102,9 @@ class Workspace:
 
     def inventory(self, alias: str) -> InventoryManifest | None:
         if alias not in self.inventories:
-            context = self.contexts[alias]
+            context = replace(
+                self.contexts[alias], warnings=list(self.discovery_warnings[alias])
+            )
             remaining = min(OBSERVATION_BYTES, self.inventory_budget.remaining_bytes)
             attempts = min(OBSERVATION_ATTEMPTS, self.inventory_budget.remaining_attempts)
             try:
