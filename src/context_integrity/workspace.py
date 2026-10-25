@@ -102,9 +102,7 @@ class Workspace:
 
     def inventory(self, alias: str) -> InventoryManifest | None:
         if alias not in self.inventories:
-            context = replace(
-                self.contexts[alias], warnings=list(self.discovery_warnings[alias])
-            )
+            context = replace(self.contexts[alias], warnings=list(self.discovery_warnings[alias]))
             remaining = min(OBSERVATION_BYTES, self.inventory_budget.remaining_bytes)
             attempts = min(OBSERVATION_ATTEMPTS, self.inventory_budget.remaining_attempts)
             try:

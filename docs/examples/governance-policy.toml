@@ -1,0 +1,16 @@
+# Template: copy to the checkout root as governance.toml, then review/commit it.
+# Relative roots resolve against this policy file, so this template is not run in place.
+governance_schema_version = 1
+policy_id = "repository-pr"
+owner = "team:maintainers"
+fail_on = "medium"
+on_inconclusive = "fail"
+
+[[targets]]
+id = "app"
+kind = "repository"
+root = "."
+require_architecture = false
+
+# Add explicit workspace/derived targets only when their inputs exist.
+# Add exact waivers after observing and reviewing a real finding fingerprint.

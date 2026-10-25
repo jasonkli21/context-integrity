@@ -183,8 +183,8 @@ Context Integrity owns the semantics and workflows for:
 - task-context policy;
 - context compilation across source types;
 - integrity findings;
-- waivers/governance later;
-- CI enforcement later;
+- explicit local waivers/governance in Phase 11;
+- separate explicit CI enforcement in Phase 11;
 - derived-context invalidation;
 - integrity observability.
 
@@ -340,6 +340,9 @@ Answers:
 - Given a task and budget, what valid context should be assembled?
 
 ## Layer 7 — Operations and Governance
+
+Phase 11 implements explicit local policy, evidence-scoped waivers, CI exit decisions and
+scoped metrics/comparison. Hosted monitoring and authenticated approvals remain future work.
 
 Answers:
 
@@ -822,7 +825,7 @@ Adapters:
 
 - CLI;
 - JSON;
-- future CI;
+- explicit local governance/CI gate;
 - future API/MCP/plugin surfaces.
 
 Interface concerns must not leak into domain policy.
@@ -1469,7 +1472,7 @@ The CLI should not contain:
 - persistence logic;
 - provider protocol/normalization logic.
 
-This allows future CI/API integrations to use the same application layer.
+Phase 11 local governance composes this application layer; future API integrations can reuse it.
 
 ---
 
@@ -1700,7 +1703,7 @@ Do not resolve these before implementation provides evidence:
 - learned ranking;
 - web UI;
 - team/hosted architecture;
-- waiver/governance model;
+- authenticated organizational governance and hosted audit history;
 - stable rename lineage;
 - automatic document repair.
 
@@ -1900,3 +1903,21 @@ shared explicit/inventory budgets and conservative uncertainty bound observation
 is exclusive and outside every participating root. Observations/publication remain sequential,
 without a multi-repo atomic snapshot or crash transaction. Exact grammar, limits, caveats and
 valid fixtures: [workspace integrity contract](workspace-integrity-contract.md).
+
+
+## Phase 11 governance boundary
+
+`governance_config.py` reads a separately supplied strict TOML v1; repository config remains v8.
+`governance_adapters.py` composes existing typed integrity, workspace and derived observations.
+`governance.py` owns versioned evidence fingerprints, declared severity/ownership, exact dated
+waivers and independent blocker/coverage aggregation. Native evaluator truth is not expanded:
+claims stay unverified and equal bytes do not prove semantics. All declared subjects are attempted;
+evaluator failures are visible gaps, never waived or silently omitted.
+
+`governance_output.py` projects separate report v1 with bounded metadata/evidence, scoped counts,
+strict optional historical comparison and exclusive publication outside participating roots.
+Comparisons never affect enforcement. Policy owners/review references are declarations, not
+signed approval. No hosted service, database, network, automatic waiver renewal or Phase 12
+reasoning is introduced. Source/body/claim literals are excluded. A report is rebuildable derived
+evidence, not canonical truth or an exhaustive compliance certificate. Exact scope, privacy,
+limits, deliberate orchestration error handling and CI exits: [governance contract](governance-contract.md).

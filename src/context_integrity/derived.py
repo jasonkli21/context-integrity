@@ -105,8 +105,9 @@ class Observation:
 class Reader:
     """One command-wide byte/work budget, shared by a memoized receipt DAG."""
 
-    def __init__(self, context: RepositoryContext):
+    def __init__(self, context: RepositoryContext, *, require_stable: bool = False):
         self.context = context
+        self.require_stable = require_stable
         self.bytes = 0
         self.work = 0
         self.cache: dict[tuple[str, int], tuple[Observation, bytes | None]] = {}
@@ -125,10 +126,12 @@ class Reader:
         data = None
         if limit == MAX_RECEIPT_BYTES:
             size, content_hash, data = read_source_bytes_with_observation(
-                self.context, path, max_bytes=bound
+                self.context, path, max_bytes=bound, require_stable=self.require_stable
             )
         else:
-            size, content_hash, _ = read_source(self.context, path, max_bytes=bound)
+            size, content_hash, _ = read_source(
+                self.context, path, max_bytes=bound, require_stable=self.require_stable
+            )
         self.bytes += size if content_hash is not None else bound
         if content_hash is None:
             warnings = self.context.warnings[start:]

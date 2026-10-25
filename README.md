@@ -10,7 +10,7 @@ Context Integrity is being built around the idea that:
 
 ## Status
 
-**Phase 10 cross-repository integrity implemented; independent review pending.**
+**Phase 11 local governance implemented; independent acceptance remains pending.**
 Phase 8 remediation is offline-verified; its independent re-review also remains pending.
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
@@ -367,7 +367,8 @@ uv run context-integrity check . --format json --output /tmp/integrity.json
 
 `check` returns 0 after a successful evaluation, including when findings exist. Repository
 or explicitly requested diff failures return 3, output failures 4, and config failures 6.
-Severity is descriptive; there are no CI thresholds in this phase.
+The original `check` remains descriptive and non-gating. Use the separate
+[governance command](docs/governance-contract.md) for explicit CI thresholds and waivers.
 
 Without `--diff`, change evidence includes modified, deleted, and untracked paths from
 local Git status. `BASE..TARGET` resolves two local commits and compares their paths,
@@ -633,7 +634,8 @@ severity, and evidence references. Earlier JSON projections remain unchanged; us
 output to inspect v6 compiler policy fields. Stable output contains no absolute root,
 timestamps, or source bodies. This is a rebuildable selection manifest, observed
 sequentially, with no source-body bundle, semantic retrieval, integrity gating, token
-budgeting, cache, LLM, database, or CI enforcement. Optional code acquisition is described below.
+budgeting, cache, LLM or database. CI enforcement is available through the separate
+[governance command](docs/governance-contract.md). Optional code acquisition is described below.
 See the [Phase 6 implementation report](docs/implementation-reports/phase-6-implementation-report.md).
 
 ## Mixed documentation and code context (configuration v7)
@@ -695,6 +697,29 @@ For implementation work, start with:
 5. [`docs/prd.md`](docs/prd.md) only when product intent or downstream alignment is needed.
 
 For AI-assisted work, read [`AGENTS.md`](AGENTS.md) before changing code. The repository intentionally keeps review reports, handoffs, and historical artifacts out of the default context path so they do not overpower current sources.
+
+## Explicit local governance
+
+Copy [the policy template](docs/examples/governance-policy.toml) to the checkout root as
+`governance.toml`, review it, then run:
+
+```bash
+uv run context-integrity governance check governance.toml --format json
+uv run context-integrity governance check governance.toml --diff app=BASE..HEAD
+```
+
+Policy v1 supplies owner, severity threshold, required coverage handling, repository/workspace/
+derived targets, reviewed rule overrides and exact expiring fingerprint waivers. Report v1 retains
+native signals, provenance and independent coverage gaps, with scoped metrics and explicit prior
+report comparison. No source bodies or claim values are emitted. Exit 8 means an unwaived blocker;
+9 means required incomplete evidence without a definite blocker. Existing check commands retain
+their exit behavior. `--as-of`, `--compare-to`, `--format` and exclusive `--output` outside observed
+roots are supported. Owners/reviews are declarations; a pass is not semantic compliance.
+
+The [governance contract](docs/governance-contract.md) defines exact grammar, fingerprints,
+limits, comparison and exits. The [PR recipe](docs/examples/governance-pr.yml) is an example;
+the existing quality workflow remains unchanged. Phase 11 and predecessor independent review
+statuses remain unresolved as recorded in [current state](docs/current-state.md).
 
 ## Roadmap
 

@@ -1,0 +1,34 @@
+# Example only. Install a reviewed governance.toml at the checkout root first.
+# Keep the existing lint/format/test quality workflow. Configure policy review/branch
+# protection separately: local owner/review declarations do not authenticate approval.
+name: Governance example
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # existing repository pin
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # existing repository pin
+        with:
+          version: "0.11.13"
+          python-version: "3.12"
+      - name: Install locked local project
+        run: uv sync --frozen --group dev
+      - name: Evaluate explicit PR range
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        # Values travel as quoted argv data; no PR title/body interpolation or API writes.
+        # uv installs dependencies above; the product evaluation below is offline.
+        run: |
+          uv run --offline context-integrity governance check governance.toml \
+            --diff "app=${BASE_SHA}..${HEAD_SHA}" --format json \
+            --output "${RUNNER_TEMP}/governance.json"
+        # Do not add continue-on-error or swallow exits 8/9.

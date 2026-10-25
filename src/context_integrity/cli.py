@@ -725,3 +725,97 @@ def workspace_compile(
 ) -> None:
     """Compile per-repository context; claim literals may be sensitive report data."""
     _workspace_command(manifest, task, format, output)
+
+
+governance_app = typer.Typer(
+    help="Apply explicit local governance; exits 8 for blockers, 9 for incomplete evidence.",
+    no_args_is_help=True,
+)
+app.add_typer(governance_app, name="governance")
+
+
+@governance_app.command("check")
+def governance_check(
+    policy: Annotated[Path, typer.Argument(help="Explicit governance TOML v1.")],
+    diff: Annotated[
+        list[str] | None, typer.Option(help="Repeat TARGET=BASE..TARGET for repository targets.")
+    ] = None,
+    as_of: Annotated[
+        str | None, typer.Option(help="UTC waiver evaluation date YYYY-MM-DD.")
+    ] = None,
+    compare_to: Annotated[
+        Path | None, typer.Option(help="Explicit prior governance JSON report.")
+    ] = None,
+    format: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.TEXT,
+    output: Annotated[
+        Path | None, typer.Option(help="New report outside all observed repositories.")
+    ] = None,
+    evidence_provider: Annotated[str | None, typer.Option()] = None,
+    context_engine_bin: Annotated[str | None, typer.Option()] = None,
+) -> None:
+    """Evaluate all declared targets; legacy check commands retain their exit semantics."""
+    from context_integrity.governance import evaluate
+    from context_integrity.governance_config import iso_date, load_policy
+    from context_integrity.governance_models import GovernanceError
+    from context_integrity.governance_output import (
+        compare,
+        load_baseline,
+        publish_report,
+        render_report,
+    )
+
+    if evidence_provider not in {None, "context-engine"} or (
+        context_engine_bin and not evidence_provider
+    ):
+        raise typer.BadParameter("Explicit supported provider selection required.")
+    try:
+        evaluation_date = iso_date(as_of) if as_of is not None else datetime.now(UTC).date()
+    except ValueError as exc:
+        raise typer.BadParameter("Expected --as-of YYYY-MM-DD.") from exc
+    try:
+        declaration, parent = load_policy(policy)
+        diffs = {}
+        repository_targets = {t.id for t in declaration.targets if t.kind == "repository"}
+        for value in diff or []:
+            target, separator, revisions = value.partition("=")
+            endpoints = revisions.split("..")
+            if (
+                not separator
+                or target not in repository_targets
+                or target in diffs
+                or len(value) > 512
+                or len(endpoints) != 2
+                or "..." in revisions
+                or any(not e or e != e.strip() or e.startswith("-") for e in endpoints)
+            ):
+                raise typer.BadParameter("Diff requires a unique repository TARGET=BASE..TARGET.")
+            diffs[target] = revisions
+        previous = load_baseline(compare_to) if compare_to is not None else None
+        report, roots = evaluate(
+            declaration,
+            parent,
+            as_of=evaluation_date,
+            diffs=diffs,
+            evidence_provider=evidence_provider is not None,
+            binary=context_engine_bin,
+        )
+        if previous is not None:
+            report["comparison"] = compare(report, previous)
+        rendered = render_report(report, as_json=format == OutputFormat.JSON)
+    except GovernanceError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(6) from exc
+    if output is None:
+        typer.echo(rendered, nl=False)
+    else:
+        try:
+            publish_report(
+                roots,
+                output,
+                rendered,
+                forbidden={p.absolute() for p in (policy, compare_to) if p is not None},
+            )
+        except DerivedOutputError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(4) from exc
+    raise typer.Exit(report["gate"]["exit_code"])

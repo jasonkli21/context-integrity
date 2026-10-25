@@ -31,3 +31,6 @@ deferred
 ```
 
 Do not claim that a planned requirement is delivered merely because it appears in the phase plan.
+
+Phase 11 delivery/self-verification: [implementation report](phase-11-implementation-report.md).
+Independent acceptance remains separately tracked in [current state](../current-state.md).

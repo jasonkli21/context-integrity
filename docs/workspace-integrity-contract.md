@@ -300,4 +300,6 @@ The consumer lock is a narrow cross-repository acceptance receipt owned by the c
 It is unauthenticated and editable, does not prove use by consumer code, and is not a generic
 Phase 9 derived receipt. Workspace context indexes do not extend receipt v1 across roots or
 prove transitive generated-artifact freshness. Semantic compatibility, authority ranking,
-cross-repo structural graphs, durable workspace receipt DAGs and CI enforcement remain deferred.
+cross-repo structural graphs and durable workspace receipt DAGs remain deferred. Phase 11 adds
+separate explicit CI enforcement in the [governance contract](governance-contract.md); workspace
+commands and schemas retain their original non-gating behavior.

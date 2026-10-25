@@ -71,6 +71,12 @@ transitive revalidation, status/coverage semantics, safe output lifecycle and re
 Implemented Phase 10 workspace/lock/check/context v1, explicit qualified identities, deterministic
 alignment semantics, independent compilation, no-follow acquisition and exclusive output bounds.
 
+### `governance-contract.md`
+
+Implemented Phase 11 explicit policy/report v1, typed evaluator composition, separate CI gates,
+exact dated waivers, scoped metrics, advisory comparison and bounded safe publication.
+Examples live under `examples/`; independent acceptance is tracked in current-state.
+
 ### `current-state.md`
 
 Short navigation/status snapshot.

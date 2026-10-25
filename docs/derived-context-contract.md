@@ -180,7 +180,8 @@ unsupported, missing, unsafe or wrong-repository receipts are input errors (exit
 
 Ordinary check outcomes exit 0. Repository/discovery and capture inventory-budget failures
 exit 3; explicit output failures exit 4; config/capture/receipt input errors exit 6. Existing
-provider failures remain exit 7. Invalid CLI flag combinations exit 2. No CI gating is implied.
+provider failures remain exit 7. Invalid CLI flag combinations exit 2. No CI gating is implied by these commands. Phase 11 composes their typed observations through
+the separate [governance contract](governance-contract.md), preserving receipt/result v1.
 
 ## Bounds and trust boundary
 

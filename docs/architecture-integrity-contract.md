@@ -147,7 +147,10 @@ uv run context-integrity check . \
 Provider selection and executable override are runtime-only; no task/budget is required.
 Omitting the provider still runs Phase 4 checks and visibly marks configured invariants
 `not_evaluated`. Provider failure exits 7; configuration errors exit 6. Findings exit 0, including
-HIGH violations. Text, JSON and output-file behavior remain supported. CI thresholds, waivers,
-positive dependency proofs, semantic contradiction reasoning, automatic fixes, persistence,
-cross-repository rules remain deferred. Phase 9 revalidation is delivered separately in
+HIGH violations. Text, JSON and output-file behavior remain supported. CI thresholds and waivers
+are available through the separate Phase 11
+[governance contract](governance-contract.md); this command stays non-gating. Positive dependency
+proofs, semantic contradiction reasoning, automatic fixes and persistence remain deferred.
+Phase 10 explicit cross-repository checks have a separate workspace contract. Phase 9 revalidation
+is delivered separately in
 [the derived context contract](derived-context-contract.md).
