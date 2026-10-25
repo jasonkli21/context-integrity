@@ -13,6 +13,7 @@ from context_integrity.governance_adapters import (
     local_provider,
     repository_subject,
     resolve_workspace_subject,
+    validate_diff_scope,
     workspace_subject,
 )
 from context_integrity.governance_models import (
@@ -130,6 +131,25 @@ def evaluate(
         evidence_count += sum(len(o.evidence) for o in subject.observations)
         if observation_count > MAX_OBSERVATIONS or evidence_count > MAX_EVIDENCE:
             raise GovernanceError("governance_observation_limit_exceeded")
+    # Recheck every explicit repository range after all other subjects have finished. This catches
+    # a checkout change that occurs after that repository's own evaluation but before the report.
+    for subject in subjects:
+        target = subject.target
+        diff = diffs.get(target.id)
+        if target.kind != "repository" or diff is None:
+            continue
+        try:
+            context = bind_repository(parent / target.root, target.repository_id)
+            changes = validate_diff_scope(context, diff)
+        except Exception as exc:
+            raise GovernanceError("governance_diff_scope_invalid") from exc
+        if (
+            not subject.repositories
+            or subject.repositories[0]["repository_id"] != context.repository.id
+            or subject.scope.get("base_revision") != changes.base_revision
+            or subject.scope.get("target_revision") != changes.target_revision
+        ):
+            raise GovernanceError("governance_diff_scope_invalid")
     rules = {(r.target, r.rule_id): r for r in policy.rule_policies}
     projected, descriptors, used_rules = [], [], set()
     for subject in subjects:
@@ -204,6 +224,11 @@ def evaluate(
                 }
             )
     matches = Counter((o["target"], o["fingerprint"]) for o in projected if o["fingerprint"])
+    finding_by_fingerprint = {
+        (o["target"], o["fingerprint"]): o
+        for o in projected
+        if o["effect"] == "finding" and o["fingerprint"]
+    }
     waivers = []
     active = {}
     for waiver in policy.waivers:
@@ -216,6 +241,11 @@ def evaluate(
             if not count
             else "ambiguous"
             if count != 1
+            else "stale_context"
+            if policy.schema_version == 1
+            or waiver.approved_severity != finding_by_fingerprint[key]["effective_severity"]
+            or waiver.approved_owner != finding_by_fingerprint[key]["owner"]
+            or waiver.approved_fail_on != policy.fail_on
             else "applied"
         )
         if status == "applied":
@@ -230,6 +260,9 @@ def evaluate(
                 "reason_sha256": sha256(waiver.reason.encode()).hexdigest(),
                 "review_ref": waiver.review_ref,
                 "expires_on": waiver.expires_on.isoformat(),
+                "approved_severity": waiver.approved_severity,
+                "approved_owner": waiver.approved_owner,
+                "approved_fail_on": waiver.approved_fail_on,
             }
         )
     for o in projected:
@@ -242,6 +275,7 @@ def evaluate(
         key=lambda o: (o["target"], o["rule_id"], o["code"], o["entity"], o["fingerprint"] or "")
     )
     policy_info = {
+        "schema_version": policy.schema_version,
         "id": policy.id,
         "owner": policy.owner,
         "sha256": policy.sha256,
@@ -261,7 +295,7 @@ def evaluate(
         ],
     }
     report = {
-        "governance_report_schema_version": 1,
+        "governance_report_schema_version": 2,
         "policy": policy_info,
         "evaluation": {"as_of_utc_date": as_of.isoformat(), "subjects": descriptors},
         "observations": projected,

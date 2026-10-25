@@ -1,4 +1,4 @@
-"""Strict explicit governance TOML v1; no implicit policy discovery."""
+"""Strict explicit governance TOML v1/v2; no implicit policy discovery."""
 
 import re
 import tomllib
@@ -78,8 +78,10 @@ def parse_policy(data: bytes) -> Policy:
             ("rule_policies", "waivers"),
         )
         require(
-            type(raw["governance_schema_version"]) is int and raw["governance_schema_version"] == 1
+            type(raw["governance_schema_version"]) is int
+            and raw["governance_schema_version"] in (1, 2)
         )
+        schema_version = raw["governance_schema_version"]
         token(raw["policy_id"])
         owner(raw["owner"])
         require(type(raw["fail_on"]) is str and raw["fail_on"] in SEVERITIES)
@@ -131,17 +133,20 @@ def parse_policy(data: bytes) -> Policy:
         require(len({(r.target, r.rule_id) for r in rules}) == len(rules))
         waivers = []
         for item in array(raw.get("waivers", []), 256):
+            waiver_fields = (
+                "id",
+                "target",
+                "finding_fingerprint",
+                "owner",
+                "reason",
+                "review_ref",
+                "expires_on",
+            )
+            if schema_version == 2:
+                waiver_fields += ("approved_severity", "approved_owner", "approved_fail_on")
             keys(
                 item,
-                (
-                    "id",
-                    "target",
-                    "finding_fingerprint",
-                    "owner",
-                    "reason",
-                    "review_ref",
-                    "expires_on",
-                ),
+                waiver_fields,
             )
             token(item["id"])
             require(type(item["target"]) is str and item["target"] in ids)
@@ -149,10 +154,20 @@ def parse_policy(data: bytes) -> Policy:
             owner(item["owner"])
             reason(item["reason"])
             review(item["review_ref"])
+            if schema_version == 2:
+                require(
+                    type(item["approved_severity"]) is str
+                    and item["approved_severity"] in SEVERITIES
+                )
+                owner(item["approved_owner"])
+                require(
+                    type(item["approved_fail_on"]) is str and item["approved_fail_on"] in SEVERITIES
+                )
             waivers.append(Waiver(**(item | {"expires_on": iso_date(item["expires_on"])})))
         require(len({w.id for w in waivers}) == len(waivers))
         require(len({(w.target, w.finding_fingerprint) for w in waivers}) == len(waivers))
         return Policy(
+            schema_version,
             raw["policy_id"],
             raw["owner"],
             sha256(data).hexdigest(),

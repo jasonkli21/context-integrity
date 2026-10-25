@@ -83,8 +83,8 @@ The projects intentionally do **not** share a database or implementation lifecyc
 │   ├── architecture.md               # system boundaries and architecture invariants
 │   ├── current-state.md              # concise status snapshot
 │   ├── plans/
-│   │   ├── phase-0-implementation-plan.md … phase-9-implementation-plan.md
-│   │   └── phase-10-implementation-plan.md # current phase plan; see current-state.md
+│   │   ├── phase-0-implementation-plan.md … phase-10-implementation-plan.md
+│   │   └── phase-11-implementation-plan.md # current phase plan; see current-state.md
 │   ├── adr/                          # durable architectural decisions
 │   ├── implementation-reports/       # evidence of what an implementation session changed
 │   ├── reviews/                      # independent review findings
@@ -708,13 +708,16 @@ uv run context-integrity governance check governance.toml --format json
 uv run context-integrity governance check governance.toml --diff app=BASE..HEAD
 ```
 
-Policy v1 supplies owner, severity threshold, required coverage handling, repository/workspace/
-derived targets, reviewed rule overrides and exact expiring fingerprint waivers. Report v1 retains
-native signals, provenance and independent coverage gaps, with scoped metrics and explicit prior
-report comparison. No source bodies or claim values are emitted. Exit 8 means an unwaived blocker;
-9 means required incomplete evidence without a definite blocker. Existing check commands retain
-their exit behavior. `--as-of`, `--compare-to`, `--format` and exclusive `--output` outside observed
-roots are supported. Owners/reviews are declarations; a pass is not semantic compliance.
+Policy v1/v2 supplies owner, severity threshold, required coverage handling, repository/workspace/
+derived targets, reviewed rule overrides and exact expiring fingerprint waivers. V2 waivers bind
+approval to effective severity, owner and threshold; legacy v1 waivers need renewal before they
+can suppress a finding. Report v2 retains native signals, provenance and independent coverage gaps,
+with scoped metrics and explicit prior report comparison. No source bodies or claim values are
+emitted. Exit 8 means an unwaived blocker; 9 means required incomplete evidence without a definite
+blocker. Explicit diff ranges require a clean checkout whose HEAD matches the range target; the
+legacy `check --diff` remains unchanged. Existing check commands retain their exit behavior.
+`--as-of`, `--compare-to`, `--format` and exclusive `--output` outside observed roots are supported.
+Owners/reviews are declarations; a pass is not semantic compliance.
 
 The [governance contract](docs/governance-contract.md) defines exact grammar, fingerprints,
 limits, comparison and exits. The [PR recipe](docs/examples/governance-pr.yml) is an example;

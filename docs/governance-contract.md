@@ -1,4 +1,4 @@
-# Governance policy and report v1
+# Governance policy v1/v2 and report v2
 
 Phase 11 adds a separate, explicit local decision layer over existing typed evaluators.
 It does not change config v1–v8, integrity JSON v2, compiled JSON v3, workspace v1 or
@@ -15,12 +15,18 @@ uv run context-integrity governance check governance.toml \
   --output /private/tmp/new-governance.json
 ```
 
-`POLICY` is mandatory; nothing is discovered implicitly. Repeat `--diff TARGET=BASE..TARGET`
-only for distinct declared repository targets. These use the existing `changed_paths` local
-Git range implementation (no rename inference). With no range, repository checks use current
-working-tree status. Findings inspect current working-tree bytes even with a Git range;
-this is change-review scoping, not a historical checkout evaluator. No PR base is guessed.
-Resolved immutable endpoints and HEAD/dirty observations are explanatory, not content pins.
+`POLICY` is mandatory; nothing is discovered implicitly. Repeat `--diff TARGET=BASE..HEAD`
+only for distinct declared repository targets. These use the existing local Git range
+implementation (no rename inference). Governance requires every explicit target to resolve to
+the checked-out `HEAD`; it also requires a known, clean Git status before evaluation and checks
+the same HEAD/clean status again before producing a report. A missing endpoint, mismatched target,
+dirty tracked or untracked path, or changed checkout is a fatal sanitized scope error (exit 6),
+regardless of `on_inconclusive`. It emits no partial report. Detached `HEAD` is supported.
+
+This binds change selection to the clean committed checkout at the evaluation boundaries; it is
+not a historical checkout evaluator or an atomic filesystem snapshot. Source reads remain
+sequential and stable individually. The legacy `integrity check --diff` behavior is unchanged.
+With no range, repository checks use current working-tree status. No PR base is guessed.
 
 `--evidence-provider context-engine` explicitly enables the existing local relation adapter
 for repository targets; `--context-engine-bin` requires that option. Missing/broken provider
@@ -40,7 +46,7 @@ Windows descriptor semantics have not been verified.
 
 ## Complete policy grammar
 
-UTF-8 TOML, at most 256 KiB, exact integer `governance_schema_version = 1`.
+UTF-8 TOML, at most 256 KiB, exact integer `governance_schema_version = 1` or `2`.
 Unknown fields and TOML duplicate keys fail closed. All tables below reject extra keys.
 All targets are required; `on_inconclusive` handles their incomplete coverage globally.
 
@@ -51,7 +57,13 @@ All targets are required; `on_inconclusive` handles their incomplete coverage gl
 | Workspace target | `id`, `kind="workspace"`, `manifest`, `review_severity` | none |
 | Derived target | `id`, `kind="derived"`, `root`, `receipt`, `review_severity` | `repository_id` |
 | Rule policy | `target`, `rule_id`, `severity`, `owner`, `reason`, `review_ref` | none |
-| Waiver | `id`, `target`, `finding_fingerprint`, `owner`, `reason`, `review_ref`, `expires_on` | none |
+| Waiver v1 | `id`, `target`, `finding_fingerprint`, `owner`, `reason`, `review_ref`, `expires_on` | none |
+| Waiver v2 | v1 fields plus `approved_severity`, `approved_owner`, `approved_fail_on` | none |
+
+Policy v1 remains accepted for policies without waivers. A v1 waiver is parsed for migration
+visibility but is `stale_context` and cannot suppress a finding; renew it under policy v2 with
+the reviewed effective severity, accountable finding owner and `fail_on` threshold. This is a
+deliberate fail-closed compatibility change.
 
 `fail_on`, `severity`, `review_severity`: `low`, `medium`, `high`, in increasing enforcement
 severity. `on_inconclusive`: exactly `fail` or `warn`, explicitly required. Native repository
@@ -148,33 +160,41 @@ which dirty bytes were analyzed. Derived observed absence is a meaningful pin st
 reasons still remain independently unwaivable.
 
 A waiver matches exactly one `(target,fingerprint)`, with declared owner/reason/review and expiry.
+Policy v2 also binds approval to the finding's effective severity, effective owner and policy
+`fail_on` threshold. A mismatch is `stale_context` and does not suppress the finding. Renew a
+waiver after a material severity, ownership or gate-threshold change. This approval context is
+separate from the evidence fingerprint, so unrelated commits and source/config changes do not
+invalidate an unchanged finding's approval context.
 `expires_on` is a quoted `YYYY-MM-DD` calendar date, valid **through** that UTC date. The next UTC
 date is expired. One UTC date is captured per invocation; `--as-of` provides explicit test/replay
 time. Neither machine time nor declared ownership is an approval trust anchor.
 
-Waiver statuses: `applied`, `expired`, `unused`, `ambiguous`. Stale evidence and cross-target
-fingerprints are unused; expired takes precedence even if unused. Duplicate policy pairs fail
-parsing rather than choosing a winner. Unused/expired/ambiguous waivers remain visible but do
-not themselves block. Nothing can waive uncertainty, an exception, a skipped required check,
-policy parsing or report failure. Waiving a definite finding cannot remove a separate gap.
+Waiver statuses: `applied`, `expired`, `unused`, `ambiguous`, `stale_context`. Stale evidence and
+cross-target fingerprints are unused; expired takes precedence even if unused. Duplicate policy
+pairs fail parsing rather than choosing a winner. Unused/expired/ambiguous/stale-context waivers
+remain visible but do not themselves block. Nothing can waive uncertainty, an exception, a skipped
+required check, policy parsing or report failure. Waiving a definite finding cannot remove a
+separate gap.
 
-## Report v1 and metrics
+## Report v2 and metrics
 
-`governance_report_schema_version=1` is separate from all predecessor schemas. Exact root keys:
+`governance_report_schema_version=2` is separate from all predecessor schemas. Exact root keys:
 `policy`, `evaluation`, `observations`, `waivers`, `gate`, `metrics`, `comparison`, `limitations`,
-and the schema version. The complete [golden report](../tests/fixtures/governance-report-v1.json)
+and the schema version. The complete [golden report](../tests/fixtures/governance-report-v2.json)
 is executable contract evidence. All keys are required, including nulls. Public projectors
 allowlist fields; no implicit full dataclass or legacy workspace report export occurs.
 
-- `policy`: `id`, `owner`, raw-byte `sha256`, `fail_on`, `on_inconclusive`, `rule_policies`.
+- `policy`: policy `schema_version`, `id`, `owner`, raw-byte `sha256`, `fail_on`,
+  `on_inconclusive`, `rule_policies`.
   Each override includes target/rule/severity/owner, reason hash, review reference and `used`.
 - `evaluation`: `as_of_utc_date`, sorted `subjects`. Each subject has `id`, `kind`, qualified
   `repositories`, nullable `config_sha256` and `review_severity`, boolean `require_architecture`,
   `scope`, `evaluated`, `complete`, `limitations`.
   Repository descriptors contain alias (nullable), ID, identity basis, HEAD and nullable dirty.
   Repository scope has kind, change scope, resolved base/target, and architecture status,
-  invariant count and nullable provider summary. Workspace scope has kind/check count; its
-  config hash is the manifest digest. Derived scope has kind, receipt, artifact ID/path,
+  invariant count and nullable provider summary. Provider summaries include provider ID/version,
+  contract version, capabilities, derivation and coverage. Workspace scope has kind/check count;
+  its config hash is the manifest digest. Derived scope has kind, receipt, artifact ID/path,
   provenance scope and observed receipt count. Failed scopes contain kind only.
 - `observations`: sorted `(target,rule_id,code,entity,fingerprint)` records for all effects.
   Each includes these identities, `signal`, `effect` (`finding`, `uncertainty`, `caveat`,
@@ -182,7 +202,8 @@ allowlist fields; no implicit full dataclass or legacy workspace report export o
   material digest, nullable pinned/observed digests, related claim/invariant/dependency/artifact
   IDs, reason codes, nullable fingerprint, waiver eligibility/ID and blocking flag.
   A finding's effective severity is required; other effects cannot block or be waived.
-- `waivers`: sorted ID/target/fingerprint/status/owner/reason hash/review/expiration records.
+- `waivers`: sorted ID/target/fingerprint/status/owner/reason hash/review/expiration records,
+  plus nullable approved context fields for policy v1 or the v2 effective severity/owner/threshold.
 - `gate`: `outcome`, independent `has_blocking_findings` and `has_incomplete_coverage`, `exit_code`.
 - `limitations`: explicit declared-scope, semantic, authentication and sequential-snapshot limits.
 
@@ -198,20 +219,51 @@ masquerade as integer counters.
 ## Comparisons
 
 `--compare-to` is explicit local JSON, at most 8 MiB, stable no-follow read, duplicate keys and
-nonfinite values rejected. Malformed v1/schema types/fields/counters fail input validation (6).
+nonfinite values rejected. Malformed v2/schema types/fields/counters fail input validation (6).
 An unsupported integer report version is `incomparable: unsupported_schema`; its data is ignored.
 
-Comparability requires schema v1, identical policy ID and raw policy hash, identical sorted target
-IDs/kinds/observed repository IDs, same repository change-scope mode, same derived receipt and
-same workspace manifest hash. A failed/unobserved scope is incomparable. Changed config bytes
-within a repository are current evidence, not automatically incompatible scope. Policy whitespace
-or waiver edits change the policy hash. Comparisons intentionally refuse to bridge those changes.
+Comparability requires report schema v2, identical policy ID and raw policy hash, identical sorted
+target IDs/kinds/observed repository IDs, same repository change-scope mode and same derived receipt.
+The evaluation config hash for each declared subject must also match (`evaluation_config_changed`).
+For `git_range`, the resolved base SHA must match (`diff_base_changed`); target/HEAD progression on
+that base remains comparable. Repository provider presence, ID/version, contract version,
+capabilities, derivation and coverage summary must match (`provider_scope_changed`,
+`provider_contract_changed`, or `provider_coverage_changed`). A failed/unobserved scope is
+incomparable. Policy whitespace or waiver edits change the policy hash. Comparisons intentionally
+refuse to bridge those changes. Prior report v1 is recognized as unsupported and reported
+`incomparable: unsupported_schema`.
 
 `comparison.status`: `not_requested`, `incomparable` (reason codes), or `comparable` with
 `metric_deltas` (current minus prior), sorted fingerprint `added`, `removed`, `persisting` arrays.
 Null/unwaivable fingerprints do not acquire invented continuity. Date differences can change
 waiver/gate counts; fingerprints exclude dates. Prior reports are unauthenticated advisory data
 and **never** change current finding decisions, waivers, coverage or exit status.
+
+## CI example, policy trust and coverage
+
+The [workflow example](examples/governance-pr.yml) writes the bounded JSON report under the
+runner's temporary directory, prints it to the evaluation step log, and adds an `if: always()` job
+summary with the gate outcome and validated aggregate counts. The summary distinguishes a report
+with a failed gate from an input/infrastructure failure that produced no report. Exit 0 allows the
+step, exit 8 means at least one unwaived blocker, and exit 9 means incomplete declared evidence
+under `on_inconclusive = "fail"`. Do not add `continue-on-error`, `|| true`, or privileged
+`pull_request_target`. The example is not installed in this repository's quality workflow.
+
+The example checks out PR-head code and therefore also reads the PR's policy. Local `owner`,
+`review_ref`, and waiver context fields are declarations, not authenticated approvals. Before
+using the example as a protected gate, independently protect policy and workflow changes: require
+code-owner reviews with stale approvals dismissed, add the policy/workflow paths to CODEOWNERS, and
+require the governance status check through branch protection, or load policy from a separately
+protected base/central source. Keep execution on ordinary `pull_request` with read-only permissions;
+do not use `pull_request_target` to run PR code.
+
+A green report means only that all **declared** evaluators passed. The supplied single-repository
+template sets `require_architecture = false`, declares no architecture invariants, and has no
+workspace or derived target; it can allow while reporting only the repository's configured checks.
+It is not a comprehensive architecture or cross-repository compliance profile. Before a protected
+gate, review which families apply and declare the required architecture invariants, workspace
+checks, and derived receipts. The schema does not yet enforce a global required-family floor; absent
+families remain an explicit deployment limitation.
 
 ## Limits and errors
 

@@ -736,9 +736,10 @@ app.add_typer(governance_app, name="governance")
 
 @governance_app.command("check")
 def governance_check(
-    policy: Annotated[Path, typer.Argument(help="Explicit governance TOML v1.")],
+    policy: Annotated[Path, typer.Argument(help="Explicit governance TOML v1 or v2.")],
     diff: Annotated[
-        list[str] | None, typer.Option(help="Repeat TARGET=BASE..TARGET for repository targets.")
+        list[str] | None,
+        typer.Option(help="Repeat TARGET=BASE..HEAD for clean repository targets."),
     ] = None,
     as_of: Annotated[
         str | None, typer.Option(help="UTC waiver evaluation date YYYY-MM-DD.")

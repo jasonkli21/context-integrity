@@ -39,10 +39,14 @@ class Waiver:
     reason: str
     review_ref: str
     expires_on: date
+    approved_severity: str | None = None
+    approved_owner: str | None = None
+    approved_fail_on: str | None = None
 
 
 @dataclass(frozen=True)
 class Policy:
+    schema_version: int
     id: str
     owner: str
     sha256: str

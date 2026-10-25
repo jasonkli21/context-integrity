@@ -1,0 +1,113 @@
+{
+  "comparison": {
+    "status": "not_requested"
+  },
+  "evaluation": {
+    "as_of_utc_date": "2026-10-24",
+    "subjects": [
+      {
+        "complete": true,
+        "config_sha256": null,
+        "evaluated": true,
+        "id": "app",
+        "kind": "repository",
+        "limitations": [
+          "declared_rules_only",
+          "no_semantic_validation",
+          "sequential_non_atomic_observations"
+        ],
+        "repositories": [
+          {
+            "alias": null,
+            "git_dirty": false,
+            "git_head": "060f9d97a64762bd9ed7682f59a4486e29fca7cc",
+            "identity_basis": "git_remote",
+            "repository_id": "repo_117fc5264566c8adf434f3eb7d37b8df"
+          }
+        ],
+        "require_architecture": false,
+        "review_severity": null,
+        "scope": {
+          "architecture": {
+            "evaluation_status": "not_evaluated",
+            "invariants_declared": 0,
+            "provider": null
+          },
+          "base_revision": "060f9d97a64762bd9ed7682f59a4486e29fca7cc",
+          "change_scope": "working_tree",
+          "kind": "repository",
+          "target_revision": null
+        }
+      }
+    ]
+  },
+  "gate": {
+    "exit_code": 0,
+    "has_blocking_findings": false,
+    "has_incomplete_coverage": false,
+    "outcome": "allow"
+  },
+  "governance_report_schema_version": 2,
+  "limitations": [
+    "declared_scope_only",
+    "no_semantic_proof",
+    "owners_and_reviews_unauthenticated",
+    "sequential_non_atomic_observations",
+    "prior_report_never_changes_enforcement"
+  ],
+  "metrics": {
+    "blocking": 0,
+    "by_rule": {},
+    "by_severity": {
+      "high": 0,
+      "low": 0,
+      "medium": 0
+    },
+    "by_target": {
+      "app": 0
+    },
+    "coverage_gaps": 0,
+    "derived_review_required": 0,
+    "findings": 0,
+    "targets_evaluated": 1,
+    "targets_incomplete": 0,
+    "targets_requested": 1,
+    "unwaived": 0,
+    "waived": 0,
+    "workspace_disagreements": 0
+  },
+  "observations": [
+    {
+      "blocking": false,
+      "code": "no_architecture_rules",
+      "effect": "caveat",
+      "effective_severity": null,
+      "entity": "target",
+      "evidence": [],
+      "fingerprint": null,
+      "intrinsic_severity": null,
+      "material_sha256": null,
+      "observed_sha256": null,
+      "owner": "team:platform",
+      "owner_basis": "policy",
+      "pinned_sha256": null,
+      "reasons": [],
+      "related_ids": [],
+      "rule_id": "architecture.forbid_relation.v1",
+      "signal": "not_configured",
+      "target": "app",
+      "waiver_eligible": false,
+      "waiver_id": null
+    }
+  ],
+  "policy": {
+    "fail_on": "medium",
+    "id": "test",
+    "on_inconclusive": "fail",
+    "owner": "team:platform",
+    "rule_policies": [],
+    "schema_version": 2,
+    "sha256": "76acb5d59e5f0a1ebf4ceaeffa4d824f6ea8e934a6279bfe8700bf6674ea9e0b"
+  },
+  "waivers": []
+}

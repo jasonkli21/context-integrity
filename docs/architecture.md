@@ -1907,15 +1907,21 @@ valid fixtures: [workspace integrity contract](workspace-integrity-contract.md).
 
 ## Phase 11 governance boundary
 
-`governance_config.py` reads a separately supplied strict TOML v1; repository config remains v8.
+`governance_config.py` reads separately supplied strict policy TOML v1/v2; repository config
+remains v8. Policy v2 binds waiver approval to effective finding severity, accountable owner and
+gate threshold. Evidence fingerprints remain independent from this approval context; v1 waivers
+cannot suppress findings until renewed under v2.
 `governance_adapters.py` composes existing typed integrity, workspace and derived observations.
 `governance.py` owns versioned evidence fingerprints, declared severity/ownership, exact dated
 waivers and independent blocker/coverage aggregation. Native evaluator truth is not expanded:
 claims stay unverified and equal bytes do not prove semantics. All declared subjects are attempted;
 evaluator failures are visible gaps, never waived or silently omitted.
 
-`governance_output.py` projects separate report v1 with bounded metadata/evidence, scoped counts,
+`governance_output.py` projects separate report v2 with bounded metadata/evidence, scoped counts,
 strict optional historical comparison and exclusive publication outside participating roots.
+Explicit Git ranges must end at the clean checkout HEAD, checked before and after evaluation;
+comparison requires the same resolved diff base, evaluation config and provider
+identity/capabilities/coverage.
 Comparisons never affect enforcement. Policy owners/review references are declarations, not
 signed approval. No hosted service, database, network, automatic waiver renewal or Phase 12
 reasoning is introduced. Source/body/claim literals are excluded. A report is rebuildable derived

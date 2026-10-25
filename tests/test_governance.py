@@ -26,7 +26,7 @@ from context_integrity.repository import discover_repository
 
 RUNNER = CliRunner()
 TODAY = date(2026, 10, 24)
-HEADER = """governance_schema_version = 1
+HEADER = """governance_schema_version = 2
 policy_id = "test"
 owner = "team:platform"
 fail_on = "medium"
@@ -63,9 +63,33 @@ def findings(report):
     return [o for o in report["observations"] if o["effect"] == "finding"]
 
 
-def waiver(fingerprint, *, target="app", expiration="2026-10-24", identifier="WAIVER-1"):
+def waiver(
+    fingerprint,
+    *,
+    target="app",
+    expiration="2026-10-24",
+    identifier="WAIVER-1",
+    approved_severity="medium",
+    approved_owner="team:platform",
+    approved_fail_on="medium",
+):
     return f'''\n[[waivers]]
 id = "{identifier}"
+target = "{target}"
+finding_fingerprint = "{fingerprint}"
+owner = "team:review"
+reason = "Reviewed exception"
+review_ref = "https://example.org/pull/1"
+expires_on = "{expiration}"
+approved_severity = "{approved_severity}"
+approved_owner = "{approved_owner}"
+approved_fail_on = "{approved_fail_on}"
+'''
+
+
+def legacy_waiver(fingerprint, *, target="app", expiration="2026-10-24"):
+    return f'''\n[[waivers]]
+id = "WAIVER-1"
 target = "{target}"
 finding_fingerprint = "{fingerprint}"
 owner = "team:review"
@@ -133,6 +157,58 @@ def test_waiver_boundary_changed_evidence_and_unrelated_head(repo, git):
     assert changed["gate"]["exit_code"] == 8
     assert changed["waivers"][0]["status"] == "unused"
     assert findings(changed)[0]["fingerprint"] != fp
+
+
+def test_waiver_requires_approval_for_effective_rule_context(repo):
+    (repo / "CLAUDE.md").write_text("Missing pointer\n")
+    text = declaration(repo)
+    finding = findings(run_policy(repo, text))[0]
+    fp = finding["fingerprint"]
+
+    escalated = """\n[[rule_policies]]
+target = "app"
+rule_id = "instruction.canonical_reference.v1"
+severity = "high"
+owner = "team:security"
+reason = "Escalated enforcement"
+review_ref = "PR-2"
+"""
+    stale = run_policy(repo, text + waiver(fp) + escalated)
+    assert stale["gate"]["exit_code"] == 8
+    assert stale["waivers"][0]["status"] == "stale_context"
+    assert findings(stale)[0]["fingerprint"] == fp
+
+    renewed = run_policy(
+        repo,
+        text
+        + waiver(
+            fp,
+            approved_severity="high",
+            approved_owner="team:security",
+        )
+        + escalated,
+    )
+    assert renewed["gate"]["exit_code"] == 0
+    assert renewed["waivers"][0]["status"] == "applied"
+
+    threshold_changed = run_policy(
+        repo,
+        declaration(repo, threshold="low") + waiver(fp, approved_fail_on="medium"),
+    )
+    assert threshold_changed["gate"]["exit_code"] == 8
+    assert threshold_changed["waivers"][0]["status"] == "stale_context"
+
+
+def test_legacy_policy_waiver_requires_v2_renewal(repo):
+    (repo / "CLAUDE.md").write_text("Missing pointer\n")
+    text = declaration(repo)
+    fp = findings(run_policy(repo, text))[0]["fingerprint"]
+    legacy = text.replace("governance_schema_version = 2", "governance_schema_version = 1")
+    report = run_policy(repo, legacy + legacy_waiver(fp))
+    assert report["policy"]["schema_version"] == 1
+    assert report["gate"]["exit_code"] == 8
+    assert report["waivers"][0]["status"] == "stale_context"
+    validate_report(report)
 
 
 def test_cross_target_waiver_unused(repo):
@@ -380,7 +456,7 @@ def test_workspace_unobservable_is_not_green(ws):
     "mutation",
     [
         "governance_schema_version = true",
-        "governance_schema_version = 2",
+        "governance_schema_version = 3",
         'governance_schema_version = "1"',
         'policy_id = "bad id"',
         'owner = ""',
@@ -532,9 +608,124 @@ def test_compare_metrics_scope_and_never_suppresses(repo, tmp_path):
     changed = copy.deepcopy(original)
     changed["evaluation"]["subjects"][0]["repositories"][0]["repository_id"] = "repo_" + "0" * 32
     assert compare(current, changed)["status"] == "incomparable"
-    assert compare(current, {"governance_report_schema_version": 2})["status"] == "incomparable"
+    assert compare(current, {"governance_report_schema_version": 3})["status"] == "incomparable"
     baseline.write_text(canonical_json(report))
     assert load_baseline(baseline) == report
+
+
+def test_compare_requires_same_git_base_but_allows_target_progression(repo, git, tmp_path):
+    (repo / ".context-integrity.toml").write_text("""schema_version=4
+[[drift_dependencies]]
+id="architecture"
+dependent="docs/architecture.md"
+upstream=["src/app.py"]
+reason="Review changed application"
+""")
+    (repo / "src").mkdir()
+    (repo / "src/app.py").write_text("before")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "A")
+    revision_a = git(repo, "rev-parse", "HEAD")
+    (repo / "src/app.py").write_text("after")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "B")
+    git(repo, "commit", "--allow-empty", "-qm", "C")
+    revision_c = git(repo, "rev-parse", "HEAD")
+    path = save_policy(repo, declaration(repo))
+
+    first = invoke(path, "--diff", f"app={revision_a}..HEAD", "--format", "json")
+    assert first.exit_code == 8
+    first_report = json.loads(first.stdout)
+    baseline = tmp_path / "prior.json"
+    baseline.write_text(first.stdout)
+
+    working_tree = invoke(path, "--format", "json")
+    assert working_tree.exit_code == 0
+    assert (
+        "target_repository_scope_changed"
+        in compare(first_report, json.loads(working_tree.stdout))["reasons"]
+    )
+
+    git(repo, "branch", "base-a", revision_a)
+    same_commit_ref = invoke(
+        path,
+        "--diff",
+        "app=base-a..HEAD",
+        "--format",
+        "json",
+        "--compare-to",
+        str(baseline),
+    )
+    assert same_commit_ref.exit_code == 8
+    assert json.loads(same_commit_ref.stdout)["comparison"]["status"] == "comparable"
+
+    changed_base = invoke(
+        path,
+        "--diff",
+        f"app={revision_c}..HEAD",
+        "--format",
+        "json",
+        "--compare-to",
+        str(baseline),
+    )
+    assert changed_base.exit_code == 0, changed_base.output
+    changed_base_report = json.loads(changed_base.stdout)
+    assert changed_base_report["comparison"] == {
+        "status": "incomparable",
+        "reasons": ["diff_base_changed"],
+    }
+    assert changed_base_report["gate"]["exit_code"] == 0
+
+    (repo / "unrelated.txt").write_text("D")
+    git(repo, "add", "unrelated.txt")
+    git(repo, "commit", "-qm", "D")
+    progressed = invoke(
+        path,
+        "--diff",
+        f"app={revision_a}..HEAD",
+        "--format",
+        "json",
+        "--compare-to",
+        str(baseline),
+    )
+    assert progressed.exit_code == 8
+    assert json.loads(progressed.stdout)["comparison"]["status"] == "comparable"
+
+
+def test_compare_marks_provider_contract_and_coverage_changes(repo):
+    report = run_policy(repo, declaration(repo))
+    provider = {
+        "id": "fixture",
+        "version": "1.0",
+        "contract_version": 1,
+        "capabilities": ["relations"],
+        "derivation": "fixture-v1",
+        "coverage_incomplete": False,
+        "coverage_signals": {"parsed_files": 1},
+        "warning_categories": [],
+    }
+    prior = copy.deepcopy(report)
+    current = copy.deepcopy(report)
+    prior["evaluation"]["subjects"][0]["scope"]["architecture"]["provider"] = provider
+    changed = copy.deepcopy(provider) | {"version": "2.0"}
+    current["evaluation"]["subjects"][0]["scope"]["architecture"]["provider"] = changed
+    assert "provider_contract_changed" in compare(current, prior)["reasons"]
+
+    current["evaluation"]["subjects"][0]["scope"]["architecture"]["provider"] = provider
+    changed_coverage = copy.deepcopy(provider) | {
+        "coverage_incomplete": True,
+        "coverage_signals": {"parsed_files": 0, "unavailable_files": 1},
+        "warning_categories": ["source_unavailable"],
+    }
+    current["evaluation"]["subjects"][0]["scope"]["architecture"]["provider"] = changed_coverage
+    assert "provider_coverage_changed" in compare(current, prior)["reasons"]
+
+
+def test_compare_marks_repository_evaluation_config_change(repo):
+    baseline = run_policy(repo, declaration(repo))
+    (repo / ".context-integrity.toml").write_text("schema_version=4\n")
+    current = run_policy(repo, declaration(repo))
+    assert "evaluation_config_changed" in compare(current, baseline)["reasons"]
 
 
 @pytest.mark.parametrize(
@@ -619,6 +810,115 @@ reason="Review changed application"
     dirty = json.loads(invoke(path, "--format", "json").stdout)
     assert dirty["evaluation"]["subjects"][0]["repositories"][0]["git_dirty"]
     assert invoke(path, "--help").exit_code == 0
+
+
+def test_governance_diff_must_match_clean_checkout_head(repo, git, tmp_path):
+    (repo / ".context-integrity.toml").write_text("""schema_version=4
+[[drift_dependencies]]
+id="architecture"
+dependent="docs/architecture.md"
+upstream=["src/app.py"]
+reason="Review changed application"
+""")
+    (repo / "src").mkdir()
+    (repo / "src/app.py").write_text("before")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "A")
+    revision_a = git(repo, "rev-parse", "HEAD")
+    (repo / "src/app.py").write_text("after")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "B")
+    revision_b = git(repo, "rev-parse", "HEAD")
+    path = None
+    for incomplete in ("warn", "fail"):
+        path = save_policy(repo, declaration(repo, incomplete=incomplete))
+        for endpoint in (f"{revision_a}..{revision_a}", f"{revision_a}..{revision_a[:12]}"):
+            result = invoke(path, "--diff", f"app={endpoint}", "--format", "json")
+            assert result.exit_code == 6
+            assert result.stdout == ""
+            assert "governance_diff_scope_invalid" in result.stderr
+
+    valid = invoke(path, "--diff", f"app={revision_a}..HEAD", "--format", "json")
+    assert valid.exit_code == 8, valid.output
+    assert any(
+        o["code"] == "document_dependency_changed" for o in findings(json.loads(valid.stdout))
+    )
+
+    detached = git(repo, "checkout", "--detach", revision_b)
+    assert detached == ""
+    by_sha = invoke(path, "--diff", f"app={revision_a}..{revision_b}", "--format", "json")
+    assert by_sha.exit_code == 8, by_sha.output
+
+    output = tmp_path / "must-not-exist.json"
+    stale = invoke(
+        path,
+        "--diff",
+        f"app={revision_a}..{revision_a}",
+        "--format",
+        "json",
+        "--output",
+        str(output),
+    )
+    assert stale.exit_code == 6 and not output.exists()
+
+    (repo / "untracked.txt").write_text("dirty")
+    dirty = invoke(path, "--diff", f"app={revision_a}..HEAD", "--format", "json")
+    assert dirty.exit_code == 6 and dirty.stdout == ""
+    (repo / "untracked.txt").unlink()
+    (repo / "src/app.py").write_text("dirty tracked bytes")
+    path = save_policy(repo, declaration(repo, incomplete="fail"))
+    dirty = invoke(path, "--diff", f"app={revision_a}..HEAD", "--format", "json")
+    assert dirty.exit_code == 6 and dirty.stdout == ""
+
+
+def test_governance_diff_missing_and_advanced_target_fail_closed(repo, git):
+    path = save_policy(repo, declaration(repo, incomplete="warn"))
+    head_b = git(repo, "rev-parse", "HEAD")
+    missing = invoke(path, "--diff", "app=missing-base..HEAD", "--format", "json")
+    assert missing.exit_code == 6 and missing.stdout == ""
+
+    (repo / "unrelated.txt").write_text("later commit")
+    git(repo, "add", "unrelated.txt")
+    git(repo, "commit", "-qm", "C")
+    advanced = invoke(path, "--diff", f"app={head_b}..{head_b}", "--format", "json")
+    assert advanced.exit_code == 6 and advanced.stdout == ""
+
+
+def test_governance_rechecks_all_diff_targets_before_report(repo, git, monkeypatch):
+    import context_integrity.governance as governance
+
+    app_head = git(repo, "rev-parse", "HEAD")
+    other = repo.parent / "other"
+    other.mkdir()
+    git(other, "init", "--initial-branch=main", "--object-format=sha1")
+    git(other, "config", "remote.origin.url", "git@example.invalid:team/other.git")
+    (other / "AGENTS.md").write_text("Instructions\n")
+    (other / "docs").mkdir()
+    (other / "docs/architecture.md").write_text("Architecture\n")
+    git(other, "add", ".")
+    git(other, "commit", "-qm", "other")
+    other_head = git(other, "rev-parse", "HEAD")
+    text = declaration(repo, incomplete="warn") + (
+        '\n[[targets]]\nid="second"\nkind="repository"\nroot="other"\n'
+    )
+
+    original = governance._evaluate
+
+    def advance_first_repo(target, *args):
+        subject = original(target, *args)
+        if target.id == "app":
+            (repo / "unrelated.txt").write_text("commit after first target evaluation")
+            git(repo, "add", "unrelated.txt")
+            git(repo, "commit", "-qm", "advance after first target")
+        return subject
+
+    monkeypatch.setattr(governance, "_evaluate", advance_first_repo)
+    with pytest.raises(GovernanceError, match="governance_diff_scope_invalid"):
+        run_policy(
+            repo,
+            text,
+            diffs={"app": f"{app_head}..{app_head}", "second": f"{other_head}..HEAD"},
+        )
 
 
 def test_required_architecture_absent_and_provider_failure(repo):
@@ -869,41 +1169,88 @@ def test_golden_report(repo):
     from pathlib import Path
 
     report = run_policy(repo, declaration(repo))
-    expected = Path(__file__).parent / "fixtures/governance-report-v1.json"
+    expected = Path(__file__).parent / "fixtures/governance-report-v2.json"
     assert render_report(report, as_json=True) == expected.read_text()
     validate_report(report)
 
 
-def test_ci_shell_propagates_blocker(repo):
+def test_v1_report_baseline_is_incomparable_not_enforced(repo, tmp_path):
+    from pathlib import Path
+
+    report = run_policy(repo, declaration(repo))
+    baseline = tmp_path / "prior-v1.json"
+    baseline.write_text((Path(__file__).parent / "fixtures/governance-report-v1.json").read_text())
+    previous = load_baseline(baseline)
+    assert previous == {"governance_report_schema_version": 1}
+    assert compare(report, previous) == {
+        "status": "incomparable",
+        "reasons": ["unsupported_schema"],
+    }
+
+
+def test_ci_recipe_preserves_exit_codes_and_emits_report(repo):
     import subprocess
     import sys
 
+    def shell_run(path):
+        return subprocess.run(
+            [
+                "bash",
+                "-c",
+                'set -e; "$@"; printf SHOULD_NOT_RUN',
+                "governance-test",
+                sys.executable,
+                "-c",
+                "from context_integrity.cli import app; app()",
+                "governance",
+                "check",
+                str(path),
+                "--format",
+                "text",
+                "--as-of",
+                TODAY.isoformat(),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    allowed_path = save_policy(repo, declaration(repo))
+    allowed = shell_run(allowed_path)
+    assert allowed.returncode == 0
+    assert "Governance: allow (exit 0)" in allowed.stdout
+    assert "SHOULD_NOT_RUN" in allowed.stdout
+
     (repo / "CLAUDE.md").write_text("no pointer")
-    path = save_policy(repo, declaration(repo))
-    result = subprocess.run(
-        [
-            "bash",
-            "-c",
-            'set -e; "$@"; printf SHOULD_NOT_RUN',
-            "governance-test",
-            sys.executable,
-            "-c",
-            "from context_integrity.cli import app; app()",
-            "governance",
-            "check",
-            str(path),
-            "--format",
-            "json",
-            "--as-of",
-            TODAY.isoformat(),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
+    blocker_path = save_policy(repo, declaration(repo))
+    blocker = shell_run(blocker_path)
+    assert blocker.returncode == 8
+    assert "SHOULD_NOT_RUN" not in blocker.stdout
+    assert "Governance: fail (exit 8)" in blocker.stdout
+    assert '"has_blocking_findings": true' in blocker.stdout
+    assert '"code": "instruction_reference_missing"' in blocker.stdout
+
+    incomplete_path = save_policy(
+        repo,
+        declaration(repo) + '\n[[targets]]\nid="missing"\nkind="repository"\nroot="absent"\n',
     )
-    assert result.returncode == 8
-    assert "SHOULD_NOT_RUN" not in result.stdout
-    assert json.loads(result.stdout)["gate"]["has_blocking_findings"]
+    incomplete = shell_run(incomplete_path)
+    assert incomplete.returncode == 8  # A definite blocker still takes precedence over coverage.
+    assert "Governance: fail (exit 8)" in incomplete.stdout
+    assert '"has_incomplete_coverage": true' in incomplete.stdout
+
+    # A clean repository with a missing target and no blocker exercises exit 9.
+    (repo / "CLAUDE.md").unlink()
+    incomplete_only = save_policy(
+        repo,
+        declaration(repo, incomplete="fail").replace('root = "basic-context"', 'root = "."')
+        + '\n[[targets]]\nid="missing"\nkind="repository"\nroot="absent"\n',
+    )
+    result9 = shell_run(incomplete_only)
+    assert result9.returncode == 9
+    assert "SHOULD_NOT_RUN" not in result9.stdout
+    assert "Governance: inconclusive (exit 9)" in result9.stdout
+    assert '"has_incomplete_coverage": true' in result9.stdout
 
 
 def test_unstable_receipt_read_is_uncertainty(repo, monkeypatch):

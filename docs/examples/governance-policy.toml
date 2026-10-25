@@ -1,6 +1,6 @@
 # Template: copy to the checkout root as governance.toml, then review/commit it.
 # Relative roots resolve against this policy file, so this template is not run in place.
-governance_schema_version = 1
+governance_schema_version = 2
 policy_id = "repository-pr"
 owner = "team:maintainers"
 fail_on = "medium"
@@ -12,5 +12,20 @@ kind = "repository"
 root = "."
 require_architecture = false
 
-# Add explicit workspace/derived targets only when their inputs exist.
-# Add exact waivers after observing and reviewing a real finding fingerprint.
+# This starter profile covers this repository target's configured checks only. With no declared
+# architecture invariants, require_architecture=false does not require architecture coverage;
+# this is not a complete architecture/workspace/derived compliance profile.
+# Add explicit workspace/derived targets only when their inputs exist and are in scope.
+# For protected CI, declare and protect every required check family before enabling this policy.
+# V2 waivers must record the reviewed finding severity, owner, and fail_on threshold.
+# [[waivers]]
+# id = "REVIEWED-EXCEPTION-1"
+# target = "app"
+# finding_fingerprint = "<64 lowercase hex characters from a report>"
+# owner = "team:maintainers"
+# reason = "Temporary exception with a specific remediation plan"
+# review_ref = "https://example.org/review/123"
+# expires_on = "2026-12-31"
+# approved_severity = "medium"
+# approved_owner = "team:maintainers"
+# approved_fail_on = "medium"

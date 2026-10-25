@@ -1,4 +1,4 @@
-"""Evidence-light report v1, strict baselines, bounded rendering and safe publication."""
+"""Evidence-light report v2, strict baselines, bounded rendering and safe publication."""
 
 import json
 from collections import Counter
@@ -78,7 +78,7 @@ def _pairs(items):
 
 
 def validate_report(raw):
-    """Validate consumed v1 grammar and counters, never trust historical enforcement."""
+    """Validate consumed v2 grammar and counters, never trust historical enforcement."""
     keys(
         raw,
         (
@@ -95,10 +95,22 @@ def validate_report(raw):
     )
     require(
         type(raw["governance_report_schema_version"]) is int
-        and raw["governance_report_schema_version"] == 1
+        and raw["governance_report_schema_version"] == 2
     )
     p = raw["policy"]
-    keys(p, ("id", "owner", "sha256", "fail_on", "on_inconclusive", "rule_policies"))
+    keys(
+        p,
+        (
+            "schema_version",
+            "id",
+            "owner",
+            "sha256",
+            "fail_on",
+            "on_inconclusive",
+            "rule_policies",
+        ),
+    )
+    require(type(p["schema_version"]) is int and p["schema_version"] in (1, 2))
     token(p["id"])
     owner(p["owner"])
     digest(p["sha256"])
@@ -176,6 +188,8 @@ def validate_report(raw):
                     (
                         "id",
                         "version",
+                        "contract_version",
+                        "capabilities",
                         "derivation",
                         "coverage_incomplete",
                         "coverage_signals",
@@ -184,6 +198,13 @@ def validate_report(raw):
                 )
                 for field in ("id", "version", "derivation"):
                     token(provider[field])
+                require(
+                    type(provider["contract_version"]) is int and provider["contract_version"] == 1
+                )
+                capabilities = array(provider["capabilities"], 5)
+                for capability in capabilities:
+                    token(capability)
+                require(len(set(capabilities)) == len(capabilities))
                 _bool(provider["coverage_incomplete"])
                 require(
                     type(provider["coverage_signals"]) is dict
@@ -320,16 +341,34 @@ def validate_report(raw):
                 "reason_sha256",
                 "review_ref",
                 "expires_on",
+                "approved_severity",
+                "approved_owner",
+                "approved_fail_on",
             ),
         )
         token(w["id"])
         require(type(w["target"]) is str and w["target"] in ids)
         digest(w["finding_fingerprint"])
         iso_date(w["expires_on"])
-        require(w["status"] in ("expired", "unused", "ambiguous", "applied"))
+        require(w["status"] in ("expired", "unused", "ambiguous", "stale_context", "applied"))
+        if p["schema_version"] == 1:
+            require(
+                w["approved_severity"] is None
+                and w["approved_owner"] is None
+                and w["approved_fail_on"] is None
+            )
+        else:
+            require(w["approved_severity"] in SEVERITIES)
+            owner(w["approved_owner"])
+            require(w["approved_fail_on"] in SEVERITIES)
     require(len({w["id"] for w in waivers}) == len(waivers))
     require(len({(w["target"], w["finding_fingerprint"]) for w in waivers}) == len(waivers))
     matches = Counter((o["target"], o["fingerprint"]) for o in observations if o["fingerprint"])
+    findings_by_fingerprint = {
+        (o["target"], o["fingerprint"]): o
+        for o in observations
+        if o["effect"] == "finding" and o["fingerprint"]
+    }
     active = {}
     evaluation_date = iso_date(evaluation["as_of_utc_date"])
     for w in waivers:
@@ -341,6 +380,15 @@ def validate_report(raw):
             if not count
             else "ambiguous"
             if count != 1
+            else "stale_context"
+            if p["schema_version"] == 1
+            or w["approved_severity"]
+            != findings_by_fingerprint[(w["target"], w["finding_fingerprint"])][
+                "effective_severity"
+            ]
+            or w["approved_owner"]
+            != findings_by_fingerprint[(w["target"], w["finding_fingerprint"])]["owner"]
+            or w["approved_fail_on"] != p["fail_on"]
             else "applied"
         )
         require(w["status"] == expected)
@@ -406,8 +454,8 @@ def load_baseline(path):
         raw = json.loads(data, object_pairs_hook=_pairs, parse_constant=lambda _: require(False))
         require(type(raw) is dict)
         version = raw.get("governance_report_schema_version")
-        # Unsupported integer versions are explicitly incomparable, never consumed as v1.
-        if type(version) is int and version != 1:
+        # Unsupported integer versions are explicitly incomparable, never consumed as v2.
+        if type(version) is int and version != 2:
             return {"governance_report_schema_version": version}
         validate_report(raw)
         return raw
@@ -416,7 +464,7 @@ def load_baseline(path):
 
 
 def compare(report, previous):
-    if previous["governance_report_schema_version"] != 1:
+    if previous["governance_report_schema_version"] != 2:
         return {"status": "incomparable", "reasons": ["unsupported_schema"]}
     reasons = []
     if report["policy"]["id"] != previous["policy"]["id"]:
@@ -424,7 +472,7 @@ def compare(report, previous):
     if report["policy"]["sha256"] != previous["policy"]["sha256"]:
         reasons.append("policy_hash_changed")
 
-    def scopes(value):
+    def target_scopes(value):
         return [
             (
                 s["id"],
@@ -432,13 +480,67 @@ def compare(report, previous):
                 sorted(r["repository_id"] for r in s["repositories"]),
                 s["scope"].get("change_scope"),
                 s["scope"].get("receipt"),
-                s["config_sha256"] if s["kind"] == "workspace" else None,
             )
             for s in value["evaluation"]["subjects"]
         ]
 
-    if scopes(report) != scopes(previous):
+    if target_scopes(report) != target_scopes(previous):
         reasons.append("target_repository_scope_changed")
+
+    def evaluation_configs(value):
+        return {s["id"]: (s["kind"], s["config_sha256"]) for s in value["evaluation"]["subjects"]}
+
+    if evaluation_configs(report) != evaluation_configs(previous):
+        reasons.append("evaluation_config_changed")
+
+    def diff_bases(value):
+        return {
+            s["id"]: s["scope"].get("base_revision")
+            for s in value["evaluation"]["subjects"]
+            if s["kind"] == "repository" and s["scope"].get("change_scope") == "git_range"
+        }
+
+    if diff_bases(report) != diff_bases(previous):
+        reasons.append("diff_base_changed")
+
+    def providers(value):
+        result = {}
+        for subject in value["evaluation"]["subjects"]:
+            if subject["kind"] != "repository" or not subject["evaluated"]:
+                continue
+            provider = subject["scope"]["architecture"]["provider"]
+            if provider is None:
+                result[subject["id"]] = None
+            else:
+                result[subject["id"]] = (
+                    provider["id"],
+                    provider["version"],
+                    provider["contract_version"],
+                    tuple(provider["capabilities"]),
+                    provider["derivation"],
+                    provider["coverage_incomplete"],
+                    tuple(sorted(provider["coverage_signals"].items())),
+                    tuple(provider["warning_categories"]),
+                )
+        return result
+
+    current_providers, previous_providers = providers(report), providers(previous)
+    if set(current_providers) != set(previous_providers):
+        reasons.append("provider_scope_changed")
+    else:
+        contract_changed = False
+        coverage_changed = False
+        for target in current_providers:
+            current, old = current_providers[target], previous_providers[target]
+            if current is None or old is None:
+                contract_changed |= current != old
+                continue
+            contract_changed |= current[:5] != old[:5]
+            coverage_changed |= current[5:] != old[5:]
+        if contract_changed:
+            reasons.append("provider_contract_changed")
+        if coverage_changed:
+            reasons.append("provider_coverage_changed")
     if any(not s["evaluated"] for v in (report, previous) for s in v["evaluation"]["subjects"]):
         reasons.append("scope_unobserved")
     if reasons:

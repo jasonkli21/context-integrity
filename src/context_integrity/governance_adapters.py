@@ -6,6 +6,7 @@ from pathlib import Path
 from context_integrity.context_engine import ContextEngineProvider
 from context_integrity.derived import Checker, Reader, fingerprint
 from context_integrity.derived_models import path_value, require, token
+from context_integrity.evidence import changed_paths
 from context_integrity.governance_models import (
     MAX_EVIDENCE,
     MAX_OBSERVATIONS,
@@ -154,7 +155,31 @@ def inventory(context):
     )
 
 
+def validate_diff_scope(context, diff):
+    """Resolve a governance range and bind it to a clean checkout HEAD."""
+    if (
+        not context.repository.git_available
+        or context.repository.git_head is None
+        or context.repository.git_dirty is not False
+        or not context.status_known
+        or context.statuses
+    ):
+        raise GovernanceError("governance_diff_scope_invalid")
+    try:
+        changes = changed_paths(context, diff)
+    except RepositoryError as exc:
+        raise GovernanceError("governance_diff_scope_invalid") from exc
+    if changes.scope.value != "git_range" or changes.target_revision != context.repository.git_head:
+        raise GovernanceError("governance_diff_scope_invalid")
+    return changes
+
+
 def repository_subject(target, context, diff=None, provider=None):
+    requested_changes = None
+    if diff is not None:
+        # Governance interprets current checkout bytes. An explicit range is valid only when
+        # those bytes belong to a clean checkout at the range's exact target commit.
+        requested_changes = validate_diff_scope(context, diff)
     manifest = inventory(context)
     collected = Collector()
     relations = None
@@ -167,6 +192,12 @@ def repository_subject(target, context, diff=None, provider=None):
         except Exception:
             collected.gap("provider_evaluation_failed")
     overview = integrity_overview(context, manifest, diff, relation_batch=relations)
+    if requested_changes is not None and (
+        overview.change_set.scope.value != "git_range"
+        or overview.change_set.base_revision != requested_changes.base_revision
+        or overview.change_set.target_revision != requested_changes.target_revision
+    ):
+        raise GovernanceError("governance_diff_scope_invalid")
     if overview.schema_version != 2:
         collected.gap("unsupported_integrity_schema")
     if overview.change_set.scope not in {"working_tree", "git_range"}:
@@ -305,6 +336,22 @@ def repository_subject(target, context, diff=None, provider=None):
         )
         if not eligible:
             collected.gap("finding_evidence_incomplete", finding.id)
+    if requested_changes is not None:
+        try:
+            final_context = discover_repository(context.root)
+        except Exception as exc:
+            raise GovernanceError("governance_diff_scope_invalid") from exc
+        try:
+            final_changes = validate_diff_scope(final_context, diff)
+        except GovernanceError:
+            raise
+        if (
+            final_context.root != context.root
+            or final_context.repository.id != context.repository.id
+            or final_changes.base_revision != requested_changes.base_revision
+            or final_changes.target_revision != requested_changes.target_revision
+        ):
+            raise GovernanceError("governance_diff_scope_invalid")
     changes = overview.change_set
     scope = {
         "kind": target.kind,
@@ -319,6 +366,8 @@ def repository_subject(target, context, diff=None, provider=None):
             else {
                 "id": architecture.state.descriptor.id,
                 "version": architecture.state.descriptor.version,
+                "contract_version": architecture.state.descriptor.contract_version,
+                "capabilities": list(architecture.state.descriptor.capabilities),
                 "derivation": architecture.state.descriptor.derivation,
                 "coverage_incomplete": architecture.state.coverage.summary.incomplete,
                 "coverage_signals": dict(architecture.state.coverage.summary.signals),

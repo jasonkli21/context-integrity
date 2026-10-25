@@ -1,6 +1,8 @@
-# Example only. Install a reviewed governance.toml at the checkout root first.
-# Keep the existing lint/format/test quality workflow. Configure policy review/branch
-# protection separately: local owner/review declarations do not authenticate approval.
+# Example only; this is not installed by the repository's quality workflow.
+# Protect governance.toml and this workflow with CODEOWNERS/required reviews, or load a
+# base-controlled policy. PR-head policy fields are declarations, not authenticated approval.
+# The report is sanitized and capped at 8 MiB; the gate log and always-run summary remain
+# available when exits 8 or 9 fail.
 name: Governance example
 on:
   pull_request:
@@ -21,14 +23,79 @@ jobs:
           python-version: "3.12"
       - name: Install locked local project
         run: uv sync --frozen --group dev
-      - name: Evaluate explicit PR range
+      - name: Evaluate explicit PR range and print report
+        id: governance
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPORT_PATH: ${{ runner.temp }}/context-integrity-governance-${{ github.run_id }}-${{ github.run_attempt }}.json
         # Values travel as quoted argv data; no PR title/body interpolation or API writes.
         # uv installs dependencies above; the product evaluation below is offline.
+        # The report is written outside the checked-out repository and printed before preserving
+        # the gate's exit code. Do not add continue-on-error or swallow that code.
         run: |
+          set +e
           uv run --offline context-integrity governance check governance.toml \
-            --diff "app=${BASE_SHA}..${HEAD_SHA}" --format json \
-            --output "${RUNNER_TEMP}/governance.json"
-        # Do not add continue-on-error or swallow exits 8/9.
+            --diff "app=${BASE_SHA}..${HEAD_SHA}" --format json --output "$REPORT_PATH"
+          result=$?
+          printf 'exit_code=%s\n' "$result" >> "$GITHUB_OUTPUT"
+          if [ -f "$REPORT_PATH" ]; then
+            cat "$REPORT_PATH"
+          fi
+          exit "$result"
+      - name: Summarize governance result
+        if: always()
+        env:
+          REPORT_PATH: ${{ runner.temp }}/context-integrity-governance-${{ github.run_id }}-${{ github.run_attempt }}.json
+          GOVERNANCE_EXIT_CODE: ${{ steps.governance.outputs.exit_code }}
+          GOVERNANCE_STEP_OUTCOME: ${{ steps.governance.outcome }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["REPORT_PATH"])
+          exit_code = os.environ.get("GOVERNANCE_EXIT_CODE", "")
+          step_outcome = os.environ.get("GOVERNANCE_STEP_OUTCOME", "unknown")
+          print("## Context Integrity governance")
+
+          if not path.is_file():
+              result = "Did not run" if step_outcome == "skipped" else "Input/infrastructure failure"
+              print(f"- Result: **{result}** (exit `{exit_code or 'unavailable'}`).")
+              print("- No complete report was produced; see the evaluation step log for the sanitized error.")
+              raise SystemExit(0)
+
+          try:
+              if path.stat().st_size > 8 * 1024 * 1024:
+                  raise ValueError("report exceeds the documented limit")
+              report = json.loads(path.read_bytes())
+              gate = report["gate"]
+              metrics = report["metrics"]
+              if gate["outcome"] not in {"allow", "allow_with_incomplete", "fail", "inconclusive"}:
+                  raise ValueError("unknown gate outcome")
+              if type(gate["exit_code"]) is not int:
+                  raise ValueError("invalid gate exit code")
+              metric_names = (
+                  "targets_requested",
+                  "targets_evaluated",
+                  "findings",
+                  "blocking",
+                  "waived",
+                  "coverage_gaps",
+              )
+              if any(type(metrics[name]) is not int or metrics[name] < 0 for name in metric_names):
+                  raise ValueError("invalid metric")
+          except (OSError, ValueError, KeyError, TypeError, UnicodeError):
+              print("- Result: **Unavailable**; the report was missing or invalid. See the evaluation step log.")
+              raise SystemExit(0)
+
+          print(f"- Gate: **{gate['outcome']}** (exit `{gate['exit_code']}`).")
+          print(f"- Targets evaluated: {metrics['targets_evaluated']}/{metrics['targets_requested']}.")
+          print(
+              f"- Findings: {metrics['findings']} total; {metrics['blocking']} blocking; "
+              f"{metrics['waived']} waived."
+          )
+          print(f"- Coverage gaps: {metrics['coverage_gaps']}.")
+          print("- The sanitized JSON report is in the evaluation step log (maximum 8 MiB).")
+          PY
