@@ -36,6 +36,7 @@ from context_integrity.models import (
     SourceRecord,
     SourceRevision,
     make_source_id,
+    valid_qualified_symbol_name,
 )
 from context_integrity.relations import EvidenceRelationBatch, EvidenceRelationRequest
 
@@ -71,6 +72,7 @@ COVERAGE_COUNTS = {
     "skips_omitted",
     "selection_candidates_omitted",
 }
+COVERAGE_OPTIONAL_COUNTS = {"sensitive_files_omitted"}
 INCOMPLETE_SIGNALS = COVERAGE_BOOLS | {
     "analysis_incomplete",
     "diagnostics_count",
@@ -267,6 +269,13 @@ def _normalize(payload, request, descriptor):
     signals.update({k: _integer(data["coverage"][k]) for k in COVERAGE_COUNTS})
     signals.update(
         {
+            k: _integer(data["coverage"][k])
+            for k in COVERAGE_OPTIONAL_COUNTS
+            if k in data["coverage"]
+        }
+    )
+    signals.update(
+        {
             k: _boolean(repository["coverage"][k])
             for k in ("analysis_incomplete", "paths_may_be_lossy")
         }
@@ -344,12 +353,7 @@ def _normalize(payload, request, descriptor):
             if _path(symbol["path"]) != path:
                 raise ValueError
             name = symbol["qualified_name"]
-            if (
-                not isinstance(name, str)
-                or not name
-                or len(name) > 1024
-                or any(c in name for c in "/\\\0\n\r")
-            ):
+            if not valid_qualified_symbol_name(name):
                 raise ValueError
             start = _integer(symbol["range"]["start"]["byte"])
             end = _integer(symbol["range"]["end"]["byte"])

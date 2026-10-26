@@ -23,6 +23,10 @@ Every candidate identifies its origin, provider/version, deterministic repositor
 ID, content SHA-256, size, provider rank, score components, sorted reason codes, matched entity
 qualified names/kinds/byte spans, omitted entity count and graph/change distances. Index-local
 file/symbol IDs are discarded. Matched entities describe syntax, not compiler-grade binding.
+Qualified names retain exact case and Unicode identifier components, separated by `.` or `::`,
+with Rust `r#` raw identifiers accepted per component and a 1,024-character limit. Empty or
+malformed components, paths, control/format/surrogate/replacement characters and invalid spans
+are rejected. Reason, kind and score-key tokens retain their strict lowercase token grammar.
 
 The Context Integrity adapter maps `source`, `test`, `schema`, `migration` to `source_code`,
 `test`, `schema`, `migration`, with `executable_truth` authority and `unknown` lifecycle.
@@ -97,7 +101,10 @@ exclusions, lifecycle and rule-scoped authority before relevance, then enforces 
 priorities, maxima and unique byte budgets. Within policy-equivalent groups, provider slots
 in the lexical ordering are filled by provider rank/path; inventory documents keep their
 positions and receive no invented rank. Optional fill uses the same local ranking. Required
-feasibility repair still minimizes bytes then paths; relevance cannot override feasibility.
+feasibility repair minimizes bytes then paths within its deterministic work ceiling; relevance
+cannot override feasibility. On repair exhaustion, the incomplete greedy required selection and
+`compiler_search_budget_exceeded` warning survive; optional fill is skipped. See the
+[compiler architecture](architecture.md#15-context-compiler-architecture) for the exact bounds.
 
 Final validation uses `validate_contract_sources` with the exact mixed universe. The original
 `validate_contract` stays inventory-only. Both require the exact config-bound contract.
@@ -116,6 +123,15 @@ attempts/failures/safety omissions, acquisition budget skips, skipped/selected c
 omissions, matched-entity omissions and change ambiguity/unavailability counts. Material
 incompleteness produces `provider_incomplete` in provider state and compiled warnings.
 Supported-role filtering does not assert that the provider found all potentially relevant code.
+When present in legacy context JSON, the bounded `sensitive_files_omitted` counter is retained
+in normalized coverage and compiled v3 public provider signals. It records intentional safety
+exclusion, a coverage caveat rather than material truncation: nonzero alone does not set
+`incomplete` or emit `provider_incomplete`. Safety filtering remains enabled. Missing this
+optional counter in an older v1 response remains missing, never an invented zero or proof of
+absence. The additive signal does not change the v3 object shape; strict signal-list consumers
+must accept it. The producer-shaped golden now deliberately includes its reported zero value.
+Production consumes legacy `ctx context`/`ctx graph` schema v1 only. Engine's independent
+`ctx evidence ...` evidence-v1 feed is not consumed by this adapter.
 
 `CompilationStatus.COMPLETE` means the package satisfies the declared contract over acquired
 candidates. It does not mean the provider analyzed all code or that code is semantically correct.

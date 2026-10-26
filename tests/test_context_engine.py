@@ -88,7 +88,11 @@ def response(request, files=None):
                 remaining=request.acquisition_budget_bytes - used,
             ),
             change=None,
-            coverage={**dict.fromkeys(COVERAGE_BOOLS, False), **dict.fromkeys(COVERAGE_COUNTS, 0)},
+            coverage={
+                **dict.fromkeys(COVERAGE_BOOLS, False),
+                **dict.fromkeys(COVERAGE_COUNTS, 0),
+                "sensitive_files_omitted": 0,
+            },
             selected=files,
             skipped=[],
         ),
@@ -444,3 +448,88 @@ def test_reversed_provider_emission_order(request_context):
     forward = normalize(fixture, request_context)
     fixture["data"]["selected"].reverse()
     assert forward == normalize(fixture, request_context)
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["crate::mod::Type::method", "pkg.Class.method", "PaCk.Mixed", "包.类.方法", "café::Étage"],
+)
+def test_producer_qualified_symbols(request_context, name):
+    value = response(request_context)
+    value["data"]["selected"][0]["matched_symbols"][0]["qualified_name"] = name
+    batch = normalize(value, request_context)
+    assert batch.candidates[0].relevance.matched_entities == ((name, "function", 0, 12),)
+    assert batch.candidates[0].revision.content_sha256 == sha256(BODY.encode()).hexdigest()
+
+
+def test_sensitive_omissions_survive_projection(request_context):
+    from context_integrity.compiler import compile_context
+    from context_integrity.rendering import render_compiled_context_json
+
+    value = response(request_context)
+    value["data"]["coverage"]["sensitive_files_omitted"] = 7
+    batch = normalize(value, request_context)
+    assert dict(batch.state.coverage.signals)["sensitive_files_omitted"] == 7
+    assert not batch.state.coverage.incomplete
+    root = request_context.repository_root
+    (root / ".context-integrity.toml").write_text(CONFIG)
+    (root / "AGENTS.md").write_text("Instructions")
+    manifest = scan_repository(root)
+    result = compile_context(
+        manifest, manifest.repository_config.context_contracts[0], task="sample", evidence=batch
+    )
+    public = json.loads(render_compiled_context_json(result))
+    assert dict(public["providers"][0]["coverage"]["signals"])["sensitive_files_omitted"] == 7
+    assert BODY not in json.dumps(public)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "",
+        "a/secret",
+        "a\\secret",
+        "a\0b",
+        "a\tb",
+        "a\x7fb",
+        "a\x85b",
+        "a\u202eb",
+        "a\ud800b",
+        "a\ufffdb",
+        "a" * 1025,
+        ".Type",
+        "crate:::Type",
+        "pkg..Type",
+    ],
+)
+def test_unsafe_qualified_symbols_rejected(request_context, name):
+    value = response(request_context)
+    value["data"]["selected"][0]["matched_symbols"][0]["qualified_name"] = name
+    with pytest.raises(EvidenceProviderError, match="invalid_response"):
+        normalize(value, request_context)
+
+
+@pytest.mark.parametrize("start,end", [(-1, 2), (2, 1), (0, 9999), (True, 2)])
+def test_qualified_symbol_bad_spans(request_context, start, end):
+    value = response(request_context)
+    symbol = value["data"]["selected"][0]["matched_symbols"][0]
+    symbol["qualified_name"] = "crate::Type::method"
+    symbol["range"] = {"start": {"byte": start}, "end": {"byte": end}}
+    with pytest.raises(EvidenceProviderError, match="invalid_response"):
+        normalize(value, request_context)
+
+
+@pytest.mark.parametrize("counter", [-1, True, 2**63, "7"])
+def test_sensitive_omission_counter_is_bounded(request_context, counter):
+    value = response(request_context)
+    value["data"]["coverage"]["sensitive_files_omitted"] = counter
+    with pytest.raises(EvidenceProviderError, match="invalid_response"):
+        normalize(value, request_context)
+
+
+def test_older_legacy_context_without_sensitive_counter(request_context):
+    value = response(request_context)
+    del value["data"]["coverage"]["sensitive_files_omitted"]
+    batch = normalize(value, request_context)
+    assert "sensitive_files_omitted" not in dict(batch.state.coverage.signals)
+    assert not batch.state.coverage.incomplete

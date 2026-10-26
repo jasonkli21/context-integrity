@@ -439,3 +439,16 @@ def test_cli_invalid_provider_options(tmp_path):
 def test_process_deadline_must_be_finite(timeout):
     with pytest.raises(ValueError):
         ContextEngineProvider(timeout=timeout)
+
+
+@pytest.mark.parametrize("endpoint", ["source", "target"])
+def test_contains_dangling_endpoints_are_rejected(graph_request, endpoint):
+    value = graph(graph_request)
+    contains = value["data"]["relations"][0]
+    assert contains["kind"] == "contains"
+    if endpoint == "source":
+        contains["source_id"] = 99999
+    else:
+        contains["target"]["entity_id"] = 99999
+    with pytest.raises(EvidenceProviderError, match="dangling_entity"):
+        normalize(value, graph_request)

@@ -905,6 +905,22 @@ class CandidateOrigin(StrEnum):
     EVIDENCE_PROVIDER = "evidence_provider"
 
 
+def valid_qualified_symbol_name(value: object) -> bool:
+    """Exact Rust/Python identifier components, retaining case and Unicode.
+
+    Rust raw identifiers are allowed per component. Qualification is descriptive
+    syntax metadata, not a reason/kind token or an executable expression.
+    """
+    return (
+        isinstance(value, str)
+        and 0 < len(value) <= 1024
+        and all(
+            (part[2:] if part.startswith("r#") else part).isidentifier()
+            for part in re.split(r"::|\.", value)
+        )
+    )
+
+
 @dataclass(frozen=True)
 class CandidateRelevance:
     rank: int
@@ -945,8 +961,7 @@ class CandidateRelevance:
             or any(
                 not isinstance(entity, tuple)
                 or len(entity) != 4
-                or not isinstance(entity[0], str)
-                or not safe_token.fullmatch(entity[0])
+                or not valid_qualified_symbol_name(entity[0])
                 or not isinstance(entity[1], str)
                 or not safe_token.fullmatch(entity[1])
                 or type(entity[2]) is not int

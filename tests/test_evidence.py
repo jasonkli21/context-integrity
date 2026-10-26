@@ -480,3 +480,19 @@ def test_ineligible_optional_provider_slots_cannot_demote_docs(tmp_path):
         files=[selected_file("A.py", 2), selected_file("z.py", 1)],
     )
     assert paths(compile_mixed(manifest, contract, batch)) == ("AGENTS.md",)
+
+
+@pytest.mark.parametrize(
+    "name", ["crate::Type::method", "pkg.Class.method", "包.类", "r#type::Étage", "a" * 1024]
+)
+def test_qualified_relevance_model_acceptance(name):
+    relevance = CandidateRelevance(1, 0, (), (), ((name, "method", 0, 1),))
+    assert relevance.matched_entities[0][0] == name
+
+
+@pytest.mark.parametrize("value", ["BadToken", "pkg.kind", "crate::kind", "é"])
+def test_qualified_names_do_not_loosen_reason_or_kind_tokens(value):
+    with pytest.raises(ValueError):
+        CandidateRelevance(1, 0, (), (value,))
+    with pytest.raises(ValueError):
+        CandidateRelevance(1, 0, (), (), (("pkg.Class", value, 0, 1),))
