@@ -73,7 +73,7 @@ alignment semantics, independent compilation, no-follow acquisition and exclusiv
 
 ### `governance-contract.md`
 
-Implemented Phase 11 explicit policy/report v1, typed evaluator composition, separate CI gates,
+Implemented Phase 11 explicit policy v1/v2 and report v2, typed evaluator composition, separate CI gates,
 exact dated waivers, scoped metrics, advisory comparison and bounded safe publication.
 Examples live under `examples/`; independent acceptance is tracked in current-state.
 

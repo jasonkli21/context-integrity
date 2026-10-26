@@ -1491,6 +1491,9 @@ Mitigation:
 
 # 36. Immediate Next Steps
 
+These are the original initialization steps, retained as historical product intent.
+Use [current state](current-state.md) for delivered phases, active work and acceptance debt.
+
 1. Use `docs/architecture.md` as the durable architectural interpretation of this PRD.
 2. Implement Phase 0 according to `docs/plans/phase-0-implementation-plan.md`.
 3. Do **not** refactor around a Rust engine that does not yet exist.

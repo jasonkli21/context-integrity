@@ -39,3 +39,16 @@ Finding IDs are scoped to each review.
 
 Phase 0/1 records were recovered from their original external artifacts during cumulative
 review remediation, rather than reconstructed from implementation summaries.
+
+## Stabilization audit inputs
+
+The independently supplied 2026-10-26 repo-wide stabilization audit and cross-project boundary
+audit both reviewed Integrity `b03d707c570b2ad66b12e88dc789006ebc82b3cc`. Their original files remain
+external, unedited inputs. Exact filenames, SHA256 digests, finding dispositions and local
+remediation commits are recorded in the
+[stabilization implementation report](../implementation-reports/stabilization-remediation-report.md).
+That report is implementation evidence, not another independent audit. A checked-in independent
+Phase 11 review artifact is still unavailable; the prior
+[Phase 11 fixes report](../implementation-reports/phase-11-review-fixes-report.md) records its
+reported findings without replacing the missing primary review. Current independent-review and
+predecessor acceptance debt remains in [current state](../current-state.md).

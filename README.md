@@ -11,7 +11,8 @@ Context Integrity is being built around the idea that:
 ## Status
 
 **Phase 11 local governance implemented; independent acceptance remains pending.**
-Phase 8 remediation is offline-verified; its independent re-review also remains pending.
+Current stabilization results and predecessor acceptance debt are tracked in
+[`docs/current-state.md`](docs/current-state.md).
 
 The local CLI inventories context documents, hashes their raw bytes, records Git revision/status when available, and explains deterministic provisional classifications. It runs offline and keeps inventory data in memory; an explicit output option can write a manifest.
 

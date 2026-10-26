@@ -35,3 +35,5 @@ Do not claim that a planned requirement is delivered merely because it appears i
 Phase 11 delivery/self-verification: [implementation report](phase-11-implementation-report.md).
 Phase 11 independent-review fixes: [review fixes report](phase-11-review-fixes-report.md).
 Independent acceptance remains separately tracked in [current state](../current-state.md).
+Post-Phase 11 stabilization: [remediation report](stabilization-remediation-report.md), including
+the supplied repo-wide/boundary audit provenance and finding-by-finding disposition.

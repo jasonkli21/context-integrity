@@ -35,6 +35,9 @@ Each binding pass uses stable no-follow reads, at most 4,096 inputs, 5 MiB per i
 total. This intentionally rejects previously accepted ignored-config PR setups; track the config
 and use checkout bytes identical to the target blobs. Working-tree checks retain ignored config
 support. Config/report schema versions and gate exits are unchanged.
+The separately supplied governance policy remains a caller-selected input identified by its
+public policy SHA256. It is not implicitly bound to each target commit; strict target scope
+binds repository configuration and inventory. Policy trust remains the deployment choice below.
 
 This binds change selection to the clean committed checkout at the evaluation boundaries; it is
 not a historical checkout evaluator or an atomic filesystem snapshot. Source reads remain

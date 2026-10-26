@@ -1325,6 +1325,13 @@ def test_ignored_config_cannot_flip_committed_gate(repo, git):
         ]
         live = subprocess.run([*args, "--format", "json"], capture_output=True, timeout=10)
         assert live.returncode == ordinary_exit, live.stderr
+        # Legacy check stays non-gating and keeps its live ignored-config semantics,
+        # including its older --diff mode. Strict binding belongs only to governance.
+        for options in ([], ["--diff", "HEAD..HEAD"]):
+            legacy = RUNNER.invoke(app, ["check", str(repo), "--format", "json", *options])
+            assert legacy.exit_code == 0, legacy.output
+            observed = json.loads(legacy.stdout)
+            assert bool(observed["findings"]) == (canonical == "GEMINI.md")
         output = repo.parent / f"rejected-{canonical}.json"
         strict = subprocess.run(
             [*args, "--diff", "app=HEAD..HEAD", "--format", "json", "--output", str(output)],
