@@ -23,6 +23,19 @@ the same HEAD/clean status again before producing a report. A missing endpoint, 
 dirty tracked or untracked path, or changed checkout is a fatal sanitized scope error (exit 6),
 regardless of `on_inconclusive`. It emits no partial report. Detached `HEAD` is supported.
 
+Strict ranges additionally bind the entire context inventory and root `.context-integrity.toml`
+to the selected commit's regular-file blobs. Live raw bytes must reproduce each Git blob ID;
+Git clean/smudge filters, assume-unchanged and skip-worktree flags cannot substitute for this
+check. A present ignored/untracked config is rejected, even if its settings would allow the gate.
+Absent config is valid only when absent from the commit too. Missing, unsafe, oversized,
+unobservable or changed inventory inputs fail closed with `governance_diff_scope_invalid` (6).
+Inventory path membership and the evaluated content/config hashes are checked again after that
+subject, and every explicit target is rechecked after all subjects before report construction.
+Each binding pass uses stable no-follow reads, at most 4,096 inputs, 5 MiB per input and 64 MiB
+total. This intentionally rejects previously accepted ignored-config PR setups; track the config
+and use checkout bytes identical to the target blobs. Working-tree checks retain ignored config
+support. Config/report schema versions and gate exits are unchanged.
+
 This binds change selection to the clean committed checkout at the evaluation boundaries; it is
 not a historical checkout evaluator or an atomic filesystem snapshot. Source reads remain
 sequential and stable individually. The legacy `integrity check --diff` behavior is unchanged.
@@ -34,6 +47,10 @@ adds a coverage gap while inventory checks still run. No installation, network, 
 credential, database, source/index/receipt/lock/policy mutation or automatic waiver refresh
 is performed. A provider executable is explicitly trusted runtime code; its own external
 side effects are outside this program's guarantees.
+Provider graph observations are separate descriptive evidence, not commit-certified input bytes:
+the legacy graph supplies no analyzed-content digest. Subjects using a provider explicitly carry
+`provider_graph_not_commit_certified`, alongside the existing sequential-observation limitation.
+Clean provider HEAD/dirty metadata and post-graph local hashes do not certify the bytes analyzed.
 
 Default output is stdout. `--format text` adds a short summary to exactly the complete JSON
 payload, preserving parity. `--output` uses cwd-relative or absolute paths, existing no-follow

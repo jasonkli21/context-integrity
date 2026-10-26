@@ -1297,3 +1297,166 @@ def test_baseline_cannot_change_observed_fingerprint_or_waiver(repo, tmp_path):
         baseline.write_text(canonical_json(previous))
         with pytest.raises(GovernanceError):
             load_baseline(baseline)
+
+
+def test_ignored_config_cannot_flip_committed_gate(repo, git):
+    import subprocess
+    import sys
+
+    (repo / "CLAUDE.md").write_text("See AGENTS.md\n")
+    (repo / ".gitignore").write_text(".context-integrity.toml\n")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "ignore local policy")
+    path = save_policy(repo, declaration(repo))
+    config = repo / ".context-integrity.toml"
+    for canonical, ordinary_exit in (("AGENTS.md", 0), ("GEMINI.md", 8)):
+        config.write_text(
+            f'schema_version=4\n[instruction_policy]\ncanonical="{canonical}"\n'
+            'compatibility=["CLAUDE.md"]\n'
+        )
+        assert git(repo, "status", "--porcelain") == ""
+        args = [
+            sys.executable,
+            "-c",
+            "from context_integrity.cli import app; app()",
+            "governance",
+            "check",
+            str(path),
+        ]
+        live = subprocess.run([*args, "--format", "json"], capture_output=True, timeout=10)
+        assert live.returncode == ordinary_exit, live.stderr
+        output = repo.parent / f"rejected-{canonical}.json"
+        strict = subprocess.run(
+            [*args, "--diff", "app=HEAD..HEAD", "--format", "json", "--output", str(output)],
+            capture_output=True,
+            timeout=10,
+        )
+        assert strict.returncode == 6, strict.stdout
+        assert strict.stdout == b"" and not output.exists()
+        assert b"governance_diff_scope_invalid" in strict.stderr
+    config.unlink()
+    assert invoke(path, "--diff", "app=HEAD..HEAD", "--format", "json").exit_code == 0
+
+
+@pytest.mark.parametrize(
+    "state",
+    ["clean", "staged", "unstaged", "removed", "symlink", "assume_unchanged", "skip_worktree"],
+)
+def test_strict_committed_config_controls(repo, git, state):
+    config = repo / ".context-integrity.toml"
+    config.write_text("schema_version=4\n")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "tracked config")
+    if state in {"assume_unchanged", "skip_worktree"}:
+        git(repo, "update-index", "--" + state.replace("_", "-"), ".context-integrity.toml")
+    if state in {"staged", "unstaged", "assume_unchanged", "skip_worktree"}:
+        config.write_text("schema_version=4\n# changed\n")
+    if state == "staged":
+        git(repo, "add", ".context-integrity.toml")
+    if state in {"removed", "symlink"}:
+        config.unlink()
+    if state == "symlink":
+        config.symlink_to("AGENTS.md")
+    path = save_policy(repo, declaration(repo, incomplete="warn"))
+    result = invoke(path, "--diff", "app=HEAD..HEAD", "--format", "json")
+    assert result.exit_code == (0 if state == "clean" else 6), result.output
+    if state != "clean":
+        assert result.stdout == ""
+
+
+@pytest.mark.parametrize("mutation", ["create", "remove", "replace", "source"])
+def test_strict_final_input_recheck(repo, git, monkeypatch, mutation):
+    import context_integrity.governance as governance
+
+    config = repo / ".context-integrity.toml"
+    (repo / ".gitignore").write_text(".context-integrity.toml\n")
+    if mutation in {"remove", "replace"}:
+        config.write_text("schema_version=4\n")
+        git(repo, "add", "-f", ".context-integrity.toml")
+        # Hide tracked changes from ordinary porcelain to exercise byte binding.
+        git(repo, "update-index", "--assume-unchanged", ".context-integrity.toml")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "final recheck fixture")
+    if mutation == "source":
+        git(repo, "update-index", "--assume-unchanged", "AGENTS.md")
+    path = save_policy(repo, declaration(repo))
+    original = governance._evaluate
+
+    def mutate(*args):
+        subject = original(*args)
+        if mutation == "remove":
+            config.unlink()
+        elif mutation == "replace":
+            config.unlink()
+            config.symlink_to("AGENTS.md")
+        elif mutation == "source":
+            (repo / "AGENTS.md").write_text("hidden changed input")
+        else:
+            config.write_text("schema_version=4\n")
+        return subject
+
+    monkeypatch.setattr(governance, "_evaluate", mutate)
+    output = repo.parent / "no-partial.json"
+    result = invoke(path, "--diff", "app=HEAD..HEAD", "--format", "json", "--output", str(output))
+    assert result.exit_code == 6 and result.stdout == "" and not output.exists(), result.output
+    assert "governance_diff_scope_invalid" in result.stderr
+
+
+def test_ignored_config_removed_before_strict_evaluation_is_absent(repo, git):
+    config = repo / ".context-integrity.toml"
+    (repo / ".gitignore").write_text(".context-integrity.toml\n")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "ignored config absent from commit")
+    config.write_text("schema_version=4\n")
+    config.unlink()
+    path = save_policy(repo, declaration(repo))
+    assert invoke(path, "--diff", "app=HEAD..HEAD", "--format", "json").exit_code == 0
+
+
+def test_provider_mutation_of_ignored_config_rejects_subprocess_report(repo, git):
+    import subprocess
+    import sys
+
+    from context_integrity.relations import EvidenceRelationRequest
+    from test_context_engine import fake_executable
+    from test_graph_adapter import graph
+
+    (repo / ".gitignore").write_text(".context-integrity.toml\n")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "provider mutation fixture")
+    payload = graph(EvidenceRelationRequest(repo, discover_repository(repo).repository))
+    script = (
+        "import sys\nfrom pathlib import Path\n"
+        "if sys.argv[1:] == ['--version']:\n print('ctx 0.1.0')\n"
+        "else:\n"
+        f" Path({str(repo / '.context-integrity.toml')!r}).write_text('schema_version=4\\n')\n"
+        f" print({json.dumps(payload)!r})\n"
+    )
+    binary = fake_executable(repo.parent, script=script)
+    path = save_policy(repo, declaration(repo, incomplete="warn"))
+    output = repo.parent / "mutated-report.json"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from context_integrity.cli import app; app()",
+            "governance",
+            "check",
+            str(path),
+            "--diff",
+            "app=HEAD..HEAD",
+            "--evidence-provider",
+            "context-engine",
+            "--context-engine-bin",
+            binary,
+            "--format",
+            "json",
+            "--output",
+            str(output),
+        ],
+        capture_output=True,
+        timeout=15,
+    )
+    assert result.returncode == 6 and not result.stdout and not output.exists(), result.stderr
+    assert b"governance_diff_scope_invalid" in result.stderr
+    assert git(repo, "status", "--porcelain") == ""

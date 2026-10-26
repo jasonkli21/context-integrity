@@ -1,10 +1,19 @@
 """Inventory application use case; no printing or output writes."""
 
+import os
 from collections import Counter
 from dataclasses import dataclass
+from hashlib import new as new_hash
+from hashlib import sha256
 from pathlib import Path
 
-from context_integrity.acquisition import MAX_SOURCE_BYTES, enumerate_candidates, read_source
+from context_integrity.acquisition import (
+    MAX_SOURCE_BYTES,
+    enumerate_candidates,
+    is_context_candidate,
+    read_source,
+    read_source_bytes,
+)
 from context_integrity.classification import apply_authority_metadata, classify_source
 from context_integrity.configuration import CONFIG_PATH, load_config, verify_config_revision
 from context_integrity.lifecycle import apply_lifecycle_metadata, resolve_supersession
@@ -19,7 +28,61 @@ from context_integrity.models import (
     SourceRevision,
     make_source_id,
 )
-from context_integrity.repository import RepositoryContext, RepositoryError, discover_repository
+from context_integrity.repository import (
+    RepositoryContext,
+    RepositoryError,
+    discover_repository,
+    git_command,
+)
+
+
+def verify_committed_inventory(context: RepositoryContext, manifest=None) -> None:
+    """Bind all live inventory inputs, including ignored config, to exact HEAD blobs.
+
+    Status alone can hide ignored config and assume-unchanged/skip-worktree bytes.
+    Compare raw bytes (without Git filters) with the immutable tree's blob identities.
+    This is an opt-in governance check, not an atomic repository snapshot.
+    """
+    result = git_command(context.root, "ls-tree", "-r", "-z", context.repository.git_head)
+    if result.returncode:
+        raise RepositoryError("Committed inventory cannot be verified.")
+    committed = {}
+    for entry in result.stdout.split(b"\0"):
+        if not entry:
+            continue
+        metadata, raw_path = entry.split(b"\t", 1)
+        path = os.fsdecode(raw_path)
+        if is_context_candidate(path):
+            mode, kind, oid = metadata.split()
+            if mode not in {b"100644", b"100755"} or kind != b"blob":
+                raise RepositoryError("Committed inventory requires regular files.")
+            committed[path] = oid.decode("ascii")
+    live_paths = set(enumerate_candidates(context))
+    if os.path.lexists(context.root / CONFIG_PATH):
+        live_paths.add(CONFIG_PATH)
+    if live_paths != set(committed) or len(live_paths) > 4096:
+        raise RepositoryError("Live inventory is not commit-bound.")
+    observed = {}
+    remaining = 64 * 1024 * 1024
+    for path in sorted(live_paths):
+        data = read_source_bytes(
+            context, path, max_bytes=min(MAX_SOURCE_BYTES, remaining), require_stable=True
+        )
+        if data is None:
+            raise RepositoryError("Live inventory cannot be verified.")
+        remaining -= len(data)
+        oid = committed[path]
+        digest = new_hash("sha1" if len(oid) == 40 else "sha256", usedforsecurity=False)
+        digest.update(f"blob {len(data)}\0".encode("ascii"))
+        digest.update(data)
+        if digest.hexdigest() != oid:
+            raise RepositoryError("Live inventory differs from committed input.")
+        observed[path] = sha256(data).hexdigest()
+    if manifest is not None and (
+        {s.path: s.revision.content_sha256 for s in manifest.sources} != observed
+        or manifest.repository_config.content_sha256 != observed.get(CONFIG_PATH)
+    ):
+        raise RepositoryError("Evaluated inventory differs from committed input.")
 
 
 @dataclass

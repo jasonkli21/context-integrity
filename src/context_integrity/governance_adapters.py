@@ -16,7 +16,7 @@ from context_integrity.governance_models import (
     Subject,
 )
 from context_integrity.integrity import integrity_overview
-from context_integrity.inventory import inventory_repository
+from context_integrity.inventory import inventory_repository, verify_committed_inventory
 from context_integrity.relations import EvidenceRelationRequest
 from context_integrity.repository import RepositoryError, discover_repository
 from context_integrity.workspace import Workspace
@@ -155,7 +155,7 @@ def inventory(context):
     )
 
 
-def validate_diff_scope(context, diff):
+def validate_diff_scope(context, diff, manifest=None):
     """Resolve a governance range and bind it to a clean checkout HEAD."""
     if (
         not context.repository.git_available
@@ -171,6 +171,10 @@ def validate_diff_scope(context, diff):
         raise GovernanceError("governance_diff_scope_invalid") from exc
     if changes.scope.value != "git_range" or changes.target_revision != context.repository.git_head:
         raise GovernanceError("governance_diff_scope_invalid")
+    try:
+        verify_committed_inventory(context, manifest)
+    except Exception as exc:
+        raise GovernanceError("governance_diff_scope_invalid") from exc
     return changes
 
 
@@ -342,7 +346,7 @@ def repository_subject(target, context, diff=None, provider=None):
         except Exception as exc:
             raise GovernanceError("governance_diff_scope_invalid") from exc
         try:
-            final_changes = validate_diff_scope(final_context, diff)
+            final_changes = validate_diff_scope(final_context, diff, manifest)
         except GovernanceError:
             raise
         if (
@@ -381,7 +385,12 @@ def repository_subject(target, context, diff=None, provider=None):
         overview.config_sha256,
         scope,
         tuple(collected.items),
-        ("declared_rules_only", "no_semantic_validation", "sequential_non_atomic_observations"),
+        (
+            "declared_rules_only",
+            "no_semantic_validation",
+            "sequential_non_atomic_observations",
+            *(("provider_graph_not_commit_certified",) if provider else ()),
+        ),
     )
 
 
