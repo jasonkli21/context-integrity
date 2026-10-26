@@ -27,11 +27,91 @@ from context_integrity.models import (
     IntegrityOverview,
     InventoryManifest,
     LifecycleState,
+    ScanWarning,
     usable_content_revision,
 )
 from context_integrity.models import (
     ContextRuleMode as Mode,
 )
+
+MAX_REPAIR_WORK = 250_000
+
+
+class _RepairLimit(Exception):
+    pass
+
+
+def _repair_required(candidates, raw_rules, rules, required, byte_limit):
+    """Exact repair within deterministic work, with conservative feasibility pruning.
+
+    Charge node copies, candidate/rule visits and cost sorting before doing the work.
+    Iteration avoids Python recursion limits. Exhaustion retains the original greedy
+    package, even if an unproven optimum was found; it never claims infeasibility.
+    """
+    work = 0
+
+    def charge(amount):
+        nonlocal work
+        work += amount
+        if work > MAX_REPAIR_WORK:
+            raise _RepairLimit
+
+    best = None
+    stack = [(0, (), 0, dict.fromkeys((r.id for r in rules), 0))]
+    try:
+        while stack:
+            index, chosen, cost, counts = stack.pop()
+            charge(1 + len(chosen) + len(rules))
+            if byte_limit is not None and cost > byte_limit:
+                continue
+            deficits = [r for r in required if counts[r.id] < r.min_count]
+            if not deficits:
+                result = (cost, chosen)  # candidates and chosen paths are lexical
+                if best is None or result < best:
+                    best = result
+                continue
+            if index == len(candidates) or (best is not None and cost > best[0]):
+                continue
+            # Each deficit independently gives a lower bound. Use max, never sum:
+            # one source may satisfy several rules and its bytes count only once.
+            impossible = False
+            for rule in deficits:
+                costs = []
+                for j in range(index, len(candidates)):
+                    source = candidates[j]
+                    matches = raw_rules[source.path]
+                    charge(1 + len(matches))
+                    if rule not in matches or any(
+                        r.max_count is not None and counts[r.id] >= r.max_count for r in matches
+                    ):
+                        continue
+                    costs.append(source.size_bytes)
+                need = rule.min_count - counts[rule.id]
+                if len(costs) < need:
+                    impossible = True
+                    break
+                charge(len(costs) * max(1, len(costs).bit_length()))
+                lower_cost = cost + sum(sorted(costs)[:need])
+                if (byte_limit is not None and lower_cost > byte_limit) or (
+                    best is not None and lower_cost > best[0]
+                ):
+                    impossible = True
+                    break
+            if impossible:
+                continue
+            source = candidates[index]
+            matches = raw_rules[source.path]
+            charge(1 + len(chosen) + len(rules) + len(matches))
+            # LIFO: include first, retaining the former lexical search order.
+            stack.append((index + 1, chosen, cost, counts))
+            if not any(r.max_count is not None and counts[r.id] >= r.max_count for r in matches):
+                updated = counts.copy()
+                for rule in matches:
+                    updated[rule.id] += 1
+                stack.append((index + 1, (*chosen, source.path), cost + source.size_bytes, updated))
+    except _RepairLimit:
+        return None, True
+    return best, False
 
 
 def compile_context(
@@ -198,50 +278,17 @@ def compile_context(
         best_policy = min(key for key, _ in ranked)
         select(relevance_order(s for key, s in ranked if key == best_policy)[0])
 
-    # Greedy is the common path. If it leaves a required deficit, search the
-    # eligible required candidate set exactly before reporting incomplete.
+    search_exhausted = False
+    # Greedy is the common path. Repair deficits within a deterministic work cap.
     if any(counts[r.id] < r.min_count for r in required):
         search_candidates = tuple(
             s
             for s in sources
             if eligibility[s.path] is None and any(r in required for r in raw_rules[s.path])
         )
-        best = None
-
-        def search(index, chosen, chosen_cost, search_counts):
-            nonlocal best
-            if budget.effective_bytes is not None and chosen_cost > budget.effective_bytes:
-                return
-            deficits = [r for r in required if search_counts[r.id] < r.min_count]
-            if not deficits:
-                candidate_result = (chosen_cost, tuple(sorted(chosen)))
-                if best is None or candidate_result < best:
-                    best = candidate_result
-                return
-            if index == len(search_candidates):
-                return
-            if best is not None and chosen_cost > best[0]:
-                return
-            remaining = search_candidates[index:]
-            for rule in deficits:
-                possible = search_counts[rule.id] + sum(
-                    1 for source in remaining if rule in raw_rules[source.path]
-                )
-                if possible < rule.min_count:
-                    return
-            source = search_candidates[index]
-            source_rules = raw_rules[source.path]
-            can_add = not any(
-                r.max_count is not None and search_counts[r.id] >= r.max_count for r in source_rules
-            )
-            if can_add:
-                updated = search_counts.copy()
-                for rule in source_rules:
-                    updated[rule.id] += 1
-                search(index + 1, (*chosen, source.path), chosen_cost + source.size_bytes, updated)
-            search(index + 1, chosen, chosen_cost, search_counts)
-
-        search(0, (), 0, {r.id: 0 for r in rules})
+        best, search_exhausted = _repair_required(
+            search_candidates, raw_rules, rules, required, budget.effective_bytes
+        )
         if best is not None:
             selected = set(best[1])
             used = 0
@@ -253,7 +300,8 @@ def compile_context(
                         counts[rule.id] += 1
 
     for rule in sorted(
-        (r for r in rules if r.mode == Mode.OPTIONAL), key=lambda r: (-r.priority, r.id)
+        (r for r in rules if r.mode == Mode.OPTIONAL and not search_exhausted),
+        key=lambda r: (-r.priority, r.id),
     ):
         optional_candidates = (
             s for s in matched[rule.id] if s.path not in selected and eligibility[s.path] is None
@@ -312,7 +360,22 @@ def compile_context(
         tuple(CompiledDependency(s.id, s.path, s.revision) for s in chosen),
         tuple(
             sorted(
-                (*validation.warnings, *(evidence.state.warnings if evidence else ())),
+                (
+                    *validation.warnings,
+                    *(evidence.state.warnings if evidence else ()),
+                    *(
+                        (
+                            ScanWarning(
+                                "compiler_search_budget_exceeded",
+                                None,
+                                "Required-context repair work limit exceeded; greedy package "
+                                "retained. Feasibility is not established.",
+                            ),
+                        )
+                        if search_exhausted
+                        else ()
+                    ),
+                ),
                 key=lambda w: (w.path or "", w.code, w.message),
             )
         ),

@@ -1,6 +1,8 @@
 # Context Integrity — Architecture
 
-**Status:** Draft v1  
+**Original design:** Draft v1; implemented phase boundaries are recorded below and current
+verification/review status lives in `docs/current-state.md`.
+
 **Date:** 2026-10-13  
 **Parent requirements:** `docs/prd.md` — aligned Context Integrity PRD  
 **Related project:** Codebase / Context Intelligence Engine  
@@ -1171,10 +1173,19 @@ selection through a different rule cannot bypass it. Maxima count all raw select
 exactly as the final validator does.
 
 Required selection first uses deterministic coverage/priority/path greedy ordering. If that
-leaves required deficits, a deterministic exact feasibility search over eligible required
-candidates repairs the package when possible, minimizing bytes and then selected paths while
-respecting maxima and budget. If no feasible set exists, the best greedy inspectable package
-is retained. Authority tiers have already filtered each rule and are not compared across
+leaves required deficits, a deterministic bounded exact repair over eligible required
+candidates minimizes bytes and then selected paths while respecting maxima and budget.
+Per-rule remaining capacity and cheapest-deficit cost bounds prune impossible branches;
+overlapping rule cost bounds are never summed. Iterative search avoids recursion-depth failure.
+Repair is capped at 250,000 work units, charging node/state copies, candidate/rule visits and
+cost sorting before work. This bounds fallback search, not all compiler/acquisition work.
+If the search proves no feasible set, the inspectable greedy package is retained. On exhaustion,
+the same safe greedy required selection is retained, optional fill is skipped, and
+`compiler_search_budget_exceeded` explicitly says feasibility was not established. Even a
+provisional feasible search result is discarded on exhaustion rather than presented as a proven
+minimum. The retained required deficit keeps final validation and compilation incomplete;
+no claim of impossibility or completed optimization follows from exhaustion.
+Authority tiers have already filtered each rule and are not compared across
 unrelated policies. For policy-equivalent groups, provider rank/path fills provider slots
 in the lexical candidate sequence while inventory documents retain their positions. Optional
 rules fill by priority descending and ID ascending with the same local relevance ordering. Source bytes count once and are checked before selection. CLI budget overrides the
@@ -1920,6 +1931,9 @@ evaluator failures are visible gaps, never waived or silently omitted.
 `governance_output.py` projects separate report v2 with bounded metadata/evidence, scoped counts,
 strict optional historical comparison and exclusive publication outside participating roots.
 Explicit Git ranges must end at the clean checkout HEAD, checked before and after evaluation;
+inventory/config raw bytes and path membership must also match that commit's regular-file blobs,
+including config otherwise hidden by Git ignore/index flags. Provider graph observations remain
+explicitly labeled as not commit certified; legacy graph metadata has no analyzed-content digest.
 comparison requires the same resolved diff base, evaluation config and provider
 identity/capabilities/coverage.
 Comparisons never affect enforcement. Policy owners/review references are declarations, not

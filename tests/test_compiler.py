@@ -638,3 +638,131 @@ def test_task_does_not_affect_selection_and_zero_byte_source(git_repo):
     assert result.selected_sources == other.selected_sources
     assert result.budget.used_bytes == 0
     assert selected(result) == ("AGENTS.md",)
+
+
+def test_impossible_tiny_compile_cli_is_bounded(git_repo, git):
+    import subprocess
+    import sys
+
+    paths = tuple(f"docs/doc{i:02}.md" for i in range(32))
+    for path in paths:
+        (git_repo / path).write_bytes(b"x")
+    (git_repo / ".context-integrity.toml").write_text(
+        'schema_version=6\n[[context_contracts]]\nid="work"\n'
+        'task_class="implementation"\ndescription="bounded"\nbudget_bytes=10\n'
+        '[[context_contracts.rules]]\nid="docs"\nmode="required"\nmin_count=12\n'
+        f"paths={json.dumps(paths)}\n"
+    )
+    git(git_repo, "add", ".")
+    git(git_repo, "commit", "-qm", "impossible contract")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from context_integrity.cli import app; app()",
+            "compile",
+            "work",
+            str(git_repo),
+            "--task",
+            "probe",
+            "--format",
+            "json",
+        ],
+        capture_output=True,
+        timeout=3,
+    )
+    assert result.returncode == 0, result.stderr
+    data = json.loads(result.stdout)
+    assert data["status"] == "incomplete" and data["schema_version"] == 3
+
+
+def test_repair_exhaustion_retains_incomplete_greedy_package(git_repo, monkeypatch):
+    import context_integrity.compiler as compiler
+
+    manifest = scan_repository(git_repo)
+    template = manifest.sources[0]
+    paths_costs = (("ab.md", 5), ("a.md", 2), ("b.md", 2), ("c.md", 3))
+    manifest = replace(
+        manifest,
+        sources=tuple(
+            replace(template, id=make_source_id(manifest.repository.id, p), path=p, size_bytes=n)
+            for p, n in paths_costs
+        ),
+    )
+    rules = (
+        rule("a", paths=("ab.md", "a.md")),
+        rule("b", paths=("ab.md", "b.md")),
+        rule("c", paths=("c.md",)),
+        rule("extra", Mode.OPTIONAL, paths=("c.md",)),
+    )
+    monkeypatch.setattr(compiler, "MAX_REPAIR_WORK", 1)
+    result = compile_rules(manifest, *rules, budget=7)
+    assert selected(result) == ("ab.md",)
+    assert result.status == "incomplete" and result.validation.findings
+    assert result.budget.used_bytes == 5
+    assert [w.code for w in result.warnings] == ["compiler_search_budget_exceeded"]
+    reverse = compile_rules(replace(manifest, sources=manifest.sources[::-1]), *rules, budget=7)
+    assert render_compiled_context_json(result) == render_compiled_context_json(reverse)
+
+
+def test_exact_repair_matches_small_exhaustive_oracle(git_repo):
+    from itertools import combinations
+
+    from context_integrity.compiler import _repair_required
+    from context_integrity.contracts import matches_rule
+
+    manifest = scan_repository(git_repo)
+    template = manifest.sources[0]
+    paths = tuple(f"docs/{i}.md" for i in range(6))
+    candidates = tuple(
+        CompilerCandidate.from_source(
+            replace(
+                template, id=make_source_id(manifest.repository.id, p), path=p, size_bytes=i % 3
+            )
+        )
+        for i, p in enumerate(paths)
+    )
+    rules = (
+        rule("a", paths=paths[:4], min_count=2, max_count=3),
+        rule("b", paths=paths[2:], min_count=2, max_count=2),
+        rule("cap", Mode.OPTIONAL, paths=paths[1:5], max_count=3),
+    )
+    required = rules[:2]
+    raw = {s.path: tuple(r for r in rules if matches_rule(s, r)) for s in candidates}
+    for budget in range(1, 8):
+        feasible = []
+        for count in range(7):
+            for chosen in combinations(candidates, count):
+                cost = sum(s.size_bytes for s in chosen)
+                counts = {r.id: sum(r in raw[s.path] for s in chosen) for r in rules}
+                if cost <= budget and all(
+                    counts[r.id] >= r.min_count
+                    and (r.max_count is None or counts[r.id] <= r.max_count)
+                    for r in rules
+                ):
+                    feasible.append((cost, tuple(s.path for s in chosen)))
+        best, exhausted = _repair_required(candidates, raw, rules, required, budget)
+        assert not exhausted
+        assert best == (min(feasible) if feasible else None)
+
+
+def test_default_repair_work_ceiling_is_explicit(git_repo):
+    manifest = scan_repository(git_repo)
+    template = manifest.sources[0]
+    paths = tuple(f"docs/{i:03}.md" for i in range(100))
+    manifest = replace(
+        manifest,
+        sources=tuple(
+            replace(template, id=make_source_id(manifest.repository.id, p), path=p, size_bytes=1)
+            for p in paths
+        ),
+    )
+    rules = (
+        rule("a", paths=paths[:50], min_count=40),
+        rule("b", paths=paths[50:], min_count=40),
+        rule("cap", Mode.OPTIONAL, paths=paths, max_count=79),
+    )
+    result = compile_rules(manifest, *rules)
+    assert result.status == "incomplete"
+    assert len(result.selected_sources) == 79
+    assert [w.code for w in result.warnings] == ["compiler_search_budget_exceeded"]
