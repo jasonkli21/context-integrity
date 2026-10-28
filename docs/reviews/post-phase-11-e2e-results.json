@@ -1,0 +1,556 @@
+{
+  "evaluation": {
+    "comparison_to_baselines": {
+      "keyword_grep": {
+        "ctx_bytes_higher": 2,
+        "ctx_bytes_lower": 1,
+        "ctx_bytes_ties": 5,
+        "extraneous_losses": 1,
+        "extraneous_ties": 6,
+        "extraneous_wins": 1,
+        "recall_losses": 1,
+        "recall_ties": 5,
+        "recall_wins": 2
+      },
+      "path_order": {
+        "ctx_bytes_higher": 7,
+        "ctx_bytes_lower": 1,
+        "ctx_bytes_ties": 0,
+        "extraneous_losses": 0,
+        "extraneous_ties": 2,
+        "extraneous_wins": 6,
+        "recall_losses": 0,
+        "recall_ties": 1,
+        "recall_wins": 7
+      }
+    },
+    "ctx_binary_build_provenance": "operator recorded offline build from engine_source_sha; executable hash is verified, but build provenance is not encoded in the binary",
+    "ctx_binary_sha256": "0e4180bfe91ebd36d4321edc661616b895f357173a5b9de70d0994ba6352f1d2",
+    "ctx_version": "ctx 0.1.0",
+    "engine_source_sha": "34a9e3d25d7a336977d114562db40fadd130979a",
+    "engine_untracked_or_modified_paths": [
+      "docs/plans/phase-10-implementation-plan.md",
+      "docs/plans/phase-11-implementation-plan.md"
+    ],
+    "engine_worktree_clean": false,
+    "evaluation_runner_sha256": "6818fa20719268f017c2b3591d4dcc0d21bfa146e673754247a478780be4c497",
+    "execution_status": "complete",
+    "fixture_commit": "dcc4316764ff9808f6805fbdb185eced0730bbdf",
+    "fixture_git_configuration": "system and global Git config disabled; ambient GIT_* overrides removed",
+    "fixture_oracle_sha256": "14069062ac0306534be99ae85a9a998b35b60119b8b4f846a26ad620e9908c00",
+    "fixture_task_count": 8,
+    "full_recall_scenarios": 6,
+    "integrity_source_sha": "52303037d413b180ec6a923b9ceb1f43b4a7bfeb",
+    "integrity_untracked_or_modified_paths": [
+      "docs/current-state.md",
+      "docs/reviews/README.md",
+      "docs/reviews/post-phase-11-e2e-results.json",
+      "docs/reviews/post-phase-11-end-to-end-evaluation.md",
+      "scripts/",
+      "tests/test_post_phase11_evaluation.py"
+    ],
+    "integrity_worktree_clean": false,
+    "limits": [
+      "authored_fixtures_only",
+      "selected_file_recall_is_not_task_success",
+      "keyword_grep_baseline_is_simple_and_not_tuned",
+      "path_order_baseline_is_a_budgeted_control_not_a_search_product",
+      "coverage_is_never_complete_evidence",
+      "evidence_v1_worktree_references_are_invocation_scoped",
+      "no_production_evidence_v1_consumer_is_exercised",
+      "fixture_source_is_analyzed_but_never_executed"
+    ],
+    "resource_limits": {
+      "candidate_limit": 200,
+      "ctx_command_timeout_seconds": 120,
+      "fixture_content_bytes": 1657,
+      "fixture_file_count": 21
+    },
+    "scenarios": [
+      {
+        "category": "exact_path_only",
+        "ctx_coverage": {
+          "budget_skips": 14,
+          "content_load_failures": 0,
+          "files_considered": 21,
+          "files_eligible": 21,
+          "selection_candidates_omitted": 0
+        },
+        "ctx_error_code": null,
+        "ctx_selected_paths": [
+          "tests/test_token_rules.py"
+        ],
+        "ctx_status": "ok",
+        "evidence_v1": {
+          "basis": "best_effort_worktree",
+          "candidate_count": 15,
+          "committed_head_matches_fixture": true,
+          "coverage_complete": false,
+          "normalized_semantics_equal": true,
+          "status": "ok",
+          "unsupported_language_files": 5,
+          "worktree_scope_nonce_changed": true
+        },
+        "expected_paths": [
+          "src/parser/token_rules.py"
+        ],
+        "normalized_context_stable": true,
+        "scenario_id": "path_only_python",
+        "strategies": {
+          "ctx": {
+            "content_bytes": 63,
+            "expected": 1,
+            "extraneous": 1,
+            "recall": 0.0,
+            "recalled": 0,
+            "selected_file_count": 1
+          },
+          "keyword_grep": {
+            "content_bytes": 103,
+            "expected": 1,
+            "extraneous": 0,
+            "recall": 1.0,
+            "recalled": 1,
+            "selected_file_count": 1
+          },
+          "path_order": {
+            "content_bytes": 91,
+            "expected": 1,
+            "extraneous": 1,
+            "recall": 0.0,
+            "recalled": 0,
+            "selected_file_count": 1
+          }
+        }
+      },
+      {
+        "category": "symbol_only",
+        "ctx_coverage": {
+          "budget_skips": 1,
+          "content_load_failures": 0,
+          "files_considered": 21,
+          "files_eligible": 21,
+          "selection_candidates_omitted": 0
+        },
+        "ctx_error_code": null,
+        "ctx_selected_paths": [
+          "src/session/manager.py"
+        ],
+        "ctx_status": "ok",
+        "evidence_v1": {
+          "basis": "best_effort_worktree",
+          "candidate_count": 2,
+          "committed_head_matches_fixture": true,
+          "coverage_complete": false,
+          "normalized_semantics_equal": true,
+          "status": "ok",
+          "unsupported_language_files": 5,
+          "worktree_scope_nonce_changed": true
+        },
+        "expected_paths": [
+          "src/session/manager.py"
+        ],
+        "normalized_context_stable": true,
+        "scenario_id": "symbol_only_python",
+        "strategies": {
+          "ctx": {
+            "content_bytes": 82,
+            "expected": 1,
+            "extraneous": 0,
+            "recall": 1.0,
+            "recalled": 1,
+            "selected_file_count": 1
+          },
+          "keyword_grep": {
+            "content_bytes": 82,
+            "expected": 1,
+            "extraneous": 0,
+            "recall": 1.0,
+            "recalled": 1,
+            "selected_file_count": 1
+          },
+          "path_order": {
+            "content_bytes": 54,
+            "expected": 1,
+            "extraneous": 1,
+            "recall": 0.0,
+            "recalled": 0,
+            "selected_file_count": 1
+          }
+        }
+      },
+      {
+        "category": "symbol_only",
+        "ctx_coverage": {
+          "budget_skips": 1,
+          "content_load_failures": 0,
+          "files_considered": 21,
+          "files_eligible": 21,
+          "selection_candidates_omitted": 0
+        },
+        "ctx_error_code": null,
+        "ctx_selected_paths": [
+          "src/transport.rs"
+        ],
+        "ctx_status": "ok",
+        "evidence_v1": {
+          "basis": "best_effort_worktree",
+          "candidate_count": 2,
+          "committed_head_matches_fixture": true,
+          "coverage_complete": false,
+          "normalized_semantics_equal": true,
+          "status": "ok",
+          "unsupported_language_files": 5,
+          "worktree_scope_nonce_changed": true
+        },
+        "expected_paths": [
+          "src/transport.rs"
+        ],
+        "normalized_context_stable": true,
+        "scenario_id": "symbol_only_rust",
+        "strategies": {
+          "ctx": {
+            "content_bytes": 146,
+            "expected": 1,
+            "extraneous": 0,
+            "recall": 1.0,
+            "recalled": 1,
+            "selected_file_count": 1
+          },
+          "keyword_grep": {
+            "content_bytes": 146,
+            "expected": 1,
+            "extraneous": 0,
+            "recall": 1.0,
+            "recalled": 1,
+            "selected_file_count": 1
+          },
+          "path_order": {
+            "content_bytes": 145,
+            "expected": 1,
+            "extraneous": 2,
+            "recall": 0.0,
+            "recalled": 0,
+            "selected_file_count": 2
+          }
+        }
+      },
+      {
+        "category": "misleading_docs",
+        "ctx_coverage": {
+          "budget_skips": 0,
+          "content_load_failures": 0,
+          "files_considered": 21,
+          "files_eligible": 21,
+          "selection_candidates_omitted": 0
+        },
+        "ctx_error_code": null,
+        "ctx_selected_paths": [
+          "src/keys.py",
+          "tests/test_keys.py"
+        ],
+        "ctx_status": "ok",
+        "evidence_v1": {
+          "basis": "best_effort_worktree",
+          "candidate_count": 2,
+          "committed_head_matches_fixture": true,
+          "coverage_complete": false,
+          "normalized_semantics_equal": true,
+          "status": "ok",
+          "unsupported_language_files": 5,
+          "worktree_scope_nonce_changed": true
+        },
+        "expected_paths": [
+          "src/keys.py",
+          "tests/test_keys.py"
+        ],
+        "normalized_context_stable": true,
+        "scenario_id": "misleading_documentation",
+        "strategies": {
+          "ctx": {
+            "content_bytes": 144,
+            "expected": 2,
+            "extraneous": 0,
+            "recall": 1.0,
+            "recalled": 2,
+            "selected_file_count": 2
+          },
+          "keyword_grep": {
+            "content_bytes": 144,
+            "expected": 2,
+            "extraneous": 0,
+            "recall": 1.0,
+            "recalled": 2,
+            "selected_file_count": 2
+          },
+          "path_order": {
+            "content_bytes": 91,
+            "expected": 2,
+            "extraneous": 1,
+            "recall": 0.0,
+            "recalled": 0,
+            "selected_file_count": 1
+          }
+        }
+      },
+      {
+        "category": "multiple_plausible_files",
+        "ctx_coverage": {
+          "budget_skips": 0,
+          "content_load_failures": 0,
+          "files_considered": 21,
+          "files_eligible": 21,
+          "selection_candidates_omitted": 0
+        },
+        "ctx_error_code": null,
+        "ctx_selected_paths": [
+          "src/compat/old_policy.rs",
+          "src/policy/current.rs"
+        ],
+        "ctx_status": "ok",
+        "evidence_v1": {
+          "basis": "best_effort_worktree",
+          "candidate_count": 2,
+          "committed_head_matches_fixture": true,
+          "coverage_complete": false,
+          "normalized_semantics_equal": true,
+          "status": "ok",
+          "unsupported_language_files": 5,
+          "worktree_scope_nonce_changed": true
+        },
+        "expected_paths": [
+          "src/compat/old_policy.rs",
+          "src/policy/current.rs"
+        ],
+        "normalized_context_stable": true,
+        "scenario_id": "multiple_plausible_implementations",
+        "strategies": {
+          "ctx": {
+            "content_bytes": 137,
+            "expected": 2,
+            "extraneous": 0,
+            "recall": 1.0,
+            "recalled": 2,
+            "selected_file_count": 2
+          },
+          "keyword_grep": {
+            "content_bytes": 137,
+            "expected": 2,
+            "extraneous": 0,
+            "recall": 1.0,
+            "recalled": 2,
+            "selected_file_count": 2
+          },
+          "path_order": {
+            "content_bytes": 91,
+            "expected": 2,
+            "extraneous": 1,
+            "recall": 0.0,
+            "recalled": 0,
+            "selected_file_count": 1
+          }
+        }
+      },
+      {
+        "category": "irrelevant_lexical_hits",
+        "ctx_coverage": {
+          "budget_skips": 2,
+          "content_load_failures": 0,
+          "files_considered": 21,
+          "files_eligible": 21,
+          "selection_candidates_omitted": 0
+        },
+        "ctx_error_code": null,
+        "ctx_selected_paths": [
+          "src/queue_metrics.py",
+          "src/worker.py"
+        ],
+        "ctx_status": "ok",
+        "evidence_v1": {
+          "basis": "best_effort_worktree",
+          "candidate_count": 4,
+          "committed_head_matches_fixture": true,
+          "coverage_complete": false,
+          "normalized_semantics_equal": true,
+          "status": "ok",
+          "unsupported_language_files": 5,
+          "worktree_scope_nonce_changed": true
+        },
+        "expected_paths": [
+          "src/worker.py",
+          "tests/test_worker.py"
+        ],
+        "normalized_context_stable": true,
+        "scenario_id": "irrelevant_lexical_hits",
+        "strategies": {
+          "ctx": {
+            "content_bytes": 129,
+            "expected": 2,
+            "extraneous": 1,
+            "recall": 0.5,
+            "recalled": 1,
+            "selected_file_count": 2
+          },
+          "keyword_grep": {
+            "content_bytes": 94,
+            "expected": 2,
+            "extraneous": 1,
+            "recall": 0.0,
+            "recalled": 0,
+            "selected_file_count": 1
+          },
+          "path_order": {
+            "content_bytes": 91,
+            "expected": 2,
+            "extraneous": 1,
+            "recall": 0.0,
+            "recalled": 0,
+            "selected_file_count": 1
+          }
+        }
+      },
+      {
+        "category": "budget_pressure",
+        "ctx_coverage": {
+          "budget_skips": 2,
+          "content_load_failures": 0,
+          "files_considered": 21,
+          "files_eligible": 21,
+          "selection_candidates_omitted": 0
+        },
+        "ctx_error_code": null,
+        "ctx_selected_paths": [
+          "src/index.rs",
+          "tests/index_test.rs"
+        ],
+        "ctx_status": "ok",
+        "evidence_v1": {
+          "basis": "best_effort_worktree",
+          "candidate_count": 4,
+          "committed_head_matches_fixture": true,
+          "coverage_complete": false,
+          "normalized_semantics_equal": true,
+          "status": "ok",
+          "unsupported_language_files": 5,
+          "worktree_scope_nonce_changed": true
+        },
+        "expected_paths": [
+          "src/index.rs",
+          "tests/index_test.rs"
+        ],
+        "normalized_context_stable": true,
+        "scenario_id": "budget_pressure",
+        "strategies": {
+          "ctx": {
+            "content_bytes": 137,
+            "expected": 2,
+            "extraneous": 0,
+            "recall": 1.0,
+            "recalled": 2,
+            "selected_file_count": 2
+          },
+          "keyword_grep": {
+            "content_bytes": 135,
+            "expected": 2,
+            "extraneous": 1,
+            "recall": 0.5,
+            "recalled": 1,
+            "selected_file_count": 2
+          },
+          "path_order": {
+            "content_bytes": 91,
+            "expected": 2,
+            "extraneous": 1,
+            "recall": 0.0,
+            "recalled": 0,
+            "selected_file_count": 1
+          }
+        }
+      },
+      {
+        "category": "incomplete_or_unsupported_analysis",
+        "ctx_coverage": {
+          "budget_skips": 10,
+          "content_load_failures": 0,
+          "files_considered": 21,
+          "files_eligible": 21,
+          "selection_candidates_omitted": 0
+        },
+        "ctx_error_code": null,
+        "ctx_selected_paths": [
+          "src/unsupported/manifest.go"
+        ],
+        "ctx_status": "ok",
+        "evidence_v1": {
+          "basis": "best_effort_worktree",
+          "candidate_count": 11,
+          "committed_head_matches_fixture": true,
+          "coverage_complete": false,
+          "normalized_semantics_equal": true,
+          "status": "ok",
+          "unsupported_language_files": 5,
+          "worktree_scope_nonce_changed": true
+        },
+        "expected_paths": [
+          "src/unsupported/manifest.go"
+        ],
+        "normalized_context_stable": true,
+        "scenario_id": "unsupported_language_coverage",
+        "strategies": {
+          "ctx": {
+            "content_bytes": 76,
+            "expected": 1,
+            "extraneous": 0,
+            "recall": 1.0,
+            "recalled": 1,
+            "selected_file_count": 1
+          },
+          "keyword_grep": {
+            "content_bytes": 76,
+            "expected": 1,
+            "extraneous": 0,
+            "recall": 1.0,
+            "recalled": 1,
+            "selected_file_count": 1
+          },
+          "path_order": {
+            "content_bytes": 54,
+            "expected": 1,
+            "extraneous": 1,
+            "recall": 0.0,
+            "recalled": 0,
+            "selected_file_count": 1
+          }
+        }
+      }
+    ],
+    "semantic_sha256": "8f9e33e91d6b9197495f8edd25624717eced736f47a5524fc02395fb8daa66a3",
+    "totals": {
+      "ctx": {
+        "content_bytes": 914,
+        "expected": 12,
+        "extraneous": 2,
+        "recall": 0.8333,
+        "recalled": 10,
+        "selected_file_count": 12
+      },
+      "keyword_grep": {
+        "content_bytes": 917,
+        "expected": 12,
+        "extraneous": 2,
+        "recall": 0.75,
+        "recalled": 9,
+        "selected_file_count": 11
+      },
+      "path_order": {
+        "content_bytes": 708,
+        "expected": 12,
+        "extraneous": 9,
+        "recall": 0.0,
+        "recalled": 0,
+        "selected_file_count": 9
+      }
+    }
+  },
+  "post_phase11_evaluation_schema_version": 1
+}

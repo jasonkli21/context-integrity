@@ -40,6 +40,12 @@ Finding IDs are scoped to each review.
 Phase 0/1 records were recovered from their original external artifacts during cumulative
 review remediation, rather than reconstructed from implementation summaries.
 
+## Evaluation evidence
+
+The [post-Phase-11 end-to-end evaluation](post-phase-11-end-to-end-evaluation.md) is a small,
+exploratory retrieval measurement over authored fixtures. It is not an independent review,
+product acceptance, or a replacement for the review debt listed in current state.
+
 ## Stabilization audit inputs
 
 The independently supplied 2026-10-26 repo-wide stabilization audit and cross-project boundary

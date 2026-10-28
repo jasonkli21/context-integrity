@@ -1,6 +1,6 @@
 # Current State
 
-**Last updated:** 2026-10-26
+**Last updated:** 2026-10-28
 **Current phase:** Phase 11 — CI / Governance / Observability
 **Active plan:** `docs/plans/phase-11-implementation-plan.md`
 **Status:** Post-Phase 11 stabilization fixes through `56cd28a` are implemented and self-tested;
@@ -40,8 +40,11 @@ Audit provenance, dispositions and exact commits:
 
 ## Verification
 
-`UV_CACHE_DIR=/tmp/context-integrity-phase11-fix-uv-cache UV_OFFLINE=1 make check` passed:
-Ruff lint, formatting (**115 files**) and **1,316 tests in 472.84s**, Python 3.12.13/macOS 27.0.1.
+`UV_CACHE_DIR=/tmp/context-integrity-postphase11-uv-cache UV_OFFLINE=1 make check` passed:
+Ruff lint, formatting (**119 files**) and **1,321 tests in 191.55s** on Python 3.12.13/macOS 27.0.1.
+The focused post-Phase-11 retrieval evaluation is recorded in
+[`post-Phase-11 evaluation evidence`](reviews/post-phase-11-end-to-end-evaluation.md); it is
+exploratory fixture evidence and does not change product acceptance.
 The broad focused suite passed **530 tests in 281.97s**; compiler/context-provider/evidence tests
 passed **251 in 48.67s**, with later additions covered by the full gate or focused reruns.
 Real-Git 28/32-file impossible-budget CLI probes returned incomplete in about one second.
@@ -67,7 +70,9 @@ The supplied stabilization audits reviewed `b03d707`: RWA-001/002 and CI-BND-01/
 local fixes, requiring fresh independent review. Earlier cumulative Phase 0–2 closure, the absent
 Phase 3 independent artifact and Phase 5–6 index-level acceptance also remain unestablished here.
 External-quality evaluation metrics and a protected-policy required-family floor remain separate
-backlog. Engine's evidence-v1 conformance finding is upstream scope; no consumer migration is delivered.
+backlog. An exploratory eight-task synthetic retrieval evaluation is recorded, but does not
+establish real task success or resolve the quality-metric backlog. Engine's evidence-v1
+conformance finding is upstream scope; no consumer migration is delivered.
 
 Reports cover explicit rules/declared inputs, not semantic truth, exhaustive compliance or API
 compatibility. Claims remain unverified. Observations are sequential; no-origin IDs are location
